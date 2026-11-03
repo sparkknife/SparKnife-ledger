@@ -510,43 +510,77 @@ class Sparkknife_Ledger_Transaction_Repository {
 	 * @return array<int, array<string, mixed>>
 	 */
 	public function monthly_totals( $months = 6 ) {
-		global $wpdb;
-
-		$table  = Sparkknife_Ledger_DB::transactions_table();
 		$months = max( 1, min( 24, (int) $months ) );
 
-		$since = gmdate( 'Y-m-d', strtotime( current_time( 'Y-m-d' ) . ' -' . ( $months - 1 ) . ' months' ) );
-		$since = gmdate( 'Y-m-01', strtotime( $since ) );
+		/*
+		 * گروه‌بندی بر اساس ماه تقویم فعال است، نه ماه میلادی.
+		 *
+		 * پیش‌تر با `DATE_FORMAT(txn_date, '%Y-%m')` گروه‌بندی می‌شد.
+		 * در تقویم شمسی این غلط است: تراکنش ۵ آذر (۲۰۲۶-۱۱-۲۶) در سطل
+		 * «2026-11» می‌افتاد که برچسبش «۱۴۰۵/۰۸/۱۰» بود، یعنی آذر زیر
+		 * ستون آبان نمایش داده می‌شد و ستون آذر اصلاً ساخته نمی‌شد.
+		 *
+		 * حالا هر تراکنش با تاریخ ذخیره‌شده‌اش به ماه شمسی نگاشت می‌شود.
+		 */
+		$buckets = Sparkknife_Ledger_Date::month_buckets( $months );
+
+		if ( empty( $buckets ) ) {
+			return array();
+		}
+
+		global $wpdb;
+
+		$table = Sparkknife_Ledger_DB::transactions_table();
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT DATE_FORMAT(txn_date, '%%Y-%%m') AS month_key,
-					COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END),0) AS income,
-					COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END),0) AS expense
+				"SELECT txn_date, type, amount
 				FROM {$table}
-				WHERE status = 'posted' AND txn_date >= %s
-				GROUP BY month_key
-				ORDER BY month_key ASC",
-				$since
+				WHERE status = 'posted' AND txn_date >= %s AND txn_date <= %s",
+				$buckets[0]['from'],
+				$buckets[ count( $buckets ) - 1 ]['to']
 			)
 		);
 
-		$by_month = array();
+		$index = array();
+		foreach ( $buckets as $position => $bucket ) {
+			$index[ $bucket['key'] ] = $position;
+		}
+
+		$totals = array();
+
 		foreach ( (array) $rows as $row ) {
-			$by_month[ $row->month_key ] = array(
-				'income'  => Sparkknife_Ledger_Amount::normalize( $row->income ),
-				'expense' => Sparkknife_Ledger_Amount::normalize( $row->expense ),
+			$key = Sparkknife_Ledger_Date::storage_to_month_key( (string) $row->txn_date );
+
+			if ( ! isset( $index[ $key ] ) ) {
+				continue;
+			}
+
+			$position = $index[ $key ];
+
+			if ( ! isset( $totals[ $position ] ) ) {
+				$totals[ $position ] = array( 'income' => '0', 'expense' => '0' );
+			}
+
+			$column = 'expense' === $row->type ? 'expense' : 'income';
+
+			$totals[ $position ][ $column ] = Sparkknife_Ledger_Amount::add(
+				$totals[ $position ][ $column ],
+				Sparkknife_Ledger_Amount::normalize( $row->amount )
 			);
 		}
 
 		$result = array();
-		for ( $i = $months - 1; $i >= 0; $i-- ) {
-			$key      = gmdate( 'Y-m', strtotime( current_time( 'Y-m-01' ) . ' -' . $i . ' months' ) );
+
+		foreach ( $buckets as $position => $bucket ) {
 			$result[] = array(
-				'key'     => $key,
-				'income'  => isset( $by_month[ $key ] ) ? $by_month[ $key ]['income'] : '0',
-				'expense' => isset( $by_month[ $key ] ) ? $by_month[ $key ]['expense'] : '0',
+				'key'     => $bucket['key'],
+				'label'   => $bucket['label'],
+				'from'    => $bucket['from'],
+				'to'      => $bucket['to'],
+				'income'  => isset( $totals[ $position ] ) ? $totals[ $position ]['income'] : '0',
+				'expense' => isset( $totals[ $position ] ) ? $totals[ $position ]['expense'] : '0',
 			);
 		}
 

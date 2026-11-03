@@ -308,6 +308,125 @@ class Sparkknife_Ledger_Date {
 	}
 
 	/**
+	 * سطل‌های ماهانه برای نمودار، بر اساس تقویم فعال.
+	 *
+	 * برای هر ماه یک بازه میلادی (from/to) و یک برچسب خوانا برمی‌گرداند.
+	 * ترتیب از قدیم به جدید است.
+	 *
+	 * @param int $months تعداد ماه (۱ تا ۲۴).
+	 * @return array<int, array{key: string, label: string, from: string, to: string}>
+	 */
+	public static function month_buckets( $months = 6 ) {
+		$months = max( 1, min( 24, (int) $months ) );
+		$today  = current_time( 'Y-m-d' );
+
+		$years  = (int) substr( $today, 0, 4 );
+		$month  = (int) substr( $today, 5, 2 );
+
+		$buckets = array();
+
+		if ( ! self::uses_jalali() ) {
+			for ( $i = $months - 1; $i >= 0; $i-- ) {
+				$anchor  = sprintf( '%04d-%02d-01', $years, $month );
+				$from_ts = strtotime( $anchor . ' -' . $i . ' months' );
+
+				if ( false === $from_ts ) {
+					continue;
+				}
+
+				$from = gmdate( 'Y-m-01', $from_ts );
+
+				$buckets[] = array(
+					'key'   => gmdate( 'Y-m', $from_ts ),
+					'label' => self::format( $from ),
+					'from'  => $from,
+					'to'    => gmdate( 'Y-m-t', $from_ts ),
+				);
+			}
+
+			return $buckets;
+		}
+
+		list( $jy, $jm ) = self::gregorian_to_jalali( $years, $month, (int) substr( $today, 8, 2 ) );
+
+		for ( $i = $months - 1; $i >= 0; $i-- ) {
+			$target_year  = (int) $jy;
+			$target_month = (int) $jm - $i;
+
+			while ( $target_month < 1 ) {
+				$target_month += 12;
+				--$target_year;
+			}
+
+			while ( $target_month > 12 ) {
+				$target_month -= 12;
+				++$target_year;
+			}
+
+			if ( $target_month <= 6 ) {
+				$length = 31;
+			} elseif ( $target_month <= 11 ) {
+				$length = 30;
+			} else {
+				$length = self::is_jalali_leap( $target_year ) ? 30 : 29;
+			}
+
+			list( $fy, $fm, $fd ) = self::jalali_to_gregorian( $target_year, $target_month, 1 );
+			list( $ty, $tm, $td ) = self::jalali_to_gregorian( $target_year, $target_month, $length );
+
+			$buckets[] = array(
+				'key'   => sprintf( '%04d-%02d', $target_year, $target_month ),
+				'label' => sprintf(
+					/* translators: 1: month name, 2: four-digit year */
+					__( '%1$s %2$s', 'sparkknife-ledger' ),
+					self::jalali_month_name( $target_month ),
+					self::to_persian_digits( (string) $target_year )
+				),
+				'from'  => sprintf( '%04d-%02d-%02d', $fy, $fm, $fd ),
+				'to'    => sprintf( '%04d-%02d-%02d', $ty, $tm, $td ),
+			);
+		}
+
+		return $buckets;
+	}
+
+	/**
+	 * تبدیل تاریخ ذخیره‌شده به کلید ماه تقویم فعال.
+	 *
+	 * @param string $date تاریخ Y-m-d.
+	 * @return string کلید ماه (YYYY-MM میلادی یا YYYY-MM شمسی).
+	 */
+	public static function storage_to_month_key( $date ) {
+		$date = substr( trim( (string) $date ), 0, 10 );
+
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m ) ) {
+			return '';
+		}
+
+		if ( ! self::uses_jalali() ) {
+			return $m[1] . '-' . $m[2];
+		}
+
+		list( $jy, $jm ) = self::gregorian_to_jalali( (int) $m[1], (int) $m[2], (int) $m[3] );
+
+		return sprintf( '%04d-%02d', $jy, $jm );
+	}
+
+	/**
+	 * ارقام فارسی (بدون وابستگی به Money).
+	 *
+	 * @param string $value رشته.
+	 * @return string
+	 */
+	private static function to_persian_digits( $value ) {
+		if ( class_exists( 'Sparkknife_Ledger_Money' ) ) {
+			return Sparkknife_Ledger_Money::to_persian_digits( $value );
+		}
+
+		return (string) $value;
+	}
+
+	/**
 	 * آیا تاریخ داده‌شده در آینده است؟
 	 *
 	 * مقایسه رشته‌ای است، نه با `strtotime()`.

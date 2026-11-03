@@ -883,6 +883,52 @@ if ( $expected_prev < 1 ) {
 spk_equals( (string) $expected_prev, (string) $pm, '«ماه گذشته» ماه شمسی قبلی است' );
 spk_equals( (string) $expected_prev_year, (string) $py, 'سال «ماه گذشته» درست است' );
 
+// ── ۲۵ح: نمودار ماهانه با ماه شمسی گروه‌بندی می‌شود ──────────────
+// نمودار با `DATE_FORMAT(txn_date, '%Y-%m')` گروه‌بندی می‌شد. در تقویم
+// شمسی، تراکنش ۵ آذر (۲۰۲۶-۱۱-۲۶) در سطل «2026-11» می‌افتاد که برچسبش
+// «آبان» بود؛ یعنی آذر زیر ستون آبان نمایش داده می‌شد و ستون آذر ساخته
+// نمی‌شد.
+$chart_buckets = Sparkknife_Ledger_Date::month_buckets( 3 );
+
+spk_equals( 3, count( $chart_buckets ), 'نمودار سه سطل ماهانه دارد' );
+
+// ترتیب صعودی و چسبیده: پایان هر ماه یک روز پیش از شروع ماه بعد است.
+for ( $i = 1; $i < count( $chart_buckets ); $i++ ) {
+	spk_assert(
+		$chart_buckets[ $i ]['from'] > $chart_buckets[ $i - 1 ]['to'],
+		'سطل‌های نمودار پیوسته و بدون همپوشانی‌اند',
+		$chart_buckets[ $i - 1 ]['to'] . ' < ' . $chart_buckets[ $i ]['from']
+	);
+}
+
+// هر سطل باید از روز اول یک ماه شروع شود.
+foreach ( $chart_buckets as $bucket ) {
+	list( $by, $bm, $bd ) = Sparkknife_Ledger_Date::gregorian_to_jalali(
+		(int) substr( $bucket['from'], 0, 4 ),
+		(int) substr( $bucket['from'], 5, 2 ),
+		(int) substr( $bucket['from'], 8, 2 )
+	);
+
+	spk_equals( 1, (int) $bd, 'سطل «' . $bucket['label'] . '» از اول ماه شروع می‌شود' );
+}
+
+// کلید ماه باید با تقویم فعال هم‌خوان باشد.
+$today_key = Sparkknife_Ledger_Date::storage_to_month_key( Sparkknife_Ledger_Date::today() );
+
+spk_equals(
+	$chart_buckets[ count( $chart_buckets ) - 1 ]['key'],
+	$today_key,
+	'آخرین سطل نمودار همان ماه جاری است'
+);
+
+// تراکنش روز آخر ماه نباید به ماه بعد بپرد.
+$last_bucket = $chart_buckets[ count( $chart_buckets ) - 1 ];
+spk_equals(
+	$last_bucket['key'],
+	Sparkknife_Ledger_Date::storage_to_month_key( $last_bucket['to'] ),
+	'روز آخر ماه در همان ماه شماری می‌شود'
+);
+
 // ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
 $p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
 $p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱
