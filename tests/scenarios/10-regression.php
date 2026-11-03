@@ -2079,6 +2079,75 @@ spk_equals( array(), $raw_digits, 'هیچ ویویی to_persian_digits را مس
 Sparkknife_Ledger_Settings::save( $settings_before, false );
 Sparkknife_Ledger_Settings::flush_cache();
 
+// ── ۲۵ژ: پیش‌نمایش مبلغ در مرورگر با ذخیره‌شده یکی است ────────────────
+//
+// `config.decimals` به جاوااسکریپت فرستاده می‌شد ولی هیچ‌جا خوانده نمی‌شد.
+// پیش‌نمایش هر تعداد اعشاری را که کاربر تایپ می‌کرد نشان می‌داد، در حالی که
+// سرور با `currency_decimals` قطع می‌کند. مدیر «۱٬۰۰۰.۹۹» می‌دید و
+// «۱٬۰۰۰» ذخیره می‌شد.
+
+$js_source = (string) file_get_contents( SPARKKNIFE_LEDGER_DIR . 'assets/js/admin.js' );
+
+spk_assert(
+	false !== mb_strpos( $js_source, 'config.decimals' ),
+	'جاوااسکریپت تنظیم تعداد اعشار را می‌خواند'
+);
+
+// قاعدهٔ سرور: قطع، نه گرد کردن.
+Sparkknife_Ledger_Settings::save( array( 'currency_decimals' => 0 ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+$scale = (int) SPARKKNIFE_LEDGER_AMOUNT_SCALE;
+
+spk_equals( '1000', (string) Sparkknife_Ledger_Money::to_human( '1000' . str_repeat( '0', $scale ) ), 'مبلغ صحیح بدون اعشار می‌ماند' );
+spk_equals( '1000', (string) Sparkknife_Ledger_Money::to_human( '10005000' ), 'نیم تومان به پایین قطع می‌شود، نه بالا' );
+spk_equals( '1000', (string) Sparkknife_Ledger_Money::to_human( '10009999' ), '۹۹٪ تومان هم به پایین قطع می‌شود' );
+
+Sparkknife_Ledger_Settings::save( array( 'currency_decimals' => 2 ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+spk_equals( '1000.45', (string) Sparkknife_Ledger_Money::to_human( '10004567' ), 'با دو اعشار، رقم سوم قطع می‌شود' );
+spk_equals( '1000.99', (string) Sparkknife_Ledger_Money::to_human( '10009999' ), 'با دو اعشار، ۰.۹۹ نگه داشته می‌شود' );
+
+Sparkknife_Ledger_Settings::save( array( 'currency_decimals' => 0 ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+// تست جاوااسکریپت اگر Node در دسترس باشد.
+$node = trim( (string) shell_exec( 'command -v node 2>/dev/null' ) );
+
+if ( '' !== $node ) {
+	$probe_file = tempnam( sys_get_temp_dir(), 'spkj' ) . '.js';
+	$js_tests   = <<<'JS'
+var fs = require( 'fs' );
+var src = fs.readFileSync( process.argv[ 2 ], 'utf-8' );
+function grab( n ) { return src.match( new RegExp( 'function ' + n + '\\s*\\([\\s\\S]*?\\n\\t\\}' ) ); }
+var config = { separator: ',', currency: '', persianDigits: 0, decimals: 0 };
+eval( grab( 'groupDigits' )[ 0 ] );
+eval( grab( 'toLatinDigits' )[ 0 ] );
+eval( grab( 'toPersianDigits' )[ 0 ] );
+eval( grab( 'formatAmount' )[ 0 ] );
+var cases = [
+	[ 0, '1000', '1,000' ], [ 0, '1000.5', '1,000' ], [ 0, '1000.99', '1,000' ],
+	[ 0, '0.5', '0' ], [ 0, '-1000.75', '-1,000' ], [ 0, '999.9999', '999' ],
+	[ 2, '1000.456', '1,000.45' ], [ 2, '1000.999', '1,000.99' ]
+];
+var bad = 0;
+for ( var i = 0; i < cases.length; i++ ) {
+	config.decimals = cases[ i ][ 0 ];
+	if ( formatAmount( cases[ i ][ 1 ], false ) !== cases[ i ][ 2 ] ) { bad++; }
+}
+process.stdout.write( String( bad ) );
+JS;
+
+	file_put_contents( $probe_file, $js_tests );
+
+	$js_bad = trim( (string) shell_exec( escapeshellarg( $node ) . ' ' . escapeshellarg( $probe_file ) . ' ' . escapeshellarg( SPARKKNIFE_LEDGER_DIR . 'assets/js/admin.js' ) . ' 2>&1' ) );
+
+	spk_equals( '0', $js_bad, 'پیش‌نمایش جاوااسکریپت با قاعده سرور یکی است' );
+
+	@unlink( $probe_file );
+}
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
