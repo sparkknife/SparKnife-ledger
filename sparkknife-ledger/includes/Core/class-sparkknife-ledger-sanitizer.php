@@ -220,6 +220,7 @@ class Sparkknife_Ledger_Sanitizer {
 	 */
 	public static function text( $value, $max_length = 190 ) {
 		$value = sanitize_text_field( wp_unslash( (string) $value ) );
+		$value = self::strip_invisible( $value );
 		return self::limit( $value, $max_length );
 	}
 
@@ -232,7 +233,44 @@ class Sparkknife_Ledger_Sanitizer {
 	 */
 	public static function textarea( $value, $max_length = 2000 ) {
 		$value = sanitize_textarea_field( wp_unslash( (string) $value ) );
+		$value = self::strip_invisible( $value, true );
 		return self::limit( $value, $max_length );
+	}
+
+	/**
+	 * حذف نویسه‌های کنترلی و نامرئی.
+	 *
+	 * `sanitize_text_field()` نویسه‌های کنترلی C0 را (به‌جز tab و newline)
+	 * نگه می‌دارد، و نویسه‌های بی‌عرض مثل ZWNJ و ZWSP هم دست‌نخورده رد
+	 * می‌شوند. نتیجه این بود که می‌شد شخصی با نام «» یا فقط
+	 * نیم‌فاصله ساخت: فیلد «نام الزامی» قبول می‌شد ولی در فهرست یک ردیف
+	 * خالی دیده می‌شد که نه می‌شد تشخیصش داد نه جستجوش کرد.
+	 *
+	 * نیم‌فاصله در وسط نام معتبر است («می‌رود»)، پس فقط وقتی حذف می‌شود
+	 * که کل رشته از نویسه‌های نامرئی ساخته شده باشد.
+	 *
+	 * @param string $value       ورودی.
+	 * @param bool   $keep_breaks حفظ خط جدید (برای textarea).
+	 * @return string
+	 */
+	private static function strip_invisible( $value, $keep_breaks = false ) {
+		$value = (string) $value;
+
+		// نویسه‌های کنترلی C0 و C1، به‌جز tab و (در صورت اجازه) newline.
+		$pattern = $keep_breaks ? '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/' : '/[\x00-\x1F\x7F]/';
+		$value   = preg_replace( $pattern, '', $value );
+
+		/*
+		 * اگر پس از حذف فاصله‌ها و نویسه‌های بی‌عرض چیزی نمانده باشد،
+		 * رشته خالی برگردانده می‌شود تا اعتبارسنجی «الزامی» بگیرد.
+		 */
+		$visible = preg_replace( '/[\s\x{200B}-\x{200F}\x{FEFF}\x{00A0}]+/u', '', (string) $value );
+
+		if ( '' === $visible ) {
+			return '';
+		}
+
+		return (string) $value;
 	}
 
 	/**
