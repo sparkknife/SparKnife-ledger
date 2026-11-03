@@ -388,7 +388,24 @@ class Sparkknife_Ledger_Sanitizer {
 			return mb_strlen( $value ) > $max_length ? mb_substr( $value, 0, $max_length ) : $value;
 		}
 
-		return strlen( $value ) > $max_length ? substr( $value, 0, $max_length ) : $value;
+		/*
+		 * بدون mbstring: برش بایتی ممنوع.
+		 *
+		 * `substr()` وسط یک نویسه UTF-8 چندبایتی می‌برد و رشته خراب
+		 * می‌سازد. اینجا نویسه‌ها با الگوی یونیکد شمرده و بریده می‌شوند.
+		 */
+		$characters = preg_split( '//u', $value, -1, PREG_SPLIT_NO_EMPTY );
+
+		if ( false === $characters ) {
+			// اگر حتی تجزیه یونیکد هم نشد، رشته از قبل خراب است.
+			return $value;
+		}
+
+		if ( count( $characters ) <= $max_length ) {
+			return $value;
+		}
+
+		return implode( '', array_slice( $characters, 0, $max_length ) );
 	}
 
 	/**

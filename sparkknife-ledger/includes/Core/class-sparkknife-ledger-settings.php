@@ -189,7 +189,7 @@ class Sparkknife_Ledger_Settings {
 
 		foreach ( $text_fields as $field => $limit ) {
 			$value = isset( $input[ $field ] ) ? sanitize_text_field( wp_unslash( $input[ $field ] ) ) : '';
-			$value = function_exists( 'mb_substr' ) ? mb_substr( $value, 0, $limit ) : substr( $value, 0, $limit );
+			$value = Sparkknife_Ledger_Sanitizer::limit( $value, $limit );
 
 			if ( '' !== $value || ! isset( $current[ $field ] ) ) {
 				$sanitized[ $field ] = $value;
