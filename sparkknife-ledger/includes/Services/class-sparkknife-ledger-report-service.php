@@ -190,7 +190,19 @@ class Sparkknife_Ledger_Report_Service {
 			$person = Sparkknife_Ledger_Person_Repository::instance()->find( $person_filter );
 			$persons = $person ? array( $person ) : array();
 		} else {
-			$persons = Sparkknife_Ledger_Person_Repository::instance()->get_all();
+			/*
+			 * اشخاص غیرحذف‌شده به‌علاوهٔ آن‌هایی که **تراکنش دارند**.
+			 *
+			 * شخص حذف‌شده معمولاً تراکنش ندارد (سرویس حذف نمی‌گذارد)، ولی
+			 * اگر داده دستی تغییر کند یا حذف نرم از راه دیگری انجام شود،
+			 * تراکنش‌هایش در جدول می‌مانند. با فهرست کردن فقط اشخاص
+			 * غیرحذف‌شده، آن مبالغ از گزارش جمعی ناپدید می‌شدند — یعنی
+			 * گزارش مالی دروغ می‌گفت که هیچ‌چیز آن‌ها را نشان نمی‌داد.
+			 *
+			 * نگه داشتنشان به‌صورت ردیف (با برچسب «حذف‌شده») هم داده را
+			 * حفظ می‌کند و هم جمع ردیف‌ها را با جمع کل یکی نگه می‌دارد.
+			 */
+			$persons = Sparkknife_Ledger_Person_Repository::instance()->get_all_with_transactions();
 		}
 
 		$ids      = array_map( 'intval', wp_list_pluck( $persons, 'id' ) );
@@ -213,6 +225,7 @@ class Sparkknife_Ledger_Report_Service {
 				'name'             => $person->name,
 				'phone'            => $person->phone,
 				'status'           => $person->status,
+				'deleted_at'       => isset( $person->deleted_at ) ? $person->deleted_at : null,
 				'income'           => $summary['income'],
 				'expense'          => $summary['expense'],
 				'balance'          => $summary['balance'],
@@ -316,17 +329,38 @@ class Sparkknife_Ledger_Report_Service {
 
 		$paged_rows = array_slice( $rows, ( $page - 1 ) * $per_page, $per_page );
 
-		// جمع کل در بازه (مستقل از فیلتر جستجو/شخص).
-		$totals = Sparkknife_Ledger_Transaction_Repository::instance()->sum_by_type(
-			array(
-				'type'      => $type,
-				'status'    => '' === $status ? 'active_only' : $status,
-				'date_from' => $range['from'],
-				'date_to'   => $range['to'],
-				'person_id' => $person_filter,
-				'search'    => '',
-			)
+		/*
+		 * جمع کل در بازه.
+		 *
+		 * این عدد عمداً مستقل از فیلتر جستجو است تا کاربر جمع «همه» را هم
+		 * ببیند. اما نباید مستقل از **مجموعهٔ اشخاص نمایش‌داده‌شده** باشد:
+		 * `$persons` از `get_all()` می‌آید که فقط اشخاص حذف‌نشده را برمی‌گرداند،
+		 * در حالی که `sum_by_type()` روی کل جدول تراکنش‌ها جمع می‌زند.
+		 *
+		 * نتیجهٔ آن تناقض، یک جمع کل نادرست نبود؛ یک **ردیف گم‌شده** بود:
+		 * اگر شخصی تراکنش داشت و بعد (مثلاً از phpMyAdmin یا با فیلتر
+		 * دستی) حذف نرم می‌شد، مبلغش در «مجموع درآمد» می‌آمد ولی هیچ
+		 * ردیفی آن را توضیح نمی‌داد — اختلافی که در هیچ ستونی دیده
+		 * نمی‌شد و کاربر آن را باگ حسابداری می‌پنداشت.
+		 *
+		 * حالا وقتی هیچ فیلتر شخصی نیست، شناسه‌های همان مجموعه‌ای که
+		 * ردیف‌ها را ساخته به جمع هم داده می‌شود تا هر دو یک مجموعه را
+		 * ببینند.
+		 */
+		$totals_args = array(
+			'type'      => $type,
+			'status'    => '' === $status ? 'active_only' : $status,
+			'date_from' => $range['from'],
+			'date_to'   => $range['to'],
+			'person_id' => $person_filter,
+			'search'    => '',
 		);
+
+		if ( ! $person_filter ) {
+			$totals_args['person_ids'] = array_map( 'intval', wp_list_pluck( $persons, 'id' ) );
+		}
+
+		$totals = Sparkknife_Ledger_Transaction_Repository::instance()->sum_by_type( $totals_args );
 
 		$income  = $totals['income'];
 		$expense = $totals['expense'];

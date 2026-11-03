@@ -116,6 +116,29 @@ class Sparkknife_Ledger_Transaction_Repository {
 		if ( ! empty( $args['person_id'] ) ) {
 			$where[]  = 't.person_id = %d';
 			$params[] = absint( $args['person_id'] );
+		} elseif ( isset( $args['person_ids'] ) && is_array( $args['person_ids'] ) ) {
+			/*
+			 * محدود کردن جمع به مجموعهٔ مشخصی از اشخاص.
+			 *
+			 * گزارش جمعی ردیف‌هایش را از اشخاص حذف‌نشده می‌سازد ولی جمع کل
+			 * را روی کل جدول تراکنش‌ها می‌گرفت. اگر شخصی تراکنش داشت و بعد
+			 * حذف نرم می‌شد، مبلغش در جمع می‌آمد بی‌آنکه ردیفی توضیحش دهد.
+			 *
+			 * فهرست خالی یعنی «هیچ شخصی» و باید صفر برگرداند، نه همه —
+			 * وگرنه حذف همهٔ اشخاص، جمع کل قبلی را نگه می‌داشت.
+			 */
+			$ids = array_values( array_filter( array_map( 'absint', $args['person_ids'] ) ) );
+
+			if ( empty( $ids ) ) {
+				$where[] = '1 = 0';
+			} else {
+				$placeholders = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+				$where[]      = "t.person_id IN ({$placeholders})";
+
+				foreach ( $ids as $id ) {
+					$params[] = $id;
+				}
+			}
 		}
 
 		if ( ! empty( $args['type'] ) && in_array( $args['type'], array( 'income', 'expense' ), true ) ) {
