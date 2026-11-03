@@ -35,6 +35,22 @@ require __DIR__ . '/../partials/nav.php';
 $selected_person = $filters['person_id'] ? Sparkknife_Ledger_Person_Repository::instance()->find( $filters['person_id'], true ) : null;
 ?>
 
+<?php
+/*
+ * خطای بازه تاریخ باید دیده شود.
+ *
+ * بدون این پیام، تاریخ نامعتبر در فیلتر بی‌صدا نادیده گرفته می‌شد و
+ * کاربر فهرستی می‌دید که فیلترش اعمال نشده بود — و آن را نتیجه فیلتر
+ * خودش می‌پنداشت.
+ */
+?>
+<?php if ( ! empty( $range['error'] ) && is_wp_error( $range['error'] ) ) : ?>
+	<div class="spk-alert spk-alert--warning">
+		<span class="dashicons dashicons-warning" aria-hidden="true"></span>
+		<span><?php echo esc_html( $range['error']->get_error_message() ); ?></span>
+	</div>
+<?php endif; ?>
+
 <div class="spk-stats spk-stats--3">
 	<article class="spk-stat spk-stat--income">
 		<div class="spk-stat__icon"><span class="dashicons dashicons-download" aria-hidden="true"></span></div>
