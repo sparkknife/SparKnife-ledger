@@ -101,9 +101,18 @@ class Sparkknife_Ledger_Person_Repository {
 			$params[] = $args['status'];
 		}
 
-		$search = trim( (string) $args['search'] );
+		$search = (string) $args['search'];
 
-		if ( '' !== $search ) {
+		/*
+		 * `trim()` استاندارد PHP فقط فاصله و تب لاتین را می‌شناسد. نیم‌فاصله
+		 * (`U+200C`) و فاصلهٔ بدون شکست (`U+00A0`) در فارسی پرکاربردند و
+		 * `trim()` آن‌ها را نگه می‌دارد. یکسان‌سازی ممیزی، آن‌ها را حذف
+		 * می‌کند و عبارت خالی می‌ماند؛ پس پیش از هر کاری همان
+		 * یکسان‌سازی را برای سنجش «خالی بودن» به کار می‌بریم.
+		 */
+		$search_is_blank = '' === trim( Sparkknife_Ledger_Sanitizer::normalize_persian( $search ) );
+
+		if ( ! $search_is_blank ) {
 			/*
 			 * جستجو با همه املای ممکن فارسی انجام می‌شود تا «علي» و «علی»
 			 * یکدیگر را پیدا کنند؛ LIKE در MySQL بایتی مقایسه می‌کند.
@@ -119,7 +128,14 @@ class Sparkknife_Ledger_Person_Repository {
 				$params[]  = $like;
 			}
 
-			$where[] = '(' . implode( ' OR ', $clauses ) . ')';
+			/*
+			 * اگر یکسان‌سازی، عبارت را کاملاً خالی کند (مثلاً ورودی فقط
+			 * نیم‌فاصله باشد) هیچ شرطی ساخته نمی‌شود. ساختن `()` کوئری
+			 * را می‌شکند و `LIKE '%%'` همهٔ رکوردها را برمی‌گرداند.
+			 */
+			if ( ! empty( $clauses ) ) {
+				$where[] = '(' . implode( ' OR ', $clauses ) . ')';
+			}
 		}
 
 		$orderby = in_array( $args['orderby'], self::sortable_columns(), true ) ? $args['orderby'] : 'created_at';
