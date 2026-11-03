@@ -78,10 +78,30 @@
 		var whole = parts[ 0 ] || '0';
 		var fraction = parts[ 1 ] || '';
 
+		/*
+		 * اعشار را با همان قاعدهٔ سرور **قطع** می‌کنیم، نه گرد.
+		 *
+		 * پیش‌تر `config.decimals` به جاوااسکریپت فرستاده می‌شد ولی هیچ‌جا
+		 * خوانده نمی‌شد و هر تعداد رقم اعشاری که کاربر تایپ می‌کرد (تا ۴)
+		 * در پیش‌نمایش می‌آمد. سرور همان مبلغ را با `currency_decimals`
+		 * قطع می‌کند (`Amount::scaled_to_decimal_string()` از `substr`
+		 * استفاده می‌کند و گرد نمی‌کند)، پس نسخهٔ اول این رفع که «نیم به
+		 * بالا» گرد می‌کرد، خودش یک ناسازگاری تازه می‌ساخت: پیش‌نمایش
+		 * «۱٬۰۰۱» و ذخیره‌شدهٔ واقعی «۱٬۰۰۰».
+		 *
+		 * برای مبلغ مالی هم قطع درست‌تر است: هیچ‌وقت مبلغی بیش از آنچه
+		 * واقعاً ثبت شده نشان داده نمی‌شود.
+		 */
+		var decimals = parseInt( config.decimals, 10 );
+		decimals     = isNaN( decimals ) || decimals < 0 ? 0 : Math.min( 4, decimals );
+
+		fraction = ( fraction + '0000' ).substring( 0, decimals );
+		fraction = fraction.replace( /0+$/, '' );
+
 		var output = ( negative ? '-' : '' ) + groupDigits( whole, separator );
 
 		if ( fraction ) {
-			output += '.' + fraction.substring( 0, 4 );
+			output += '.' + fraction;
 		}
 
 		if ( withCurrency && currency ) {
