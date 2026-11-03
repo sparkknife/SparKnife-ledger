@@ -122,12 +122,22 @@ class Sparkknife_Ledger_Report_Service {
 		// خلاصه محاسباتی مستقل از فیلتر نوع/وضعیت (مطابق تعریف مانده).
 		$summary = Sparkknife_Ledger_Ledger_Service::instance()->get_person_summary( $person_id, $date_args );
 
-		// در حالت گزارش همیشه تراکنش‌های معتبر پایه محاسبه است؛ جمع فیلترشده جداگانه ارائه می‌شود.
+		/*
+		 * جمع تراکنش‌های همان ردیف‌هایی که پرس‌وجوی بالا برگرداند.
+		 *
+		 * نکته مهم: اگر کاربر وضعیتی انتخاب نکرده باشد، `query()` هیچ
+		 * فیلتری روی وضعیت نمی‌گذارد و ردیف‌های باطل‌شده را هم نشان
+		 * می‌دهد. پیش‌تر اینجا `'' === $status ? 'active_only' : $status`
+		 * بود، یعنی جمع فقط تراکنش‌های معتبر را می‌گرفت. نتیجه: برای یک
+		 * فیلتر یکسان، جدول ۵ ردیف نشان می‌داد ولی جمع پایین صفحه می‌گفت
+		 * ۴؛ و هر مصرف‌کننده‌ای (REST، افزونه دیگر، صادرات) دو عدد
+		 * ناسازگار می‌گرفت.
+		 */
 		$filtered_sums = Sparkknife_Ledger_Transaction_Repository::instance()->sum_by_type(
 			array(
 				'person_id' => $person_id,
 				'type'      => $type,
-				'status'    => '' === $status ? 'active_only' : $status,
+				'status'    => $status,
 				'date_from' => $range['from'],
 				'date_to'   => $range['to'],
 				'search'    => isset( $args['search'] ) ? (string) $args['search'] : '',
