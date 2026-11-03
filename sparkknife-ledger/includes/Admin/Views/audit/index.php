@@ -90,6 +90,13 @@ $object_labels = array(
 				value="<?php echo esc_attr( $args['object_id'] ? (string) $args['object_id'] : '' ); ?>" placeholder="0" />
 		</div>
 
+		<div class="spk-field spk-field--compact">
+			<label class="spk-field__label" for="spk-audit-search"><?php esc_html_e( 'جستجو در متن تغییرات', 'sparkknife-ledger' ); ?></label>
+			<input type="search" class="spk-input" id="spk-audit-search" name="search"
+				value="<?php echo esc_attr( isset( $args['search'] ) ? (string) $args['search'] : '' ); ?>"
+				placeholder="<?php esc_attr_e( 'نام شخص، شماره تراکنش، دلیل ابطال…', 'sparkknife-ledger' ); ?>" />
+		</div>
+
 		<div class="spk-filter__buttons">
 			<button type="submit" class="spk-btn spk-btn--primary">
 				<span class="dashicons dashicons-filter" aria-hidden="true"></span>

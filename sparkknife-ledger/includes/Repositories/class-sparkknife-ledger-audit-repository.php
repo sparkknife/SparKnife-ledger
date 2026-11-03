@@ -78,6 +78,7 @@ class Sparkknife_Ledger_Audit_Repository {
 			'object_id'   => 0,
 			'action'      => '',
 			'user_id'     => 0,
+			'search'      => '',
 			'date_from'   => '',
 			'date_to'     => '',
 			'page'        => 1,
@@ -108,6 +109,23 @@ class Sparkknife_Ledger_Audit_Repository {
 		if ( ! empty( $args['user_id'] ) ) {
 			$where[]  = 'user_id = %d';
 			$params[] = absint( $args['user_id'] );
+		}
+
+		if ( ! empty( $args['search'] ) ) {
+			/*
+			 * جستجوی متنی در خلاصه و نام کاربر.
+			 *
+			 * این پارامتر پیش‌تر در `wp_parse_args()` نبود و هر مقداری که
+			 * می‌رسید **بی‌صدا نادیده گرفته می‌شد** — یعنی هر کسی از
+			 * `query()` جستجو می‌خواست، همهٔ رکوردها را می‌گرفت و فکر
+			 * می‌کرد جستجو کار کرده. با هزاران رکورد ممیزی، پیدا کردن
+			 * یک تغییر عملاً ناممکن بود.
+			 */
+			$like     = '%' . $wpdb->esc_like( (string) $args['search'] ) . '%';
+			$where[]  = '(summary LIKE %s OR changes LIKE %s OR ip_address LIKE %s)';
+			$params[] = $like;
+			$params[] = $like;
+			$params[] = $like;
 		}
 
 		if ( ! empty( $args['date_from'] ) ) {
