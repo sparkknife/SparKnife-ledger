@@ -25,8 +25,32 @@ $missing = $reports->get_person_report( 999999 );
 spk_assert( is_wp_error( $missing ), 'گزارش شخص ناموجود خطا می‌دهد' );
 
 // فیلتر نوع در گزارش فردی.
+/*
+ * `filtered` جمع همان ردیف‌هایی است که فهرست تراکنش‌ها نشان می‌دهد.
+ *
+ * پیش‌تر اینجا انتظار می‌رفت ۰ باشد چون تراکنش ورودی ابطال شده بود —
+ * یعنی تست، باگ را قفل کرده بود: فهرست آن تراکنش را نمایش می‌داد ولی
+ * جمع می‌گفت هیچ ورودی‌ای نیست. اکنون هر دو یک چیز می‌گویند.
+ */
 $income_only = $reports->get_person_report( $persons['ali'], array( 'type' => 'income' ) );
-spk_equals( 0, $income_only['filtered']['count'], 'تراکنش ورودی معتبری برای علی نمانده (ابطال شده)' );
+
+spk_equals(
+	$income_only['transactions']['total'],
+	$income_only['filtered']['count'],
+	'جمع فیلترشده با تعداد ردیف‌های فیلتر ورودی یکی است'
+);
+spk_equals( 1, $income_only['filtered']['count'], 'یک ردیف ورودی برای علی هست (ابطال‌شده ولی نمایش‌داده‌شده)' );
+
+// همان فیلتر با وضعیت صریح «ثبت‌شده»: ابطال‌شده‌ها کنار می‌روند.
+$income_posted = $reports->get_person_report(
+	$persons['ali'],
+	array(
+		'type'   => 'income',
+		'status' => 'posted',
+	)
+);
+
+spk_equals( 0, $income_posted['filtered']['count'], 'با فیلتر «ثبت‌شده»، ورودی ابطال‌شده شمرده نمی‌شود' );
 
 $expense_only = $reports->get_person_report( $persons['ali'], array( 'type' => 'expense' ) );
 spk_assert( $expense_only['filtered']['count'] >= 1, 'فیلتر نوع خروجی در گزارش' );

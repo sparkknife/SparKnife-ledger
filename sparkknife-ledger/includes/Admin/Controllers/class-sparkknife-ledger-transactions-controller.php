@@ -88,11 +88,18 @@ class Sparkknife_Ledger_Transactions_Controller {
 			)
 		);
 
+		/*
+		 * جمع پایین جدول باید با همان ردیف‌هایی بخواند که جدول نشان
+		 * می‌دهد. اگر کاربر وضعیتی انتخاب نکرده، `query()` ردیف‌های
+		 * باطل‌شده را هم می‌آورد؛ پیش‌تر اینجا `'active_only'` گذاشته
+		 * می‌شد و جمع فقط معتبرها را می‌گرفت. نتیجه: جدول ۵ ردیف داشت
+		 * ولی جمع می‌گفت ۴ — و کاربر نمی‌دانست کدام درست است.
+		 */
 		$totals = Sparkknife_Ledger_Transaction_Repository::instance()->sum_by_type(
 			array(
 				'person_id' => $filters['person_id'],
 				'type'      => $filters['type'],
-				'status'    => '' === $filters['status'] ? 'active_only' : $filters['status'],
+				'status'    => $filters['status'],
 				'search'    => $filters['search'],
 				'date_from' => $range['from'],
 				'date_to'   => $range['to'],

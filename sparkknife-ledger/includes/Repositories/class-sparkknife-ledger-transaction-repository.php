@@ -259,7 +259,19 @@ class Sparkknife_Ledger_Transaction_Repository {
 	}
 
 	/**
-	 * محاسبه مجموع مبالغ با فیلتر (فقط تراکنش‌های معتبر به‌صورت پیش‌فرض).
+	 * محاسبه مجموع مبالغ با فیلتر.
+	 *
+	 * `status` سه حالت دارد:
+	 *   - `posted` یا `void`: فقط همان وضعیت.
+	 *   - خالی/ناشناخته: **همه** ردیف‌ها، از جمله باطل‌شده‌ها — دقیقاً
+	 *     همان چیزی که `query()` با همین پارامترها برمی‌گرداند.
+	 *
+	 * حالت سوم عمداً با `query()` یکی است تا جمعی که زیر یک جدول
+	 * نوشته می‌شود با ردیف‌های همان جدول بخواند. پیش‌تر خالی به
+	 * `active_only` تبدیل می‌شد و جمع از تعداد ردیف‌ها کمتر می‌شد.
+	 *
+	 * اگر فقط تراکنش‌های معتبر لازم است، صریحاً `status => 'posted'`
+	 * بدهید (یا `active_only`، که برای سازگاری پذیرفته می‌شود).
 	 *
 	 * @param array<string, mixed> $args فیلترها.
 	 * @return array{income:int, expense:int, count:int}
@@ -270,9 +282,15 @@ class Sparkknife_Ledger_Transaction_Repository {
 		$transactions = Sparkknife_Ledger_DB::transactions_table();
 		$persons      = Sparkknife_Ledger_DB::persons_table();
 
-		$args['status'] = isset( $args['status'] ) && in_array( $args['status'], array( 'posted', 'void' ), true )
-			? $args['status']
-			: 'active_only';
+		/*
+		 * پیش‌تر اینجا هر مقدار ناشناخته به `active_only` تبدیل می‌شد.
+		 * حالا فقط `active_only` (صریح) به `posted` تبدیل می‌شود؛ خالی
+		 * دست‌نخورده می‌ماند تا `build_where()` هیچ فیلتری روی وضعیت
+		 * نگذارد — همان رفتار `query()`.
+		 */
+		if ( isset( $args['status'] ) && 'active_only' === $args['status'] ) {
+			$args['status'] = 'posted';
+		}
 
 		list( $where_sql, $params ) = $this->build_where( $args );
 
