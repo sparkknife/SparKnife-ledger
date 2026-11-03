@@ -72,7 +72,7 @@ $selected_person = $filters['person_id'] ? Sparkknife_Ledger_Person_Repository::
 		<div class="spk-stat__icon"><span class="dashicons dashicons-list-view" aria-hidden="true"></span></div>
 		<div class="spk-stat__body">
 			<span class="spk-stat__label"><?php esc_html_e( 'تعداد ردیف', 'sparkknife-ledger' ); ?></span>
-			<span class="spk-stat__value"><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $totals['count'] ) ); ?></span>
+			<span class="spk-stat__value"><?php echo esc_html( Sparkknife_Ledger_Money::digits( (string) $totals['count'] ) ); ?></span>
 			<span class="spk-stat__meta"><?php echo esc_html( $range['label'] ); ?></span>
 		</div>
 	</article>
@@ -121,7 +121,7 @@ Sparkknife_Ledger_Renderer::view(
 			printf(
 				/* translators: %s: total rows */
 				esc_html__( 'تراکنش‌ها (%s ردیف)', 'sparkknife-ledger' ),
-				esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $query['total'] ) )
+				esc_html( Sparkknife_Ledger_Money::digits( (string) $query['total'] ) )
 			);
 			?>
 		</h2>

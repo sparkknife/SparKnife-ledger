@@ -153,13 +153,13 @@ $export_url = wp_nonce_url(
 		<div class="spk-stat__icon"><span class="dashicons dashicons-list-view" aria-hidden="true"></span></div>
 		<div class="spk-stat__body">
 			<span class="spk-stat__label"><?php esc_html_e( 'تعداد تراکنش‌ها', 'sparkknife-ledger' ); ?></span>
-			<span class="spk-stat__value"><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $summary['count'] ) ); ?></span>
+			<span class="spk-stat__value"><?php echo esc_html( Sparkknife_Ledger_Money::digits( (string) $summary['count'] ) ); ?></span>
 			<span class="spk-stat__meta">
 				<?php
 				printf(
 					/* translators: %s: void count */
 					esc_html__( '%s تراکنش باطل‌شده', 'sparkknife-ledger' ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $summary['void_count'] ) )
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $summary['void_count'] ) )
 				);
 				?>
 			</span>

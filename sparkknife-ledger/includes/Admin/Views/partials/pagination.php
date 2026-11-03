@@ -38,9 +38,9 @@ $build = function ( $target ) use ( $base_url, $arg ) {
 		printf(
 			/* translators: 1: first item, 2: last item, 3: total */
 			esc_html__( 'نمایش %1$s تا %2$s از %3$s مورد', 'sparkknife-ledger' ),
-			esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $from ) ),
-			esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $to ) ),
-			esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $total ) )
+			esc_html( Sparkknife_Ledger_Money::digits( (string) $from ) ),
+			esc_html( Sparkknife_Ledger_Money::digits( (string) $to ) ),
+			esc_html( Sparkknife_Ledger_Money::digits( (string) $total ) )
 		);
 		?>
 	</span>
@@ -57,8 +57,8 @@ $build = function ( $target ) use ( $base_url, $arg ) {
 				printf(
 					/* translators: 1: current page, 2: total pages */
 					esc_html__( 'صفحه %1$s از %2$s', 'sparkknife-ledger' ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $page ) ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $pages ) )
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $page ) ),
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $pages ) )
 				);
 				?>
 			</span>

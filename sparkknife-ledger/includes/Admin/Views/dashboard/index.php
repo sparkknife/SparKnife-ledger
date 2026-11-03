@@ -22,7 +22,18 @@ require __DIR__ . '/../partials/header.php';
 require __DIR__ . '/../partials/nav.php';
 ?>
 
-<?php if ( 0 === (int) $stats['persons_total'] && 0 === (int) $stats['transactions_all'] ) : ?>
+<?php
+/*
+ * پنل خوش‌آمد فقط در داشبورد خالی و تنها وقتی مدیر آن را خواسته است.
+ *
+ * تنظیم `show_welcome_panel` پیش‌تر فقط در فرم تنظیمات خوانده می‌شد و
+ * هیچ‌جا در خروجی به کار نمی‌رفت: مدیر تیک را برمی‌داشت، «ذخیره شد»
+ * می‌دید، و پنل سر جایش می‌ماند. یک تنظیم مرده بدتر از نداشتن تنظیم
+ * است، چون کاربر فکر می‌کند کنترل دارد.
+ */
+$show_welcome = (bool) Sparkknife_Ledger_Settings::get( 'show_welcome_panel', 1 );
+?>
+<?php if ( $show_welcome && 0 === (int) $stats['persons_total'] && 0 === (int) $stats['transactions_all'] ) : ?>
 	<section class="spk-card spk-welcome">
 		<div class="spk-welcome__icon" aria-hidden="true"><span class="dashicons dashicons-chart-area"></span></div>
 		<div>
@@ -48,14 +59,14 @@ require __DIR__ . '/../partials/nav.php';
 		<div class="spk-stat__icon"><span class="dashicons dashicons-groups" aria-hidden="true"></span></div>
 		<div class="spk-stat__body">
 			<span class="spk-stat__label"><?php esc_html_e( 'تعداد کل اشخاص', 'sparkknife-ledger' ); ?></span>
-			<span class="spk-stat__value"><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $stats['persons_total'] ) ); ?></span>
+			<span class="spk-stat__value"><?php echo esc_html( Sparkknife_Ledger_Money::digits( (string) $stats['persons_total'] ) ); ?></span>
 			<span class="spk-stat__meta">
 				<?php
 				printf(
 					/* translators: 1: active count, 2: inactive count */
 					esc_html__( '%1$s فعال · %2$s غیرفعال', 'sparkknife-ledger' ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $stats['persons_active'] ) ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $stats['persons_inactive'] ) )
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $stats['persons_active'] ) ),
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $stats['persons_inactive'] ) )
 				);
 				?>
 			</span>
@@ -113,14 +124,14 @@ require __DIR__ . '/../partials/nav.php';
 		<div class="spk-stat__icon"><span class="dashicons dashicons-list-view" aria-hidden="true"></span></div>
 		<div class="spk-stat__body">
 			<span class="spk-stat__label"><?php esc_html_e( 'تعداد تراکنش‌ها', 'sparkknife-ledger' ); ?></span>
-			<span class="spk-stat__value"><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $stats['transactions'] ) ); ?></span>
+			<span class="spk-stat__value"><?php echo esc_html( Sparkknife_Ledger_Money::digits( (string) $stats['transactions'] ) ); ?></span>
 			<span class="spk-stat__meta">
 				<?php
 				printf(
 					/* translators: 1: void count, 2: total transactions */
 					esc_html__( '%1$s باطل‌شده از %2$s کل رکورد', 'sparkknife-ledger' ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $stats['void_count'] ) ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $stats['transactions_all'] ) )
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $stats['void_count'] ) ),
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $stats['transactions_all'] ) )
 				);
 				?>
 			</span>
@@ -140,7 +151,7 @@ require __DIR__ . '/../partials/nav.php';
 						printf(
 							/* translators: %s: number of months */
 							esc_html__( '%s ماه', 'sparkknife-ledger' ),
-							esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $months_option ) )
+							esc_html( Sparkknife_Ledger_Money::digits( (string) $months_option ) )
 						);
 						?>
 					</a>
@@ -358,7 +369,7 @@ require __DIR__ . '/../partials/nav.php';
 								<span class="spk-badge is-bad"><?php esc_html_e( 'یافت نشد', 'sparkknife-ledger' ); ?></span>
 							<?php endif; ?>
 						</td>
-						<td><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( $table['rows'] ) ); ?></td>
+						<td><?php echo esc_html( Sparkknife_Ledger_Money::digits( $table['rows'] ) ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>
