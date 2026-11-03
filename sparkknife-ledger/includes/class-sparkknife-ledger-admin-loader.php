@@ -170,7 +170,7 @@ class Sparkknife_Ledger_Admin_Loader {
 				'separator'     => Sparkknife_Ledger_Money::thousands_separator(),
 				'persianDigits' => Sparkknife_Ledger_Money::uses_persian_digits() ? 1 : 0,
 				'decimals'      => Sparkknife_Ledger_Money::decimals(),
-				'isRtl'         => is_rtl() || 'rtl' === Sparkknife_Ledger_Settings::get( 'admin_rtl', 'rtl' ) ? 1 : 0,
+				'isRtl'         => 1, // رابط پنل همیشه راست‌به‌چپ است؛ محتوا فارسی است.
 				'strings'       => array(
 					'confirmVoid'    => __( 'آیا از ابطال این تراکنش اطمینان دارید؟ این عملیات قابل بازگشت نیست.', 'sparkknife-ledger' ),
 					'confirmDelete'  => __( 'آیا از حذف این مورد اطمینان دارید؟', 'sparkknife-ledger' ),
