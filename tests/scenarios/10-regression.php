@@ -702,6 +702,58 @@ spk_assert(
 	'کلید مرتب‌سازی: پ پیش از ت'
 );
 
+// ── ۲۸: بازسازی جداول گم‌شده حتی وقتی نسخه به‌روز است ──────────────
+// اگر مدیر جداول را دستی پاک کند، نسخه در دیتابیس هنوز ۱.۰.۰ می‌ماند.
+// پیش‌تر maybe_upgrade() در این حالت هیچ کاری نمی‌کرد و افزونه برای
+// همیشه خراب می‌ماند.
+
+global $wpdb;
+
+if ( ! defined( 'WP_CLI' ) ) {
+	define( 'WP_CLI', true );
+}
+
+$restore_tables = array( 'audit_log', 'transactions', 'persons' );
+
+foreach ( $restore_tables as $dropped_table ) {
+	$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'sparkknife_ledger_' . $dropped_table );
+}
+
+Sparkknife_Ledger_DB::flush_table_cache();
+
+spk_assert( ! Sparkknife_Ledger_DB::tables_exist(), 'جداول برای آزمون حذف شدند' );
+spk_equals( SPARKKNIFE_LEDGER_DB_VERSION, get_option( 'sparkknife_ledger_db_version' ), 'نسخه هنوز به‌روز است' );
+
+Sparkknife_Ledger_Installer::maybe_upgrade();
+Sparkknife_Ledger_DB::flush_table_cache();
+
+spk_assert( Sparkknife_Ledger_DB::tables_exist(), 'جداول گم‌شده به‌صورت خودکار بازسازی شدند' );
+
+// و پس از بازسازی، افزونه باید کار کند.
+$restored_person = Sparkknife_Ledger_Person_Service::instance()->create(
+	array( 'name' => 'پس از بازسازی', 'phone' => '09120000001' )
+);
+
+spk_assert( ! is_wp_error( $restored_person ), 'ثبت شخص پس از بازسازی کار می‌کند', is_wp_error( $restored_person ) ? $restored_person->get_error_message() : '' );
+
+// ── ۲۹: تنظیمات خراب (غیرآرایه) خودترمیم می‌شود ─────────────────────
+update_option( Sparkknife_Ledger_Settings::OPTION_KEY, 'not-an-array' );
+Sparkknife_Ledger_Settings::flush_cache();
+
+$repaired = Sparkknife_Ledger_Settings::all();
+
+spk_assert( is_array( $repaired ), 'تنظیمات خراب به آرایه تبدیل می‌شود' );
+spk_assert( isset( $repaired['currency_type'] ), 'کلیدهای تنظیمات بازسازی می‌شوند' );
+
+update_option( Sparkknife_Ledger_Settings::OPTION_KEY, 98765 );
+Sparkknife_Ledger_Settings::flush_cache();
+
+spk_assert( is_array( Sparkknife_Ledger_Settings::all() ), 'تنظیمات عددی هم خودترمیم می‌شود' );
+
+// بازگرداندن تنظیمات سالم.
+Sparkknife_Ledger_Settings::save( Sparkknife_Ledger_Settings::defaults(), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
