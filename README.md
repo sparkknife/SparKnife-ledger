@@ -5,7 +5,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-5.8%2B-21759b)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-777bb4)](https://www.php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-blue)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Tests](https://img.shields.io/badge/tests-620%20passing-brightgreen)](#تستها)
+[![Tests](https://img.shields.io/badge/tests-681%20passing-brightgreen)](#تستها)
 
 ---
 
@@ -263,7 +263,7 @@ add_filter( 'sparkknife_ledger_export_formats', function ( $formats ) {
 php tests/run-tests.php /path/to/wp-load.php
 ```
 
-پوشش: **۶۲۰ assertion در ۱۰ سناریو**
+پوشش: **۶۸۱ assertion در ۱۰ سناریو**
 
 | # | سناریو |
 | --- | --- |
