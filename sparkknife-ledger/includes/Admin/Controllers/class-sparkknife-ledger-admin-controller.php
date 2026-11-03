@@ -176,9 +176,19 @@ class Sparkknife_Ledger_Admin_Controller {
 			if ( is_wp_error( $result ) ) {
 				$this->flash_error( $result );
 				$this->redirect_back_with( $redirect, $person_id, $input );
+
+				return;
 			}
 
 			Sparkknife_Ledger_Admin_Loader::add_notice( 'success', __( 'اطلاعات شخص با موفقیت ذخیره شد.', 'sparkknife-ledger' ), array(), $redirect );
+
+			/*
+			 * `add_notice()` با `$redirect` خودش خارج می‌شود، ولی این
+			 * `return` عمدی است: اگر روزی رفتار `add_notice` عوض شود یا
+			 * `$redirect` خالی باشد، جریان به `create()` نمی‌رسد و برای
+			 * شخص موجود، یک شخص تکراری ساخته نمی‌شود.
+			 */
+			return;
 		}
 
 		$result = $service->create( $input );
