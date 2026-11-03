@@ -1303,6 +1303,103 @@ spk_assert( is_array( Sparkknife_Ledger_Settings::all() ), 'تنظیمات عد�
 Sparkknife_Ledger_Settings::save( Sparkknife_Ledger_Settings::defaults(), false );
 Sparkknife_Ledger_Settings::flush_cache();
 
+// ── ۲۵س: جدول نیمه‌ساخته باید «خراب» گزارش شود و ترمیم گردد ────────
+// اگر ساخت جدولی وسط کار قطع شود، جدول با چند ستون باقی می‌ماند. پیش‌تر
+// گزارش سلامت فقط وجود جدول را می‌سنجید و آن را «سالم» نشان می‌داد، در حالی
+// که ثبت ممیزی در آن شکست می‌خورد و هیچ تغییری ثبت نمی‌شد.
+
+global $wpdb;
+
+$audit_table = Sparkknife_Ledger_DB::audit_table();
+
+$required_columns = array( 'id', 'object_type', 'object_id', 'action', 'changes', 'created_at' );
+
+$wpdb->query( "DROP TABLE IF EXISTS {$audit_table}" );
+$wpdb->query( "CREATE TABLE {$audit_table} ( id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, PRIMARY KEY (id) )" );
+Sparkknife_Ledger_DB::flush_table_cache();
+
+$missing_before = Sparkknife_Ledger_DB::missing_columns( $audit_table, $required_columns );
+
+spk_assert( ! empty( $missing_before ), 'جدول نیمه‌ساخته ستون‌های غایب دارد' );
+
+$report = Sparkknife_Ledger_Installer::get_health_report();
+$audit_row = null;
+
+foreach ( $report as $row ) {
+	if ( isset( $row['table'] ) && $row['table'] === $audit_table ) {
+		$audit_row = $row;
+	}
+}
+
+spk_assert( null !== $audit_row, 'جدول ممیزی در گزارش سلامت هست' );
+spk_equals( 'broken', $audit_row['status'], 'گزارش سلامت جدول نیمه‌ساخته را «خراب» می‌داند' );
+spk_assert( ! empty( $audit_row['missing_columns'] ), 'گزارش سلامت ستون‌های غایب را نام می‌برد' );
+
+$failed = Sparkknife_Ledger_Audit_Service::instance()->log( 'person', 1, 'test', array(), 'آزمون' );
+
+spk_assert( false === $failed || empty( $failed ), 'ثبت ممیزی روی جدول ناقص موفق نیست' );
+
+Sparkknife_Ledger_Installer::maybe_upgrade();
+Sparkknife_Ledger_DB::flush_table_cache();
+
+$missing_after = Sparkknife_Ledger_DB::missing_columns( $audit_table, $required_columns );
+
+spk_equals( array(), $missing_after, 'maybe_upgrade جدول نیمه‌ساخته را ترمیم می‌کند' );
+
+$report_after = Sparkknife_Ledger_Installer::get_health_report();
+
+foreach ( $report_after as $row ) {
+	if ( isset( $row['table'] ) && $row['table'] === $audit_table ) {
+		spk_equals( 'ok', $row['status'], 'گزارش سلامت پس از ترمیم «سالم» است' );
+	}
+}
+
+$logged = Sparkknife_Ledger_Audit_Service::instance()->log( 'person', 1, 'test', array(), 'پس از ترمیم' );
+
+spk_assert( is_int( $logged ) || is_string( $logged ), 'ثبت ممیزی پس از ترمیم موفق است' );
+
+// ── ۲۵ع: وضعیت «ناقص» از «یافت نشد» تفکیک می‌شود ───────────────────
+// پیش‌تر هر وضعیت غیر از ok در پنل «یافت نشد» نشان داده می‌شد، پس جدولی
+// که وجود دارد ولی ستون‌هایش ناقص است با جدول غایب یکی دیده می‌شد و مدیر
+// پیام گمراه‌کننده می‌گرفت.
+
+global $wpdb;
+
+$audit_table = Sparkknife_Ledger_DB::audit_table();
+
+$wpdb->query( "DROP TABLE IF EXISTS {$audit_table}" );
+$wpdb->query( "CREATE TABLE {$audit_table} ( id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, PRIMARY KEY (id) )" );
+Sparkknife_Ledger_DB::flush_table_cache();
+
+$health = Sparkknife_Ledger_Installer::get_health_report();
+$audit_health = null;
+
+foreach ( $health as $row ) {
+	if ( isset( $row['table'] ) && $row['table'] === $audit_table ) {
+		$audit_health = $row;
+	}
+}
+
+spk_assert( null !== $audit_health, 'ردیف سلامت جدول ممیزی موجود است' );
+spk_equals( 'broken', $audit_health['status'], 'وضعیت جدول نیمه‌ساخته «broken» است نه «missing»' );
+spk_assert(
+	! empty( $audit_health['missing_columns'] ),
+	'فهرست ستون‌های غایب برای نمایش در پنل موجود است'
+);
+
+// برچسب فارسی هر وضعیت باید متفاوت باشد.
+$labels = array(
+	'ok'      => __( 'آماده', 'sparkknife-ledger' ),
+	'broken'  => __( 'ناقص', 'sparkknife-ledger' ),
+	'missing' => __( 'یافت نشد', 'sparkknife-ledger' ),
+);
+
+spk_assert( $labels['broken'] !== $labels['missing'], 'برچسب «ناقص» با «یافت نشد» یکی نیست' );
+
+// بازسازی برای ادامه آزمون‌ها.
+Sparkknife_Ledger_Installer::maybe_upgrade();
+Sparkknife_Ledger_DB::flush_table_cache();
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();

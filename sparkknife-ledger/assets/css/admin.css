@@ -65,6 +65,7 @@
 }
 
 .spk-muted { color: var(--spk-muted); }
+.spk-small { font-size: 12px; }
 .spk-strong { font-weight: 700; }
 .spk-center { text-align: center; }
 .spk-nowrap { white-space: nowrap; }

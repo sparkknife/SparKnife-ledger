@@ -331,8 +331,29 @@ require __DIR__ . '/../partials/nav.php';
 						<td><?php echo esc_html( $table['label'] ); ?></td>
 						<td><code><?php echo esc_html( $table['table'] ); ?></code></td>
 						<td>
-							<?php if ( 'ok' === $table['status'] ) : ?>
+							<?php
+							/*
+							 * جدولی که وجود دارد ولی ستون‌هایش ناقص است
+							 * «یافت نشد» نیست؛ «ناقص» است. پیام درست، مدیر را
+							 * به مسیر درست (بازسازی خودکار) هدایت می‌کند.
+							 */
+							$spk_status = isset( $table['status'] ) ? (string) $table['status'] : 'missing';
+							?>
+							<?php if ( 'ok' === $spk_status ) : ?>
 								<span class="spk-badge is-ok"><?php esc_html_e( 'آماده', 'sparkknife-ledger' ); ?></span>
+							<?php elseif ( 'broken' === $spk_status ) : ?>
+								<span class="spk-badge is-bad"><?php esc_html_e( 'ناقص', 'sparkknife-ledger' ); ?></span>
+								<?php if ( ! empty( $table['missing_columns'] ) ) : ?>
+									<span class="spk-muted spk-small">
+										<?php
+										printf(
+											/* translators: %s: comma separated column names */
+											esc_html__( 'ستون‌های غایب: %s', 'sparkknife-ledger' ),
+											esc_html( implode( '، ', array_map( 'strval', (array) $table['missing_columns'] ) ) )
+										);
+										?>
+									</span>
+								<?php endif; ?>
 							<?php else : ?>
 								<span class="spk-badge is-bad"><?php esc_html_e( 'یافت نشد', 'sparkknife-ledger' ); ?></span>
 							<?php endif; ?>
