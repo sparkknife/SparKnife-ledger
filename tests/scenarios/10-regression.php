@@ -398,6 +398,52 @@ spk_equals( '125000', $decimal, 'اعشار واقعی با نقطه حفظ می
 $two_decimals = Sparkknife_Ledger_Money::parse_amount( Sparkknife_Ledger_Money::normalize_amount_input( '0.75' ) );
 spk_equals( '7500', $two_decimals, 'اعشار کمتر از یک با نقطه' );
 
+// ── ۱۵ب: نقطه فقط در واحد بدون اعشار جداکننده هزارگان است ────────────
+// قاعده «۱.۲۳۴ = ۱۲۳۴» برای تومان درست است، ولی برای دلار باید نقطه
+// را اعشار گرفت؛ وگرنه ۱.۵ دلار به ۱۵۰۰ دلار تبدیل می‌شد.
+$saved_currency = Sparkknife_Ledger_Settings::all();
+
+Sparkknife_Ledger_Settings::save(
+	array_merge(
+		$saved_currency,
+		array(
+			'currency_type'     => 'custom',
+			'currency_decimals' => 2,
+			'currency_label'    => 'دلار',
+			'currency_symbol'   => '$',
+			'currency_code'     => 'USD',
+		)
+	),
+	false
+);
+Sparkknife_Ledger_Settings::flush_cache();
+
+$decimal_amount = Sparkknife_Ledger_Money::parse_amount( '1.500' );
+spk_equals( '15000', $decimal_amount, 'با دو رقم اعشار، «1.500» یعنی ۱.۵ (نه ۱۵۰۰)' );
+
+$decimal_1005 = Sparkknife_Ledger_Money::parse_amount( '1.005' );
+spk_equals( '10050', $decimal_1005, 'با دو رقم اعشار، «1.005» یعنی ۱.۰۰۵' );
+
+// بازگشت به تومان: نقطه دوباره جداکننده است.
+Sparkknife_Ledger_Settings::save(
+	array_merge(
+		$saved_currency,
+		array( 'currency_type' => 'toman', 'currency_decimals' => 0 )
+	),
+	false
+);
+Sparkknife_Ledger_Settings::flush_cache();
+
+$integer_amount = Sparkknife_Ledger_Money::parse_amount( '1.500' );
+spk_equals(
+	'1500',
+	Sparkknife_Ledger_Money::to_human( $integer_amount ),
+	'با صفر رقم اعشار، «1.500» یعنی ۱۵۰۰'
+);
+
+Sparkknife_Ledger_Settings::save( $saved_currency, false );
+Sparkknife_Ledger_Settings::flush_cache();
+
 // ── ۱۶: منفی‌های یونیکد مبلغ را مثبت نمی‌کنند ───────────────────────
 $unicode_minus = array(
 	'−5'  => 'منفی یونیکد U+2212',
