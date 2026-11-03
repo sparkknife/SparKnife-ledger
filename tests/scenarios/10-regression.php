@@ -1676,6 +1676,44 @@ if ( ! is_wp_error( $dup_first ) ) {
 	$dup_service->delete( $dup_first );
 }
 
+// ── ۲۵ت: «منفی صفر» نمایش داده نمی‌شود ───────────────────────────
+// مبلغ -۱۰۰۰ مقیاس‌شده یعنی منفی یک‌دهم تومان. با صفر رقم اعشار نمایشش
+// «۰» است، ولی مقدار مقیاس‌شده صفر نیست؛ پیش‌تر شرط علامت روی همان
+// مقدار مقیاس‌شده بود و نتیجه «-۰ تومان» می‌شد.
+
+$zero_defaults = Sparkknife_Ledger_Settings::defaults();
+
+Sparkknife_Ledger_Settings::save(
+	array(
+		'currency_decimals'      => 0,
+		'custom_currency_label'  => 'واحد',
+		'custom_currency_symbol' => 'واحد',
+	),
+	false
+);
+Sparkknife_Ledger_Settings::flush_cache();
+
+$neg_zero = Sparkknife_Ledger_Money::format( '-1000' );
+
+spk_assert( false === strpos( $neg_zero, '-' ), 'مبلغ کوچک‌تر از واحد نمایش، منفی صفر نشان نمی‌دهد' );
+spk_assert( false === strpos( $neg_zero, '−' ), 'علامت منفی یونیکد هم نمی‌آید' );
+
+// مبلغی که واقعاً منفی است، علامتش می‌ماند.
+$real_negative = Sparkknife_Ledger_Money::format( '-50000' );
+
+spk_assert( 0 === strpos( $real_negative, '-' ), 'مبلغ منفی واقعی علامت منفی دارد' );
+
+// با دو رقم اعشار، همان مبلغ «-۰٫۱» می‌شود، نه صفر.
+Sparkknife_Ledger_Settings::save( array( 'currency_decimals' => 2 ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+$with_decimals = Sparkknife_Ledger_Money::to_human( '-1000' );
+
+spk_equals( '-0.1', $with_decimals, 'با دو رقم اعشار، منفی یک‌دهم درست نمایش داده می‌شود' );
+
+Sparkknife_Ledger_Settings::save( $zero_defaults, false );
+Sparkknife_Ledger_Settings::flush_cache();
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
