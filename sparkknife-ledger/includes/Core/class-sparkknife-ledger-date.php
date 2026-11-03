@@ -22,6 +22,36 @@ class Sparkknife_Ledger_Date {
 	}
 
 	/**
+	 * تجزیه ایمن تاریخ ذخیره‌شده به اجزای میلادی، بدون timestamp.
+	 *
+	 * دلیل: strtotime() روی PHP ۳۲ بیتی برای سال‌های دور (پیش از ۱۹۰۱ یا
+	 * پس از ۲۰۳۸) هشدار «Epoch doesn't fit in a PHP integer» می‌دهد و
+	 * تاریخ را به خط تیره تبدیل می‌کند. این تابع به timestamp نیاز ندارد.
+	 *
+	 * @param string $date تاریخ Y-m-d یا Y-m-d H:i:s.
+	 * @return array{0:int,1:int,2:int,3:int,4:int}|null [سال, ماه, روز, ساعت, دقیقه] یا null.
+	 */
+	private static function split_stored_date( $date ) {
+		$date = trim( (string) $date );
+
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/', $date, $m ) ) {
+			return null;
+		}
+
+		$year  = (int) $m[1];
+		$month = (int) $m[2];
+		$day   = (int) $m[3];
+		$hour  = isset( $m[4] ) ? (int) $m[4] : 0;
+		$min   = isset( $m[5] ) ? (int) $m[5] : 0;
+
+		if ( $year < 1 || ! checkdate( $month, $day, $year ) ) {
+			return null;
+		}
+
+		return array( $year, $month, $day, $hour, $min );
+	}
+
+	/**
 	 * تبدیل تاریخ میلادی به شمسی.
 	 *
 	 * پیاده‌سازی الگوریتم استاندارد (بر اساس روزهای جولین) بدون وابستگی خارجی.
@@ -241,24 +271,22 @@ class Sparkknife_Ledger_Date {
 			return '—';
 		}
 
-		$timestamp = strtotime( $date );
+		$parts = self::split_stored_date( $date );
 
-		if ( false === $timestamp ) {
+		if ( null === $parts ) {
 			return '—';
 		}
 
-		$time_part = $with_time ? ' ' . gmdate( 'H:i', $timestamp ) : '';
+		list( $gy, $gm, $gd, $hour, $minute ) = $parts;
+
+		$time_part = $with_time ? sprintf( ' %02d:%02d', $hour, $minute ) : '';
 
 		if ( self::uses_jalali() ) {
-			list( $jy, $jm, $jd ) = self::gregorian_to_jalali(
-				(int) gmdate( 'Y', $timestamp ),
-				(int) gmdate( 'n', $timestamp ),
-				(int) gmdate( 'j', $timestamp )
-			);
+			list( $jy, $jm, $jd ) = self::gregorian_to_jalali( $gy, $gm, $gd );
 
 			$formatted = sprintf( '%04d/%02d/%02d', $jy, $jm, $jd );
 		} else {
-			$formatted = gmdate( 'Y/m/d', $timestamp );
+			$formatted = sprintf( '%04d/%02d/%02d', $gy, $gm, $gd );
 		}
 
 		$formatted .= $time_part;
@@ -320,23 +348,21 @@ class Sparkknife_Ledger_Date {
 			return '';
 		}
 
-		$timestamp = strtotime( $date );
+		$parts = self::split_stored_date( $date );
 
-		if ( false === $timestamp ) {
+		if ( null === $parts ) {
 			return '';
 		}
 
+		list( $gy, $gm, $gd ) = $parts;
+
 		if ( self::uses_jalali() ) {
-			list( $jy, $jm, $jd ) = self::gregorian_to_jalali(
-				(int) gmdate( 'Y', $timestamp ),
-				(int) gmdate( 'n', $timestamp ),
-				(int) gmdate( 'j', $timestamp )
-			);
+			list( $jy, $jm, $jd ) = self::gregorian_to_jalali( $gy, $gm, $gd );
 
 			return sprintf( '%04d/%02d/%02d', $jy, $jm, $jd );
 		}
 
-		return gmdate( 'Y/m/d', $timestamp );
+		return sprintf( '%04d/%02d/%02d', $gy, $gm, $gd );
 	}
 
 	/**
