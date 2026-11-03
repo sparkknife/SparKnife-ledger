@@ -1557,6 +1557,41 @@ if ( ! is_wp_error( $filter_person ) ) {
 	$persons_service->delete( $filter_person );
 }
 
+// ── ۲۵ر: پیشوند شماره تراکنش می‌تواند فارسی باشد ──────────────────
+// پیش‌تر پیشوند با `[^A-Za-z0-9]` پاک می‌شد، پس «پیشوند-فارسی» یا
+// «۱۲۳۴» به رشته خالی می‌رسید و بی‌صدا به TXN می‌افتاد: کاربر پیشوندش
+// را در تنظیمات می‌دید ولی شماره تراکنش‌ها چیز دیگری بود.
+
+global $wpdb;
+
+$txn_service = Sparkknife_Ledger_Transaction_Service::instance();
+
+// Settings پیشوند را به ۱۱ نویسه محدود می‌کند؛ انتظار هم همان است.
+$prefix_cases = array(
+	'پیشوند'   => 'پیشوند',
+	'۱۲۳۴'     => '1234',
+	'SPK'      => 'SPK',
+	'A-B_C'    => 'A-B_C',
+	''         => 'TXN',
+);
+
+$defaults_before = Sparkknife_Ledger_Settings::defaults();
+
+foreach ( $prefix_cases as $input => $expected ) {
+	Sparkknife_Ledger_Settings::save( array( 'reference_prefix' => $input ), false );
+	Sparkknife_Ledger_Settings::flush_cache();
+
+	$reference = $txn_service->generate_reference( '2024-07-31' );
+
+	spk_assert(
+		0 === strpos( $reference, $expected . '-' ),
+		sprintf( 'پیشوند «%s» در شماره تراکنش به کار می‌رود', '' === $input ? '(خالی)' : $input )
+	);
+}
+
+Sparkknife_Ledger_Settings::save( $defaults_before, false );
+Sparkknife_Ledger_Settings::flush_cache();
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
