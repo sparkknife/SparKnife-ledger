@@ -207,7 +207,32 @@ require __DIR__ . '/../partials/nav.php';
 	</div>
 <?php endif; ?>
 
-<?php if ( $report['filtered']['count'] > 0 && '' !== $args['type'] ) : ?>
+<?php
+/*
+ * هشدار «این مبالغ کل بازه‌اند، نه نتیجهٔ فیلتر».
+ *
+ * شرط پیش‌تر فقط `type` را می‌سنجید، در حالی که متن هشدار خودش می‌گوید
+ * «نوع/جستجو». نتیجه: با جستجوی بی‌نتیجه جدول خالی می‌شد ولی کارت‌های
+ * بالای آن همچنان مبلغ کل بازه را نشان می‌دادند — عددی که هیچ ردیفی
+ * توضیحش نمی‌داد و هیچ توضیحی هم نداشت.
+ *
+ * حالا وجود فیلتر جستجو هم شرط را فعال می‌کند. `filtered.count > 0`
+ * لازم است چون وقتی هیچ ردیفی نیست، عدد صفر همه‌چیز را می‌گوید و هشدار
+ * تکراری است.
+ */
+$has_narrowing_filter = '' !== (string) $args['type']
+	|| '' !== (string) $report['filters']['search'];
+
+/*
+ * دو حالت جدا:
+ *
+ * - فیلتر نتیجه داشت: بگوییم مبالغ بالا کل بازه است، نه فیلتر.
+ * - فیلتر هیچ نتیجه‌ای نداشت: جدول خالی است و مبالغ بالا **فقط** کل
+ *   بازه‌اند؛ این حالت گیج‌کننده‌تر است و باید هم توضیح داده شود.
+ */
+$filter_matched_something = (int) $report['filtered']['count'] > 0;
+?>
+<?php if ( $has_narrowing_filter && $filter_matched_something ) : ?>
 		<div class="spk-alert spk-alert--info">
 			<span class="dashicons dashicons-info" aria-hidden="true"></span>
 			<span>
@@ -217,6 +242,17 @@ require __DIR__ . '/../partials/nav.php';
 					esc_html__( '%s تراکنش با فیلتر نوع/جستجوی فعلی مطابقت دارد؛ مبالغ ستون‌های بالا مطابق تعریف مانده، همه تراکنش‌های معتبر بازه را شامل می‌شود.', 'sparkknife-ledger' ),
 					esc_html( Sparkknife_Ledger_Money::digits( (string) $report['filtered']['count'] ) )
 				);
+				?>
+			</span>
+		</div>
+	<?php endif; ?>
+
+	<?php if ( $has_narrowing_filter && ! $filter_matched_something ) : ?>
+		<div class="spk-alert spk-alert--warning">
+			<span class="dashicons dashicons-warning" aria-hidden="true"></span>
+			<span>
+				<?php
+				esc_html_e( 'هیچ تراکنشی با فیلتر فعلی مطابقت ندارد. مبالغ ستون‌های بالا مربوط به کل بازه است، نه نتیجهٔ این فیلتر.', 'sparkknife-ledger' );
 				?>
 			</span>
 		</div>
