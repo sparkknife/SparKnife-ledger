@@ -433,13 +433,24 @@ class Sparkknife_Ledger_Admin_Controller {
 			? sanitize_key( wp_unslash( $_POST['active_tab'] ) )
 			: 'all';
 
-		Sparkknife_Ledger_Settings::save( $input );
+		$tab = isset( $_POST['active_tab'] ) ? sanitize_key( wp_unslash( $_POST['active_tab'] ) ) : 'currency';
+
+		$saved = Sparkknife_Ledger_Settings::save( $input );
+
+		if ( is_wp_error( $saved ) ) {
+			Sparkknife_Ledger_Admin_Loader::add_notice(
+				'error',
+				$saved->get_error_message(),
+				array(),
+				add_query_arg( array( 'page' => 'sparkknife-ledger-settings', 'tab' => $tab ), admin_url( 'admin.php' ) )
+			);
+		}
 
 		Sparkknife_Ledger_Admin_Loader::add_notice(
 			'success',
 			__( 'تنظیمات با موفقیت ذخیره شد.', 'sparkknife-ledger' ),
 			array(),
-			add_query_arg( array( 'page' => 'sparkknife-ledger-settings', 'tab' => isset( $_POST['active_tab'] ) ? sanitize_key( wp_unslash( $_POST['active_tab'] ) ) : 'currency' ), admin_url( 'admin.php' ) )
+			add_query_arg( array( 'page' => 'sparkknife-ledger-settings', 'tab' => $tab ), admin_url( 'admin.php' ) )
 		);
 	}
 
