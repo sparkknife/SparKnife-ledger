@@ -763,6 +763,30 @@ spk_assert(
 $capped = $report_svc->get_summary_report( array( 'page' => 1, 'per_page' => 500 ) );
 spk_equals( 200, $capped['pagination']['per_page'], 'سقف ۲۰۰ ردیف برای صفحه عادی حفظ شده است' );
 
+// ── ۲۵د: تاریخ آینده روی PHP ۳۲ بیتی رد می‌شود ─────────────────────
+// `strtotime()` برای تاریخ بعد از ۲۰۳۸ روی PHP ۳۲ بیتی `false` می‌دهد و
+// `false > int` همیشه نادرست است؛ پس بررسی «تاریخ آینده» بی‌صدا از کار
+// می‌افتاد و می‌شد تراکنشی با تاریخ ۲۰۴۰ ثبت کرد.
+spk_assert( Sparkknife_Ledger_Date::is_future( '2099-12-31' ), 'سال ۲۰۹۹ آینده تشخیص داده می‌شود' );
+spk_assert( Sparkknife_Ledger_Date::is_future( '2040-01-01' ), 'سال ۲۰۴۰ آینده تشخیص داده می‌شود' );
+
+$today_str = Sparkknife_Ledger_Date::today();
+spk_assert( ! Sparkknife_Ledger_Date::is_future( $today_str ), 'امروز آینده نیست' );
+spk_assert( ! Sparkknife_Ledger_Date::is_future( '1970-01-01' ), 'گذشته آینده نیست' );
+spk_assert( ! Sparkknife_Ledger_Date::is_future( 'not-a-date' ), 'تاریخ نامعتبر آینده شمرده نمی‌شود' );
+
+// فردا هنوز مجاز است (رواداری منطقه زمانی).
+$tomorrow_ts = strtotime( $today_str . ' +1 day' );
+if ( false !== $tomorrow_ts ) {
+	spk_assert(
+		! Sparkknife_Ledger_Date::is_future( gmdate( 'Y-m-d', $tomorrow_ts ) ),
+		'تاریخ فردا مجاز است'
+	);
+}
+
+// تا آخر آزمون تقویم شمسی است.
+spk_assert( Sparkknife_Ledger_Date::uses_jalali(), 'تقویم آزمون شمسی است' );
+
 // ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
 $p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
 $p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱
