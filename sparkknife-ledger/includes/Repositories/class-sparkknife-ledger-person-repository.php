@@ -199,6 +199,38 @@ class Sparkknife_Ledger_Person_Repository {
 	}
 
 	/**
+	 * اشخاص غیرحذف‌شده به‌علاوهٔ اشخاص حذف‌شده‌ای که تراکنش دارند.
+	 *
+	 * گزارش جمعی ردیف‌هایش را از این فهرست می‌سازد. شخص حذف‌شده‌ای که
+	 * تراکنش دارد نباید از گزارش مالی ناپدید شود؛ وگرنه جمع کل عددی را
+	 * نشان می‌دهد که هیچ ردیفی توضیحش نمی‌دهد. ستون `deleted_at` هم
+	 * برگردانده می‌شود تا ویو بتواند ردیف را با برچسب «حذف‌شده» نشان دهد.
+	 *
+	 * @return array<int, object>
+	 */
+	public function get_all_with_transactions() {
+		global $wpdb;
+
+		$persons      = Sparkknife_Ledger_DB::persons_table();
+		$transactions = Sparkknife_Ledger_DB::transactions_table();
+
+		/*
+		 * `EXISTS` به‌جای `JOIN` تا هر شخص فقط یک بار بیاید، حتی اگر
+		 * صدها تراکنش داشته باشد.
+		 */
+		$sql = "SELECT p.id, p.name, p.phone, p.status, p.deleted_at
+			FROM {$persons} p
+			WHERE p.deleted_at IS NULL
+			   OR EXISTS ( SELECT 1 FROM {$transactions} t WHERE t.person_id = p.id )
+			ORDER BY p.name ASC";
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results( $sql );
+
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
 	 * درج شخص جدید.
 	 *
 	 * @param array<string, mixed> $data داده معتبر.
