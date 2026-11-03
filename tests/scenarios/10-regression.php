@@ -2334,6 +2334,74 @@ if ( ! is_wp_error( $rp_person_report ) ) {
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$rp_txns} WHERE person_id IN (%d, %d)", $rp_live, $rp_ghost ) );
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$rp_persons} WHERE id IN (%d, %d)", $rp_live, $rp_ghost ) );
 
+// ── ۲۵ط: مبالغ بالای جدول وقتی فیلتر نتیجه ندارد، توضیح دارند ─────────
+//
+// با جستجوی بی‌نتیجه، جدول تراکنش‌ها خالی می‌شد ولی کارت‌های بالای آن
+// همچنان مبلغ کل بازه را نشان می‌دادند. شرط نمایش هشدار فقط `type` را
+// می‌سنجید، در حالی که متن هشدار خودش می‌گفت «نوع/جستجو» — یعنی قصد
+// پوشش جستجو وجود داشت و شرط جا افتاده بود.
+//
+// بدترین حالت، جستجوی بی‌نتیجه بود: صفحه خالی با یک عدد بی‌توضیح.
+
+/*
+ * بلوک قبلی اشخاص آزمایشی‌اش را پاک کرد، پس یک شخص تازه با یک تراکنش
+ * می‌سازیم تا مبلغ خلاصه غیرصفر باشد و بتوانیم درباره‌اش ادعا کنیم.
+ */
+$warn_person = Sparkknife_Ledger_Person_Repository::instance()->insert(
+	array( 'name' => 'هشدار ' . $marker, 'phone' => '09127770003', 'description' => '', 'status' => 'active' )
+);
+
+spk_assert( $warn_person > 0, 'شخص آزمایشی برای آزمون هشدار ساخته شد' );
+
+Sparkknife_Ledger_Transaction_Service::instance()->create(
+	array( 'person_id' => $warn_person, 'type' => 'income', 'amount' => '700', 'txn_date' => '2026-11-01', 'description' => '', 'reference' => '' )
+);
+
+if ( $warn_person > 0 ) {
+	$warn_report = Sparkknife_Ledger_Report_Service::instance()->get_person_report(
+		$warn_person,
+		array( 'range' => 'all', 'search' => 'ZZZZ' . $marker )
+	);
+
+	spk_assert( ! is_wp_error( $warn_report ), 'گزارش فردی با جستجوی بی‌نتیجه ساخته می‌شود' );
+	spk_equals( 0, (int) $warn_report['filtered']['count'], 'جستجوی بی‌نتیجه هیچ تراکنشی مطابقت نمی‌دهد' );
+	spk_equals( 0, count( $warn_report['transactions']['items'] ), 'جدول در جستجوی بی‌نتیجه خالی است' );
+
+	// مبلغ خلاصه هنوز کل بازه است — این طراحی است، نه باگ؛ ولی باید توضیح داشته باشد.
+	spk_assert(
+		'0' !== (string) Sparkknife_Ledger_Amount::normalize( $warn_report['summary']['income'] ),
+		'خلاصه هنوز مبلغ کل بازه را دارد'
+	);
+
+	// شرط هشدار باید جستجو را هم ببیند.
+	$person_view_src = (string) file_get_contents( SPARKKNIFE_LEDGER_DIR . 'includes/Admin/Views/reports/person.php' );
+
+	spk_assert(
+		false !== mb_strpos( $person_view_src, '$has_narrowing_filter' ),
+		'ویو گزارش فردی وجود فیلتر را از نوع و جستجو می‌سنجد'
+	);
+	spk_assert(
+		false !== mb_strpos( $person_view_src, "spk-alert--warning" ),
+		'ویو برای فیلتر بی‌نتیجه هشدار دارد'
+	);
+	spk_assert(
+		false !== mb_strpos( $person_view_src, "\$report['filters']['search']" ),
+		'شرط هشدار، جستجو را می‌خواند نه فقط نوع'
+	);
+
+	// با جستجوی خالی، فیلتری وجود ندارد.
+	$plain_report = Sparkknife_Ledger_Report_Service::instance()->get_person_report(
+		$warn_person,
+		array( 'range' => 'all', 'search' => '' )
+	);
+
+	spk_equals( '', (string) $plain_report['filters']['search'], 'جستجوی خالی، فیلتر جستجو نمی‌سازد' );
+
+	// تمیزکاری.
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}sparkknife_ledger_transactions WHERE person_id = %d", $warn_person ) );
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}sparkknife_ledger_persons WHERE id = %d", $warn_person ) );
+}
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
