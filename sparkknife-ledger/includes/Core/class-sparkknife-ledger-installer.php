@@ -181,7 +181,26 @@ class Sparkknife_Ledger_Installer {
 
 		$installed = get_option( self::DB_VERSION_OPTION, '' );
 
-		if ( $installed === SPARKKNIFE_LEDGER_DB_VERSION ) {
+		/*
+		 * نسخه ذخیره‌شده کافی نیست؛ جداول هم باید واقعاً وجود داشته باشند.
+		 *
+		 * اگر مدیر جداول را دستی از phpMyAdmin پاک کند، یا مهاجرت نیمه‌کاره
+		 * بماند، نسخه هنوز به‌روز است ولی جدولی در کار نیست. پیش‌تر این حالت
+		 * هرگز ترمیم نمی‌شد و افزونه برای همیشه خراب می‌ماند.
+		 */
+		$tables_ok = Sparkknife_Ledger_DB::tables_exist();
+
+		if ( $installed === SPARKKNIFE_LEDGER_DB_VERSION && $tables_ok ) {
+			return;
+		}
+
+		if ( $installed === SPARKKNIFE_LEDGER_DB_VERSION && ! $tables_ok ) {
+			// نسخه به‌روز است ولی جداول نیستند: بازسازی بدون مهاجرت.
+			self::create_tables();
+			Sparkknife_Ledger_DB::flush_table_cache();
+			Sparkknife_Ledger_Settings::install_defaults();
+			Sparkknife_Ledger_Capabilities::add_capabilities();
+
 			return;
 		}
 
