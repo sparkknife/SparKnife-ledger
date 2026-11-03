@@ -1153,6 +1153,44 @@ if ( null !== $csv_data_row ) {
 	spk_assert( $currency_in_header, 'واحد پول در سرصفحه CSV ذکر شده است' );
 }
 
+// ── ۲۵ن: ستون تاریخ در CSV قابل مرتب‌سازی است ─────────────────────
+// `Date::format()` تاریخ شمسی با ارقام فارسی می‌دهد («۱۴۰۳/۰۵/۱۰»).
+// Excel آن را تاریخ نمی‌شناسد، پس نه مرتب می‌شود نه فیلتر بازه‌ای.
+$date_csv_report = $report_svc->get_person_report(
+	$csv_person_id,
+	array( 'range' => 'all', 'for_export' => true )
+);
+
+if ( ! is_wp_error( $date_csv_report ) ) {
+	$date_rows = $export->person_report_rows( $date_csv_report );
+
+	$transaction_row = null;
+
+	foreach ( $date_rows as $date_row ) {
+		if ( is_array( $date_row ) && isset( $date_row[0] ) && 0 === strpos( (string) $date_row[0], 'TXN-' ) ) {
+			$transaction_row = $date_row;
+			break;
+		}
+	}
+
+	spk_assert( null !== $transaction_row, 'ردیف تراکنش در CSV گزارش فردی هست' );
+
+	if ( null !== $transaction_row ) {
+		// ستون تاریخ (اندیس ۱) باید ISO لاتین باشد.
+		spk_assert(
+			(bool) preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $transaction_row[1] ),
+			'ستون تاریخ CSV قالب ISO دارد',
+			var_export( $transaction_row[1], true )
+		);
+
+		// هیچ رقم فارسی در ستون تاریخ نباشد.
+		spk_assert(
+			! preg_match( '/[۰-۹٠-٩]/u', (string) $transaction_row[1] ),
+			'ستون تاریخ CSV رقم فارسی ندارد'
+		);
+	}
+}
+
 // ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
 $p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
 $p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱
