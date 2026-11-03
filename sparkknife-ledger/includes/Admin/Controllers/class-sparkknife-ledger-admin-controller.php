@@ -425,6 +425,14 @@ class Sparkknife_Ledger_Admin_Controller {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce در handle_post_action بررسی شده است.
 		$input = wp_unslash( $_POST );
 
+		/*
+		 * `active_tab` مشخص می‌کند فرم کدام تب ارسال شده است؛ بدون آن،
+		 * ذخیره یک تب چک‌باکس‌های تب‌های دیگر را خاموش می‌کرد.
+		 */
+		$input['settings_section'] = isset( $_POST['active_tab'] )
+			? sanitize_key( wp_unslash( $_POST['active_tab'] ) )
+			: 'all';
+
 		Sparkknife_Ledger_Settings::save( $input );
 
 		Sparkknife_Ledger_Admin_Loader::add_notice(

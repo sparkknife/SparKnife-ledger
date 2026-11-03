@@ -190,5 +190,6 @@ require_once __DIR__ . '/scenarios/06-reports-export.php';
 require_once __DIR__ . '/scenarios/07-security.php';
 require_once __DIR__ . '/scenarios/08-ui-render.php';
 require_once __DIR__ . '/scenarios/09-uninstall.php';
+require_once __DIR__ . '/scenarios/10-regression.php';
 
 exit( Sparkknife_Ledger_Test_Reporter::summary() );

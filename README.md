@@ -5,7 +5,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-5.8%2B-21759b)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-777bb4)](https://www.php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-blue)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Tests](https://img.shields.io/badge/tests-326%20passing-brightgreen)](#تستها)
+[![Tests](https://img.shields.io/badge/tests-378%20passing-brightgreen)](#تستها)
 
 ---
 
@@ -258,7 +258,7 @@ add_filter( 'sparkknife_ledger_export_formats', function ( $formats ) {
 php tests/run-tests.php /path/to/wp-load.php
 ```
 
-پوشش: **۳۲۶ assertion در ۹ سناریو**
+پوشش: **۳۷۸ assertion در ۱۰ سناریو**
 
 | # | سناریو |
 | --- | --- |
@@ -271,6 +271,7 @@ php tests/run-tests.php /path/to/wp-load.php
 | ۷ | امنیت (nonce، capability، XSS) |
 | ۸ | رندر رابط کاربری |
 | ۹ | حذف افزونه و نگه‌داری داده‌ها |
+| ۱۰ | رگرسیون باگ‌های ممیزی |
 
 `09-uninstall.php` باید آخرین سناریو بماند، چون در پایان جداول را از نو می‌سازد تا سایت تست قابل استفاده مجدد باشد.
 
