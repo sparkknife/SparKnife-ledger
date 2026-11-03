@@ -1714,6 +1714,39 @@ spk_equals( '-0.1', $with_decimals, 'با دو رقم اعشار، منفی یک
 Sparkknife_Ledger_Settings::save( $zero_defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
 
+// ── ۲۵ث: ورودی نامعتبر مبلغ، خطا می‌دهد نه مبلغ اشتباه ────────────
+// `normalize_amount_input()` هر نویسه غیرمجاز را حذف می‌کرد، پس ورودی
+// نامعتبر به یک مبلغ معتبر ولی اشتباه تبدیل می‌گشت: «1e5» می‌شد ۱۵
+// تومان و «0x10» می‌شد ۱۰ تومان. کاربر مبلغی تایپ می‌کرد و چیز دیگری
+// ثبت می‌شد، بی‌هیچ پیامی.
+
+$bad_amounts = array( '1e5', '0x10', '1+000', '12ab34', 'ده هزار' );
+
+foreach ( $bad_amounts as $bad ) {
+	$parsed = Sparkknife_Ledger_Money::parse_amount( $bad );
+
+	spk_assert(
+		is_wp_error( $parsed ),
+		sprintf( 'مبلغ نامعتبر «%s» رد می‌شود (نه اینکه به عدد دیگری تبدیل شود)', $bad )
+	);
+}
+
+// ورودی‌های معتبر همچنان کار می‌کنند.
+$valid_amounts = array(
+	'۱۰۰۰'    => '10000000',
+	'۱٬۰۰۰'   => '10000000',
+	'1,000'   => '10000000',
+	'١٠٠٠'    => '10000000',
+	'+1000'   => '10000000',
+	'1000.5'  => '10005000',
+);
+
+foreach ( $valid_amounts as $raw => $expected ) {
+	$parsed = Sparkknife_Ledger_Money::parse_amount( $raw );
+
+	spk_equals( $expected, is_wp_error( $parsed ) ? 'خطا' : (string) $parsed, sprintf( 'مبلغ معتبر «%s» درست خوانده می‌شود', $raw ) );
+}
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
