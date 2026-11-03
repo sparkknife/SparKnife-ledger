@@ -13,6 +13,50 @@ defined( 'ABSPATH' ) || exit;
 class Sparkknife_Ledger_Report_Service {
 
 	/**
+	 * سقف ردیف در هر صفحه.
+	 *
+	 * صفحه‌های عادی حداکثر ۲۰۰ ردیف نشان می‌دهند تا بار سرور کنترل شود،
+	 * ولی چاپ و صادرات CSV باید همه داده را بدهند. پیش‌تر کنترلر چاپ
+	 * `per_page` را ۵۰۰ می‌فرستاد و بی‌صدا به ۲۰۰ کوتاه می‌شد؛ صادرات هم
+	 * اصلاً نمی‌فرستاد و روی پیش‌فرض ۲۰ می‌ماند. نتیجه این بود که از ۲۵۰
+	 * شخص، فقط ۲۰۰ در چاپ و ۲۰ در CSV می‌آمد، در حالی که `total` عدد
+	 * کامل را نشان می‌داد و کاربر فکر می‌کرد فایلش کامل است.
+	 */
+	const MAX_PAGE_SIZE = 200;
+
+	/**
+	 * سقف ردیف برای صادرات و چاپ.
+	 *
+	 * عملاً «همه چیز» است؛ فقط برای جلوگیری از تمام شدن حافظه در دفتری
+	 * با بیش از صدهزار شخص گذاشته شده. هر ردیف حدود ۲۰۰ بایت می‌گیرد،
+	 * پس ۱۰۰٬۰۰۰ ردیف حدود ۲۰ مگابایت می‌شود که در سقف ۲۵۶ مگابایتی
+	 * وردپرس جا می‌شود.
+	 */
+	const MAX_EXPORT_PAGE_SIZE = 100000;
+
+	/**
+	 * محاسبه اندازه صفحه با رعایت سقف.
+	 *
+	 * @param array<string, mixed> $args آرگومان‌ها.
+	 * @return int
+	 */
+	private static function resolve_page_size( array $args ) {
+		if ( isset( $args['per_page'] ) ) {
+			$requested = absint( $args['per_page'] );
+
+			return max( 1, min( self::MAX_PAGE_SIZE, $requested ) );
+		}
+
+		// صادرات و چاپ: همه ردیف‌ها تا سقف بالا.
+		if ( ! empty( $args['for_export'] ) ) {
+			return self::MAX_EXPORT_PAGE_SIZE;
+		}
+
+		return (int) Sparkknife_Ledger_Settings::get( 'per_page', 20 );
+	}
+
+
+	/**
 	 * نمونه یکتا.
 	 *
 	 * @var Sparkknife_Ledger_Report_Service|null
@@ -57,7 +101,7 @@ class Sparkknife_Ledger_Report_Service {
 		$type   = isset( $args['type'] ) && in_array( $args['type'], array( 'income', 'expense' ), true ) ? $args['type'] : '';
 		$status = isset( $args['status'] ) && in_array( $args['status'], array( 'posted', 'void' ), true ) ? $args['status'] : '';
 
-		$per_page = isset( $args['per_page'] ) ? max( 1, min( 200, absint( $args['per_page'] ) ) ) : (int) Sparkknife_Ledger_Settings::get( 'per_page', 20 );
+		$per_page = self::resolve_page_size( $args );
 		$page     = isset( $args['page'] ) ? max( 1, absint( $args['page'] ) ) : 1;
 
 		$query_args = array(
@@ -170,14 +214,30 @@ class Sparkknife_Ledger_Report_Service {
 			);
 		}
 
-		// جستجو روی نام.
+		/*
+		 * جستجو روی نام و شماره تلفن.
+		 *
+		 * برای هر دو طرف مقایسه از `normalize_persian()` استفاده می‌شود تا
+		 * «علي» و «علی» یکی شمرده شوند؛ وگرنه کسی که نامش را با «ي» عربی
+		 * تایپ کرده بود در این گزارش پیدا نمی‌شد، در حالی که همان جستجو در
+		 * فهرست اشخاص نتیجه می‌داد.
+		 *
+		 * `mb_stripos` اگر mbstring نصب نباشد باعث خطای مرگبار می‌شود؛
+		 * `stripos` جایگزین امن آن است (نام‌ها پس از یکسان‌سازی فارسی،
+		 * تفاوت بزرگی/کوچکی حروف لاتین را فقط در بخش انگلیسی نام دارند).
+		 */
 		$search = isset( $args['search'] ) ? trim( (string) $args['search'] ) : '';
 		if ( '' !== $search ) {
+			$needle = Sparkknife_Ledger_Sanitizer::normalize_persian( $search );
+
 			$rows = array_values(
 				array_filter(
 					$rows,
-					function ( $row ) use ( $search ) {
-						return false !== mb_stripos( $row['name'], $search ) || false !== strpos( (string) $row['phone'], $search );
+					function ( $row ) use ( $needle ) {
+						$name  = Sparkknife_Ledger_Sanitizer::normalize_persian( $row['name'] );
+						$phone = Sparkknife_Ledger_Sanitizer::normalize_persian( (string) $row['phone'] );
+
+						return false !== stripos( $name, $needle ) || false !== strpos( $phone, $needle );
 					}
 				)
 			);
@@ -240,7 +300,7 @@ class Sparkknife_Ledger_Report_Service {
 		}
 
 		// صفحه‌بندی.
-		$per_page = isset( $args['per_page'] ) ? max( 1, min( 200, absint( $args['per_page'] ) ) ) : (int) Sparkknife_Ledger_Settings::get( 'per_page', 20 );
+		$per_page = self::resolve_page_size( $args );
 		$page     = isset( $args['page'] ) ? max( 1, absint( $args['page'] ) ) : 1;
 		$total    = count( $rows );
 

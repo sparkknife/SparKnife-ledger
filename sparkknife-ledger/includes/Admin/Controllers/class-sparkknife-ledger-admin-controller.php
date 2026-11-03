@@ -562,8 +562,11 @@ class Sparkknife_Ledger_Admin_Controller {
 			'type'      => isset( $_GET['type'] ) ? sanitize_key( wp_unslash( $_GET['type'] ) ) : '',
 			'status'    => isset( $_GET['status'] ) ? sanitize_key( wp_unslash( $_GET['status'] ) ) : '',
 			'search'    => isset( $_GET['search'] ) ? wp_unslash( $_GET['search'] ) : '',
-			'orderby'   => isset( $_GET['orderby'] ) ? sanitize_key( wp_unslash( $_GET['orderby'] ) ) : 'balance',
-			'order'     => isset( $_GET['order'] ) ? sanitize_key( wp_unslash( $_GET['order'] ) ) : 'desc',
+			'orderby'    => isset( $_GET['orderby'] ) ? sanitize_key( wp_unslash( $_GET['orderby'] ) ) : 'balance',
+			'order'      => isset( $_GET['order'] ) ? sanitize_key( wp_unslash( $_GET['order'] ) ) : 'desc',
+			// صادرات باید کل داده را بدهد؛ بدون این، فقط ۲۰ ردیف اول می‌آمد.
+			'for_export' => true,
+			'page'       => 1,
 		);
 
 		$export = Sparkknife_Ledger_Export_Service::instance();
@@ -635,9 +638,9 @@ class Sparkknife_Ledger_Admin_Controller {
 			'search'    => isset( $_GET['search'] ) ? sanitize_text_field( wp_unslash( $_GET['search'] ) ) : '',
 			'orderby'   => isset( $_GET['orderby'] ) ? sanitize_key( wp_unslash( $_GET['orderby'] ) ) : 'balance',
 			'order'     => isset( $_GET['order'] ) ? sanitize_key( wp_unslash( $_GET['order'] ) ) : 'desc',
-			// چاپ باید همه ردیف‌ها را شامل شود.
-			'per_page'  => 500,
-			'page'      => 1,
+			// چاپ باید همه ردیف‌ها را شامل شود، نه یک صفحه.
+			'for_export' => true,
+			'page'       => 1,
 		);
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 

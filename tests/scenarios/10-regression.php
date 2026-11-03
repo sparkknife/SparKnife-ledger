@@ -688,6 +688,81 @@ $k_search       = $person_repo->query( array( 'search' => $k_arabic_query, 'page
 
 spk_assert( $k_search['total'] >= 1, 'جستجو با «ك» عربی نام دارای «ک» را پیدا می‌کند', (string) $k_search['total'] );
 
+// ── ۲۵ب: جستجوی گزارش خلاصه هم املاهای فارسی را یکسان می‌بیند ─────
+// جستجو در فهرست اشخاص (مخزن) با «علي» کار می‌کرد ولی گزارش خلاصه
+// لایه‌ی فیلتر خودش را داشت که فقط مقایسه‌ی خام انجام می‌داد.
+// یک شخص مخصوص همین آزمون ساخته می‌شود تا به داده‌ی آزمون‌های قبل
+// وابسته نباشد.
+$report_search_person = 'مریم گزارش‌آزمون';
+$wpdb->query(
+	$wpdb->prepare(
+		'DELETE FROM ' . Sparkknife_Ledger_DB::persons_table() . ' WHERE name = %s',
+		$report_search_person
+	)
+);
+$ps->create( array( 'name' => $report_search_person, 'phone' => '09125550000' ) );
+
+$report_search_queries = array( 'مريم', 'مریم' );
+
+foreach ( $report_search_queries as $needle ) {
+	$summary = Sparkknife_Ledger_Report_Service::instance()->get_summary_report( array( 'search' => $needle ) );
+	spk_assert( count( $summary['rows'] ) >= 1, 'گزارش خلاصه با «' . $needle . '» نتیجه می‌دهد', (string) count( $summary['rows'] ) );
+}
+
+// ── ۲۵ج: صادرات و چاپ نباید به یک صفحه محدود شوند ──────────────────
+// کنترلر چاپ `per_page = 500` می‌فرستاد که بی‌صدا به ۲۰۰ کوتاه می‌شد و
+// کنترلر صادرات هیچ عددی نمی‌فرستاد، پس روی پیش‌فرض ۲۰ می‌ماند؛ فایل
+// CSV از ۲۵۰ شخص فقط ۲۰ ردیف داشت، بدون هیچ هشداری.
+$export_person = 'شخص صادرات‌آزمون';
+$wpdb->query(
+	$wpdb->prepare(
+		'DELETE FROM ' . Sparkknife_Ledger_DB::persons_table() . ' WHERE name = %s',
+		$export_person
+	)
+);
+
+$export_person_id = $ps->create( array( 'name' => $export_person, 'phone' => '09125550100' ) );
+spk_assert( ! is_wp_error( $export_person_id ), 'شخص آزمون صادرات ساخته شد' );
+
+$txn_svc = Sparkknife_Ledger_Transaction_Service::instance();
+
+for ( $i = 1; $i <= 45; $i++ ) {
+	$txn_svc->create(
+		array(
+			'person_id' => $export_person_id,
+			'type'      => 0 === $i % 2 ? 'income' : 'expense',
+			'amount'    => '1000',
+			'txn_date'  => '1403/05/' . str_pad( (string) ( ( $i % 28 ) + 1 ), 2, '0', STR_PAD_LEFT ),
+			'description' => 'تراکنش آزمون صادرات ' . $i,
+		)
+	);
+}
+
+$report_svc = Sparkknife_Ledger_Report_Service::instance();
+
+// بدون for_export فقط یک صفحه می‌آید (رفتار صفحه‌بندی عادی).
+$page_report = $report_svc->get_person_report( $export_person_id, array( 'page' => 1 ) );
+$page_count  = count( $page_report['transactions']['items'] );
+
+// با for_export همه تراکنش‌ها می‌آیند.
+$full_report = $report_svc->get_person_report( $export_person_id, array( 'page' => 1, 'for_export' => true ) );
+$full_count  = count( $full_report['transactions']['items'] );
+
+spk_equals( 45, $full_count, 'صادرات همه تراکنش‌های شخص را می‌دهد' );
+spk_assert( $full_count > $page_count, 'صادرات بیشتر از یک صفحه ردیف دارد', $page_count . ' → ' . $full_count );
+
+// گزارش تجمیعی هم با for_export از سقف ۲۰۰ ردیف صفحه عبور می‌کند.
+$summary_export = $report_svc->get_summary_report( array( 'page' => 1, 'for_export' => true ) );
+spk_assert(
+	$summary_export['pagination']['per_page'] > Sparkknife_Ledger_Report_Service::MAX_PAGE_SIZE,
+	'صادرات تجمیعی از سقف صفحه‌بندی عبور می‌کند',
+	(string) $summary_export['pagination']['per_page']
+);
+
+// ولی سقف امنیتی برای صفحه عادی سر جایش است: ۵۰۰ خواسته، ۲۰۰ می‌گیرد.
+$capped = $report_svc->get_summary_report( array( 'page' => 1, 'per_page' => 500 ) );
+spk_equals( 200, $capped['pagination']['per_page'], 'سقف ۲۰۰ ردیف برای صفحه عادی حفظ شده است' );
+
 // ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
 $p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
 $p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱
