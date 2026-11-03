@@ -67,11 +67,29 @@ class Sparkknife_Ledger_Transaction_Service {
 		global $wpdb;
 
 		$prefix = Sparkknife_Ledger_Settings::get( 'reference_prefix', 'TXN' );
-		$prefix = preg_replace( '/[^A-Za-z0-9]/', '', (string) $prefix );
+
+		/*
+		 * پیشوند می‌تواند فارسی باشد.
+		 *
+		 * پیش‌تر تنها `[A-Za-z0-9]` نگه داشته می‌شد، پس پیشوندی مثل
+		 * «پیشوند-فارسی» یا «۱۲۳۴» به رشته خالی تبدیل می‌شد و **بی‌صدا**
+		 * به `TXN` می‌افتاد — کاربر پیشوند را در تنظیمات می‌دید، ولی
+		 * شماره تراکنش‌ها چیز دیگری بود. این افزونه فارسی است؛ پیشوند
+		 * فارسی باید کار کند.
+		 *
+		 * ارقام فارسی/عربی به لاتین تبدیل می‌شوند تا شماره‌ها در هر
+		 * جستجو و صادراتی یکسان دیده شوند، و خط تیره/زیرخط نگه داشته
+		 * می‌شود (جداکننده طبیعی پیشوند است).
+		 */
+		$prefix = Sparkknife_Ledger_Money::to_latin_digits( (string) $prefix );
+		$prefix = preg_replace( '/[^\p{L}\p{N}_-]/u', '', $prefix );
 
 		if ( '' === $prefix ) {
 			$prefix = 'TXN';
 		}
+
+		// ستون `reference` بیست‌وپنج نویسه جا می‌دهد؛ بیش از این، بریده می‌شود.
+		$prefix = Sparkknife_Ledger_Sanitizer::limit( $prefix, 11 );
 
 		$date = $date ? $date : Sparkknife_Ledger_Date::today();
 		$stem = $prefix . '-' . gmdate( 'Ymd', strtotime( $date ) ) . '-';
