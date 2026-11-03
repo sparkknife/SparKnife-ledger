@@ -1095,6 +1095,64 @@ spk_equals( 'علی', Sparkknife_Ledger_Sanitizer::limit( 'علی', 190 ), 'مت
 $long_persian = Sparkknife_Ledger_Sanitizer::limit( str_repeat( 'ی', 500 ), 190 );
 spk_equals( 190, Sparkknife_Ledger_Sanitizer::length( $long_persian ), 'سقف بر حسب نویسه اعمال می‌شود نه بایت' );
 
+// ── ۲۵م: ستون مبلغ در CSV عدد است، نه متن ─────────────────────────
+// `Money::format()` ارقام فارسی می‌کند و برچسب واحد پول می‌چسباند. آن
+// رشته در Excel متن است نه عدد، پس کاربر نمی‌تواند جمع بزند یا نمودار
+// بکشد. برای فایل صادراتی حسابداری یعنی فایل عملاً بی‌مصرف.
+$csv_owner = 'شخص سی‌اس‌وی‌آزمون';
+$wpdb->query(
+	$wpdb->prepare(
+		'DELETE FROM ' . Sparkknife_Ledger_DB::persons_table() . ' WHERE name = %s',
+		$csv_owner
+	)
+);
+
+$csv_person_id = $ps->create( array( 'name' => $csv_owner, 'phone' => '09125552000' ) );
+$txn_svc->create(
+	array(
+		'person_id' => $csv_person_id,
+		'type'      => 'income',
+		'amount'    => '1234',
+		'txn_date'  => '1403/05/10',
+	)
+);
+
+$csv_report = $report_svc->get_summary_report( array( 'range' => 'all', 'for_export' => true ) );
+$csv_rows   = $export->summary_report_rows( $csv_report );
+
+$csv_data_row = null;
+
+foreach ( $csv_rows as $csv_candidate ) {
+	if ( is_array( $csv_candidate ) && isset( $csv_candidate[1] ) && $csv_candidate[1] === $csv_owner ) {
+		$csv_data_row = $csv_candidate;
+		break;
+	}
+}
+
+spk_assert( null !== $csv_data_row, 'ردیف داده در CSV پیدا شد' );
+
+if ( null !== $csv_data_row ) {
+	// ستون ۳ (ورودی) باید عدد خالص باشد.
+	spk_assert( is_numeric( $csv_data_row[3] ), 'ستون ورودی CSV عدد است', var_export( $csv_data_row[3], true ) );
+	spk_equals( '1234', (string) $csv_data_row[3], 'مبلغ CSV همان مبلغ ثبت‌شده است' );
+
+	// هیچ ارقام فارسی یا برچسب واحد پول نباید داخل سلول مبلغ باشد.
+	spk_assert( false === strpos( (string) $csv_data_row[3], 'تومان' ), 'ستون مبلغ برچسب واحد پول ندارد' );
+	spk_assert( false === strpos( (string) $csv_data_row[3], '،' ), 'ستون مبلغ جداکننده فارسی ندارد' );
+
+	// واحد پول باید در سرصفحه آمده باشد تا اطلاعات گم نشود.
+	$currency_in_header = false;
+
+	foreach ( $csv_rows as $csv_head ) {
+		if ( is_array( $csv_head ) && isset( $csv_head[0] ) && 0 === strpos( (string) $csv_head[0], 'واحد پول' ) ) {
+			$currency_in_header = true;
+			break;
+		}
+	}
+
+	spk_assert( $currency_in_header, 'واحد پول در سرصفحه CSV ذکر شده است' );
+}
+
 // ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
 $p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
 $p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱
