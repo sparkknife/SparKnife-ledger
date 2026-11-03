@@ -1400,6 +1400,56 @@ spk_assert( $labels['broken'] !== $labels['missing'], 'برچسب «ناقص» �
 Sparkknife_Ledger_Installer::maybe_upgrade();
 Sparkknife_Ledger_DB::flush_table_cache();
 
+// ── ۲۵ف: بک‌اسلش نام شخص دو بار unslash نمی‌شود ────────────────────
+// مسیر واقعی: وردپرس ابرگلوبال را slash می‌زند، کنترلر یک بار
+// `wp_unslash()` می‌کند، و `Sanitizer::text()` پیش‌تر دوباره این کار را
+// می‌کرد. نتیجه: نام «بک‌اسلش\دار» بی‌صدا به «بک‌اسلشدار» تبدیل می‌شد.
+
+global $wpdb;
+
+$pe = Sparkknife_Ledger_DB::persons_table();
+
+// نامی که یک بک‌اسلش واقعی دارد، پس از یک بار unslash.
+$name_after_unslash = 'کاربر بک‌اسلش\دار';
+
+$sanitized = Sparkknife_Ledger_Sanitizer::text( $name_after_unslash );
+
+spk_equals(
+	$name_after_unslash,
+	$sanitized,
+	'Sanitizer::text بک‌اسلش را دست‌نخورده نگه می‌دارد'
+);
+
+$sanitized_area = Sparkknife_Ledger_Sanitizer::textarea( "خط اول\nمسیر C:\\پوشه\\فایل" );
+
+spk_assert(
+	false !== strpos( $sanitized_area, '\\' ),
+	'Sanitizer::textarea بک‌اسلش را نگه می‌دارد'
+);
+
+// مسیر کامل کنترلر → سرویس → دیتابیس.
+$phone = '0919' . str_pad( (string) wp_rand( 1000000, 9999999 ), 7, '0', STR_PAD_LEFT );
+$made  = Sparkknife_Ledger_Person_Service::instance()->create(
+	array(
+		'name'  => $name_after_unslash,
+		'phone' => $phone,
+	)
+);
+
+spk_assert( ! is_wp_error( $made ), 'شخص با بک‌اسلش در نام ثبت می‌شود' );
+
+if ( ! is_wp_error( $made ) ) {
+	$stored = $wpdb->get_var( $wpdb->prepare( "SELECT name FROM {$pe} WHERE id = %d", (int) $made ) );
+
+	spk_equals( $name_after_unslash, (string) $stored, 'بک‌اسلش نام در دیتابیس حفظ می‌شود' );
+	spk_assert(
+		false !== strpos( (string) $stored, '\\' ),
+		'نام ذخیره‌شده بک‌اسلش دارد'
+	);
+
+	Sparkknife_Ledger_Person_Service::instance()->delete( (int) $made );
+}
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
