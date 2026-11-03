@@ -169,7 +169,19 @@ $form_url = $is_edit
 				<div class="spk-field spk-field--preview">
 					<span class="spk-field__label"><?php esc_html_e( 'پیش‌نمایش مبلغ', 'sparkknife-ledger' ); ?></span>
 					<div class="spk-amount-preview" data-amount-preview aria-live="polite">
-						<?php echo esc_html( '' !== $values['amount'] ? Sparkknife_Ledger_Money::format( Sparkknife_Ledger_Money::parse_amount( $values['amount'] ) ?: 0 ) : '—' ); ?>
+						<?php
+						/*
+						 * parse_amount() در خطا یک WP_Error برمی‌گرداند و WP_Error
+						 * در شرط بولی «صدق‌پذیر» است؛ بنابراین الگوی پیشین
+						 * `?: 0` هرگز به ۰ نمی‌رسید و format() روی شیء خطا
+						 * می‌افتاد و صفحه با خطای مرگبار از کار می‌افتاد.
+						 */
+						$preview_amount = '' !== $values['amount']
+							? Sparkknife_Ledger_Money::parse_amount( $values['amount'] )
+							: null;
+
+						echo esc_html( is_string( $preview_amount ) ? Sparkknife_Ledger_Money::format( $preview_amount ) : '—' );
+						?>
 					</div>
 					<p class="spk-field__hint"><?php esc_html_e( 'مبلغ نهایی پس از ذخیره، دقیق و اعشاری ذخیره می‌شود.', 'sparkknife-ledger' ); ?></p>
 				</div>

@@ -193,6 +193,14 @@ class Sparkknife_Ledger_Money {
 	 */
 	public static function normalize_amount_input( $raw ) {
 		$value = self::to_latin_digits( $raw );
+
+		/*
+		 * منفی یونیکد (U+2212) و منفی کشیده (U+2013/U+2014) به منفی ASCII
+		 * تبدیل می‌شوند. پیش‌تر این کاراکترها در مرحله پاک‌سازی حذف می‌شدند
+		 * و «−۵» به «۵» تبدیل می‌شد — یعنی مبلغ منفی، مثبت ثبت می‌شد.
+		 */
+		$value = str_replace( array( '−', '–', '—', '﹣' ), '-', $value );
+
 		$value = str_replace( array( '٫', '،', '٬' ), array( '.', ',', '' ), $value );
 
 		// حذف نماد/برچسب واحد پول.
@@ -213,6 +221,19 @@ class Sparkknife_Ledger_Money {
 			}
 		} else {
 			$value = str_replace( self::thousands_separator(), '', $value );
+		}
+
+		/*
+		 * نقطه در جای جداکننده هزارگان.
+		 *
+		 * کاربران ایرانی «۱.۲۳۴» را به‌جای «۱٬۲۳۴» می‌نویسند و کیبورد عددی
+		 * نیز همین را می‌دهد. الگوی نقطه‌ی درست‌چیده‌شده در گروه‌های سه‌رقمی
+		 * بی‌ابهام است و به‌عنوان جداکننده حذف می‌شود. بدون این کار «1.234»
+		 * به‌عنوان یک و دو‌دهم‌و‌سیصدو‌سی‌وچهار هزارم خوانده می‌شد و مبلغی
+		 * هزار برابر کوچک‌تر از خواسته کاربر ذخیره می‌شد.
+		 */
+		if ( preg_match( '/^\d{1,3}(?:\.\d{3})+$/', $value ) ) {
+			$value = str_replace( '.', '', $value );
 		}
 
 		// فقط رقم، نقطه و علامت منفی مجاز است؛ هر کاراکتر دیگر حذف می‌شود.
@@ -304,6 +325,15 @@ class Sparkknife_Ledger_Money {
 	 * @return string
 	 */
 	public static function format( $amount, $scaled = true, $with_currency = true ) {
+		/*
+		 * اگر به‌اشتباه WP_Error یا شیئی به اینجا برسد، پیش‌تر با
+		 * «Object could not be converted to string» صفحه از کار می‌افتاد.
+		 * حالا به‌جای خطای مرگبار، خط تیره نمایش داده می‌شود.
+		 */
+		if ( is_object( $amount ) || is_array( $amount ) ) {
+			return '—';
+		}
+
 		$value = $scaled ? self::to_human( $amount ) : (string) $amount;
 
 		$result = Sparkknife_Ledger_Amount::group( $value, self::thousands_separator() );

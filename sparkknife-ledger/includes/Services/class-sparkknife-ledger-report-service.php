@@ -213,7 +213,20 @@ class Sparkknife_Ledger_Report_Service {
 						$result = Sparkknife_Ledger_Amount::cmp( $a[ $orderby ], $b[ $orderby ] );
 					}
 
-					return 'asc' === $order ? $result : -$result;
+					$result = 'asc' === $order ? $result : -$result;
+
+					/*
+					 * کلید دوم برای شکستن تساوی.
+					 *
+					 * usort در PHP پیش از ۸.۰ پایدار نیست؛ بدون این کلید،
+					 * ردیف‌هایی با مانده یکسان می‌توانستند بین صفحه‌ها
+					 * جابه‌جا شوند یا در دو صفحه تکرار شوند.
+					 */
+					if ( 0 === $result ) {
+						$result = (int) $a['id'] <=> (int) $b['id'];
+					}
+
+					return $result;
 				}
 			);
 		}

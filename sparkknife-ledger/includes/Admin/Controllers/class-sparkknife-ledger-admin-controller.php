@@ -482,6 +482,13 @@ class Sparkknife_Ledger_Admin_Controller {
 	 * @return void
 	 */
 	private function handle_data_purge( $redirect ) {
+		/*
+		 * این متد داده‌های مالی را نابود می‌کند؛ هر دو شرط باید صریحاً
+		 * با return محافظت شوند و به خروجی add_notice تکیه نکنیم.
+		 * add_notice با redirect غیرخالی exit می‌کند، اما اگر روزی آن
+		 * رفتار تغییر کند یا $redirect خالی باشد، بدون این returnها
+		 * حذف داده برای کاربر بی‌مجوز هم اجرا می‌شد.
+		 */
 		if ( ! current_user_can( 'manage_options' ) ) {
 			Sparkknife_Ledger_Admin_Loader::add_notice(
 				'error',
@@ -489,6 +496,8 @@ class Sparkknife_Ledger_Admin_Controller {
 				array(),
 				$redirect
 			);
+
+			return;
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce در handle_post_action بررسی شده است.
@@ -501,6 +510,8 @@ class Sparkknife_Ledger_Admin_Controller {
 				array(),
 				$redirect
 			);
+
+			return;
 		}
 
 		Sparkknife_Ledger_Installer::purge_all_data();
@@ -707,7 +718,14 @@ class Sparkknife_Ledger_Admin_Controller {
 			60
 		);
 
-		Sparkknife_Ledger_Admin_Loader::add_notice( 'error', $error->get_error_message() );
+		/*
+		 * عمداً add_notice صدا زده نمی‌شود.
+		 *
+		 * پیام خطا از ترنزینت form_errors در header.php نمایش داده می‌شود و
+		 * فراخوان‌ها پس از این متد خودشان add_notice( ..., $redirect ) را
+		 * صدا می‌زنند. صدا زدن هر دو منبع، همان خطا را دو بار به کاربر
+		 * نشان می‌داد.
+		 */
 	}
 
 	/**

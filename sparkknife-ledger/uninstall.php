@@ -79,6 +79,12 @@ function sparkknife_ledger_uninstall_site() {
 
 		do_action( 'sparkknife_ledger_uninstalled', true );
 
+		// گزینه‌های نسخه در هر دو حالت پاک می‌شوند؛ پیش‌تر return بالا
+		// باعث می‌شد در حالت حذف کامل هم باقی بمانند و نصب مجدد تصور
+		// کند جداول هنوز وجود دارند.
+		delete_option( 'sparkknife_ledger_db_version' );
+		delete_option( 'sparkknife_ledger_version' );
+
 		return;
 	}
 

@@ -208,6 +208,17 @@ class Sparkknife_Ledger_Admin_Loader {
 		$type = isset( $notice['type'] ) && in_array( $notice['type'], array( 'success', 'error', 'warning', 'info' ), true ) ? $notice['type'] : 'info';
 		$text = isset( $notice['message'] ) ? (string) $notice['message'] : '';
 
+		/*
+		 * پیام خالی رندر نمی‌شود.
+		 *
+		 * redirect_back_with() عمداً اعلانی با پیام خالی ثبت می‌کند تا
+		 * فقط کاربر به فرم بازگردانده شود؛ پیش‌تر این حالت یک جعبه
+		 * خطای توخالی در بالای صفحه نمایش می‌داد.
+		 */
+		if ( '' === trim( $text ) ) {
+			return;
+		}
+
 		printf(
 			'<div class="notice notice-%1$s is-dismissible sparkknife-ledger-notice"><p>%2$s</p></div>',
 			esc_attr( $type ),
