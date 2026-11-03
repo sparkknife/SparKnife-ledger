@@ -1795,6 +1795,47 @@ foreach ( $views_to_check as $view_relative ) {
 	);
 }
 
+// ── ۲۵چ: پارامترهای آدرس کدگذاری می‌شوند ──────────────────────────
+// `add_query_arg()` خودش کدگذاری نمی‌کند. مقداری مثل «علی & co» با `&`
+// خام در آدرس می‌نشست و مرورگر آن را به دو پارامتر می‌شکست. با مقدار
+// دستکاری‌شده می‌شد پارامتر جعلی ساخت («x&action=delete»).
+
+$url_cases = array(
+	'علی & co',
+	'a b',
+	'x&action=delete',
+	'۱۰۰%',
+	'علي',
+);
+
+foreach ( $url_cases as $query_value ) {
+	$url = Sparkknife_Ledger_Renderer::url( 'persons', array( 'search' => $query_value ) );
+
+	$parsed_query = (string) wp_parse_url( $url, PHP_URL_QUERY );
+
+	$params = array();
+	parse_str( $parsed_query, $params );
+
+	spk_equals(
+		$query_value,
+		isset( $params['search'] ) ? (string) $params['search'] : '',
+		sprintf( 'مقدار جستجوی «%s» پس از رفت و برگشت در آدرس سالم می‌ماند', $query_value )
+	);
+
+	spk_equals(
+		'sparkknife-ledger-persons',
+		isset( $params['page'] ) ? (string) $params['page'] : '',
+		'صفحه درست در آدرس می‌ماند'
+	);
+}
+
+// پارامتر جعلی ساخته نمی‌شود.
+$tricky = Sparkknife_Ledger_Renderer::url( 'persons', array( 'search' => 'x&action=delete' ) );
+$tricky_params = array();
+parse_str( (string) wp_parse_url( $tricky, PHP_URL_QUERY ), $tricky_params );
+
+spk_assert( ! isset( $tricky_params['action'] ), 'هیچ پارامتر جعلی از مقدار جستجو ساخته نمی‌شود' );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
