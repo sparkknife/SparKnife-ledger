@@ -1,0 +1,303 @@
+<?php
+/**
+ * سرویس گزارش‌گیری فردی و تجمیعی.
+ *
+ * @package SparKnife_Ledger
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * تولید داده گزارش‌ها.
+ */
+class Sparkknife_Ledger_Report_Service {
+
+	/**
+	 * نمونه یکتا.
+	 *
+	 * @var Sparkknife_Ledger_Report_Service|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * دریافت نمونه.
+	 *
+	 * @return Sparkknife_Ledger_Report_Service
+	 */
+	public static function instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * گزارش فردی یک شخص.
+	 *
+	 * @param int                  $person_id شناسه شخص.
+	 * @param array<string, mixed> $args      فیلترها (range, date_from, date_to, type, status, page, per_page, search).
+	 * @return array<string, mixed>|WP_Error
+	 */
+	public function get_person_report( $person_id, array $args = array() ) {
+		$person_id = absint( $person_id );
+		$person    = Sparkknife_Ledger_Person_Repository::instance()->find( $person_id, true );
+
+		if ( ! $person ) {
+			return new WP_Error( 'sparkknife_ledger_person_not_found', __( 'شخص موردنظر یافت نشد.', 'sparkknife-ledger' ) );
+		}
+
+		$range = Sparkknife_Ledger_Ledger_Service::resolve_range( $args );
+
+		$date_args = array(
+			'from' => $range['from'],
+			'to'   => $range['to'],
+		);
+
+		$type   = isset( $args['type'] ) && in_array( $args['type'], array( 'income', 'expense' ), true ) ? $args['type'] : '';
+		$status = isset( $args['status'] ) && in_array( $args['status'], array( 'posted', 'void' ), true ) ? $args['status'] : '';
+
+		$per_page = isset( $args['per_page'] ) ? max( 1, min( 200, absint( $args['per_page'] ) ) ) : (int) Sparkknife_Ledger_Settings::get( 'per_page', 20 );
+		$page     = isset( $args['page'] ) ? max( 1, absint( $args['page'] ) ) : 1;
+
+		$query_args = array(
+			'person_id' => $person_id,
+			'type'      => $type,
+			'status'    => $status,
+			'date_from' => $range['from'],
+			'date_to'   => $range['to'],
+			'search'    => isset( $args['search'] ) ? (string) $args['search'] : '',
+			'page'      => $page,
+			'per_page'  => $per_page,
+			'orderby'   => isset( $args['orderby'] ) ? $args['orderby'] : 'txn_date',
+			'order'     => isset( $args['order'] ) ? $args['order'] : 'DESC',
+		);
+
+		$transactions = Sparkknife_Ledger_Transaction_Repository::instance()->query( $query_args );
+
+		// خلاصه محاسباتی مستقل از فیلتر نوع/وضعیت (مطابق تعریف مانده).
+		$summary = Sparkknife_Ledger_Ledger_Service::instance()->get_person_summary( $person_id, $date_args );
+
+		// در حالت گزارش همیشه تراکنش‌های معتبر پایه محاسبه است؛ جمع فیلترشده جداگانه ارائه می‌شود.
+		$filtered_sums = Sparkknife_Ledger_Transaction_Repository::instance()->sum_by_type(
+			array(
+				'person_id' => $person_id,
+				'type'      => $type,
+				'status'    => '' === $status ? 'active_only' : $status,
+				'date_from' => $range['from'],
+				'date_to'   => $range['to'],
+				'search'    => isset( $args['search'] ) ? (string) $args['search'] : '',
+			)
+		);
+
+		return array(
+			'person'       => $person,
+			'range'        => $range,
+			'filters'      => array(
+				'type'   => $type,
+				'status' => $status,
+				'search' => isset( $args['search'] ) ? (string) $args['search'] : '',
+			),
+			'transactions' => $transactions,
+			'summary'      => $summary,
+			'filtered'     => array(
+				'income'            => $filtered_sums['income'],
+				'expense'           => $filtered_sums['expense'],
+				'count'             => $filtered_sums['count'],
+				'income_formatted'  => Sparkknife_Ledger_Money::format( $filtered_sums['income'] ),
+				'expense_formatted' => Sparkknife_Ledger_Money::format( $filtered_sums['expense'] ),
+				'balance_formatted' => Sparkknife_Ledger_Money::format( Sparkknife_Ledger_Amount::sub( $filtered_sums['income'], $filtered_sums['expense'] ) ),
+				'balance'           => Sparkknife_Ledger_Amount::sub( $filtered_sums['income'], $filtered_sums['expense'] ),
+			),
+		);
+	}
+
+	/**
+	 * گزارش تجمیعی همه اشخاص.
+	 *
+	 * @param array<string, mixed> $args فیلترها (range, date_from, date_to, person_id, type, status, page, per_page, search, orderby, order).
+	 * @return array<string, mixed>
+	 */
+	public function get_summary_report( array $args = array() ) {
+		$range = Sparkknife_Ledger_Ledger_Service::resolve_range( $args );
+
+		$date_args = array(
+			'from' => $range['from'],
+			'to'   => $range['to'],
+		);
+
+		$person_filter = isset( $args['person_id'] ) ? absint( $args['person_id'] ) : 0;
+
+		$type   = isset( $args['type'] ) && in_array( $args['type'], array( 'income', 'expense' ), true ) ? $args['type'] : '';
+		$status = isset( $args['status'] ) && in_array( $args['status'], array( 'posted', 'void' ), true ) ? $args['status'] : '';
+
+		// فهرست اشخاص (بر اساس فیلتر).
+		if ( $person_filter ) {
+			$person = Sparkknife_Ledger_Person_Repository::instance()->find( $person_filter );
+			$persons = $person ? array( $person ) : array();
+		} else {
+			$persons = Sparkknife_Ledger_Person_Repository::instance()->get_all();
+		}
+
+		$ids      = array_map( 'intval', wp_list_pluck( $persons, 'id' ) );
+		$balances = Sparkknife_Ledger_Ledger_Service::instance()->get_balances_bulk( $ids, $date_args );
+
+		$rows = array();
+
+		foreach ( $persons as $person ) {
+			$person_id = (int) $person->id;
+			$summary   = isset( $balances[ $person_id ] ) ? $balances[ $person_id ] : array(
+				'income'         => '0',
+				'expense'        => '0',
+				'balance'        => '0',
+				'count'          => 0,
+				'account_status' => 'settled',
+			);
+
+			$rows[] = array(
+				'id'               => $person_id,
+				'name'             => $person->name,
+				'phone'            => $person->phone,
+				'status'           => $person->status,
+				'income'           => $summary['income'],
+				'expense'          => $summary['expense'],
+				'balance'          => $summary['balance'],
+				'count'            => $summary['count'],
+				'account_status'   => $summary['account_status'],
+				'income_formatted'  => Sparkknife_Ledger_Money::format( $summary['income'] ),
+				'expense_formatted' => Sparkknife_Ledger_Money::format( $summary['expense'] ),
+				'balance_formatted' => Sparkknife_Ledger_Money::format( $summary['balance'] ),
+			);
+		}
+
+		// جستجو روی نام.
+		$search = isset( $args['search'] ) ? trim( (string) $args['search'] ) : '';
+		if ( '' !== $search ) {
+			$rows = array_values(
+				array_filter(
+					$rows,
+					function ( $row ) use ( $search ) {
+						return false !== mb_stripos( $row['name'], $search ) || false !== strpos( (string) $row['phone'], $search );
+					}
+				)
+			);
+		}
+
+		// فقط اشخاص دارای تراکنش.
+		if ( ! empty( $args['with_transactions_only'] ) ) {
+			$rows = array_values(
+				array_filter(
+					$rows,
+					function ( $row ) {
+						return $row['count'] > 0;
+					}
+				)
+			);
+		}
+
+		// مرتب‌سازی.
+		$orderby = isset( $args['orderby'] ) ? sanitize_key( (string) $args['orderby'] ) : 'balance';
+		$order   = isset( $args['order'] ) && 'asc' === strtolower( (string) $args['order'] ) ? 'asc' : 'desc';
+
+		$sortable = array( 'name', 'income', 'expense', 'balance', 'count' );
+
+		if ( in_array( $orderby, $sortable, true ) ) {
+			usort(
+				$rows,
+				function ( $a, $b ) use ( $orderby, $order ) {
+					if ( 'name' === $orderby ) {
+						$result = strcmp( $a['name'], $b['name'] );
+					} elseif ( 'count' === $orderby ) {
+						$result = (int) $a['count'] <=> (int) $b['count'];
+					} else {
+						$result = Sparkknife_Ledger_Amount::cmp( $a[ $orderby ], $b[ $orderby ] );
+					}
+
+					return 'asc' === $order ? $result : -$result;
+				}
+			);
+		}
+
+		// صفحه‌بندی.
+		$per_page = isset( $args['per_page'] ) ? max( 1, min( 200, absint( $args['per_page'] ) ) ) : (int) Sparkknife_Ledger_Settings::get( 'per_page', 20 );
+		$page     = isset( $args['page'] ) ? max( 1, absint( $args['page'] ) ) : 1;
+		$total    = count( $rows );
+
+		$paged_rows = array_slice( $rows, ( $page - 1 ) * $per_page, $per_page );
+
+		// جمع کل در بازه (مستقل از فیلتر جستجو/شخص).
+		$totals = Sparkknife_Ledger_Transaction_Repository::instance()->sum_by_type(
+			array(
+				'type'      => $type,
+				'status'    => '' === $status ? 'active_only' : $status,
+				'date_from' => $range['from'],
+				'date_to'   => $range['to'],
+				'person_id' => $person_filter,
+				'search'    => '',
+			)
+		);
+
+		$income  = $totals['income'];
+		$expense = $totals['expense'];
+		$balance = Sparkknife_Ledger_Amount::sub( $income, $expense );
+
+		$comparison = array(
+			'positive' => 0,
+			'negative' => 0,
+			'settled'  => 0,
+		);
+
+		foreach ( $rows as $row ) {
+			$comparison[ $row['account_status'] ] = isset( $comparison[ $row['account_status'] ] ) ? $comparison[ $row['account_status'] ] + 1 : 1;
+		}
+
+		return array(
+			'range'      => $range,
+			'filters'    => array(
+				'person_id' => $person_filter,
+				'type'      => $type,
+				'status'    => $status,
+				'search'    => $search,
+				'orderby'   => $orderby,
+				'order'     => $order,
+			),
+			'rows'       => $paged_rows,
+			'all_rows'   => $rows,
+			'pagination' => array(
+				'total'    => $total,
+				'pages'    => (int) ceil( $total / $per_page ),
+				'page'     => $page,
+				'per_page' => $per_page,
+			),
+			'totals'     => array(
+				'income'            => $income,
+				'expense'           => $expense,
+				'balance'           => $balance,
+				'count'             => $totals['count'],
+				'income_formatted'  => Sparkknife_Ledger_Money::format( $income ),
+				'expense_formatted' => Sparkknife_Ledger_Money::format( $expense ),
+				'balance_formatted' => Sparkknife_Ledger_Money::format( $balance ),
+			),
+			'comparison' => $comparison,
+			'persons'    => Sparkknife_Ledger_Person_Repository::instance()->get_all(),
+		);
+	}
+
+	/**
+	 * نمودار ماهانه برای داشبورد (با بازه دلخواه).
+	 *
+	 * @param int $months تعداد ماه.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function get_monthly_chart( $months = 6 ) {
+		$data = Sparkknife_Ledger_Transaction_Repository::instance()->monthly_totals( $months );
+
+		foreach ( $data as $index => $row ) {
+			$data[ $index ]['label']            = Sparkknife_Ledger_Date::format( $row['key'] . '-01' );
+			$data[ $index ]['income_formatted']  = Sparkknife_Ledger_Money::format( $row['income'] );
+			$data[ $index ]['expense_formatted'] = Sparkknife_Ledger_Money::format( $row['expense'] );
+		}
+
+		return $data;
+	}
+}
