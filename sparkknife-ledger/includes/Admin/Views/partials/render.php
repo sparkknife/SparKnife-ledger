@@ -138,6 +138,21 @@ class Sparkknife_Ledger_Renderer {
 			}
 		);
 
+		/*
+		 * مقادیر باید کدگذاری شوند.
+		 *
+		 * `add_query_arg()` خودش چیزی را کدگذاری نمی‌کند: مقدار جستجوی
+		 * «علی & co» با `&` خام در آدرس می‌نشست و مرورگر آن را به دو
+		 * پارامتر می‌شکست — «search=علی » و «co=». حتی فاصله هم خام
+		 * می‌ماند. با یک مقدار دستکاری‌شده می‌شد پارامتر جعلی ساخت.
+		 */
+		$args = array_map(
+			function ( $value ) {
+				return rawurlencode( (string) $value );
+			},
+			$args
+		);
+
 		$url = add_query_arg( array_merge( array( 'page' => $slug ), $args ), admin_url( 'admin.php' ) );
 
 		return $url;
