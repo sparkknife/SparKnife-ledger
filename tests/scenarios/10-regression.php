@@ -126,10 +126,12 @@ Sparkknife_Ledger_Money::format( array( 'balance' => '7000000000' ) );
 restore_error_handler();
 
 spk_assert( empty( $warnings ), 'قالب‌بندی آرایه هیچ هشدار PHP تولید نمی‌کند', implode( ' | ', $warnings ) );
-spk_assert(
-	0 === strpos( Sparkknife_Ledger_Money::format( array( 1, 2 ) ), '۰' ),
-	'آرایه به صفر تبدیل می‌شود',
-	Sparkknife_Ledger_Money::format( array( 1, 2 ) )
+// آرایه نباید به «۰ تومان» تبدیل شود (پیش‌تر همین کار را می‌کرد و
+// مبلغ صفر جعلی نشان می‌داد)؛ حالا خط تیره نمایش داده می‌شود.
+spk_equals(
+	'—',
+	Sparkknife_Ledger_Money::format( array( 1, 2 ) ),
+	'آرایه به‌جای مبلغ صفر جعلی، خط تیره می‌دهد'
 );
 
 // ── ۵: خروجی CSV فرمول خطرناک را خنثی می‌کند ────────────────────────
@@ -330,6 +332,228 @@ foreach ( glob( SPARKKNIFE_LEDGER_DIR . 'includes/**/*.php' ) as $php_file ) {
 }
 
 spk_assert( empty( $missing_keys ), 'همه کلیدهای تنظیمات خوانده‌شده تعریف شده‌اند', implode( ', ', $missing_keys ) );
+
+// ── ۱۴: تقویم شمسی با تقویم رسمی مطابق است ─────────────────────────
+// سال‌های کبیسه شناخته‌شده (مرجع: تقویم رسمی ایران).
+$known_leap    = array( 1370, 1375, 1379, 1383, 1387, 1391, 1395, 1399, 1403, 1408, 1412, 1416, 1420 );
+$known_regular = array( 1400, 1401, 1402, 1404, 1405, 1406, 1407, 1409, 1410, 1411 );
+
+foreach ( $known_leap as $leap_year ) {
+	spk_assert( Sparkknife_Ledger_Date::is_jalali_leap( $leap_year ), 'سال کبیسه: ' . $leap_year );
+}
+
+foreach ( $known_regular as $regular_year ) {
+	spk_assert( ! Sparkknife_Ledger_Date::is_jalali_leap( $regular_year ), 'سال عادی: ' . $regular_year );
+}
+
+// ۳۰ اسفند ۱۴۰۳ باید پذیرفته شود (۱۴۰۳ کبیسه است) و به ۲۰۲۵-۰۳-۲۰ برسد.
+$esfand30 = Sparkknife_Ledger_Date::jalali_to_date( '1403/12/30' );
+spk_assert( ! is_wp_error( $esfand30 ), '۳۰ اسفند ۱۴۰۳ پذیرفته می‌شود', is_wp_error( $esfand30 ) ? $esfand30->get_error_message() : '' );
+spk_assert( '2025-03-20' === $esfand30, '۳۰ اسفند ۱۴۰۳ = ۲۰ مارس ۲۰۲۵', (string) $esfand30 );
+
+// و ۳۰ اسفند ۱۴۰۲ باید رد شود.
+$wrong_esfand = Sparkknife_Ledger_Date::jalali_to_date( '1402/12/30' );
+spk_assert( is_wp_error( $wrong_esfand ), '۳۰ اسفند ۱۴۰۲ رد می‌شود (۱۴۰۲ عادی است)' );
+
+// رفت‌وبرگشت: هر روز ۱۴۰۳ باید همان روز برگردد.
+$roundtrip_failures = 0;
+$cursor             = strtotime( '2024-03-20' ); // ۱ فروردین ۱۴۰۳
+$end_cursor         = strtotime( '2025-03-20' ); // ۳۰ اسفند ۱۴۰۳
+
+while ( $cursor <= $end_cursor ) {
+	$gregorian = gmdate( 'Y-m-d', $cursor );
+	$jalali    = Sparkknife_Ledger_Date::format_for_input( $gregorian );
+	$back      = Sparkknife_Ledger_Date::jalali_to_date( $jalali );
+
+	if ( is_wp_error( $back ) || $back !== $gregorian ) {
+		$roundtrip_failures++;
+	}
+
+	$cursor += DAY_IN_SECONDS;
+}
+
+spk_assert( 0 === $roundtrip_failures, 'رفت‌وبرگشت همه روزهای ۱۴۰۳ بی‌خطاست', (string) $roundtrip_failures );
+
+// ── ۱۵: نقطه به‌عنوان جداکننده هزارگان ──────────────────────────────
+// کاربر «۱.۲۳۴» می‌نویسد؛ پیش‌تر یک و ۲۳۴ هزارم خوانده می‌شد (هزار برابر کوچک‌تر).
+$dot_grouped = array(
+	'1.234'     => '1234',
+	'1.234.567' => '1234567',
+	'12.345'    => '12345',
+);
+
+foreach ( $dot_grouped as $input => $expected ) {
+	$parsed = Sparkknife_Ledger_Money::parse_amount( Sparkknife_Ledger_Money::normalize_amount_input( $input ) );
+	spk_equals(
+		Sparkknife_Ledger_Money::to_human( $parsed ),
+		$expected,
+		'نقطه به‌عنوان جداکننده هزارگان: ' . $input
+	);
+}
+
+// اعشار واقعی باید همچنان اعشار بماند.
+$decimal = Sparkknife_Ledger_Money::parse_amount( Sparkknife_Ledger_Money::normalize_amount_input( '12.5' ) );
+spk_equals( '125000', $decimal, 'اعشار واقعی با نقطه حفظ می‌شود' );
+
+$two_decimals = Sparkknife_Ledger_Money::parse_amount( Sparkknife_Ledger_Money::normalize_amount_input( '0.75' ) );
+spk_equals( '7500', $two_decimals, 'اعشار کمتر از یک با نقطه' );
+
+// ── ۱۶: منفی‌های یونیکد مبلغ را مثبت نمی‌کنند ───────────────────────
+$unicode_minus = array(
+	'−5'  => 'منفی یونیکد U+2212',
+	'–5'  => 'خط تیره کوتاه U+2013',
+	'—5'  => 'خط تیره بلند U+2014',
+	'−۱۲۳' => 'منفی یونیکد با ارقام فارسی',
+);
+
+foreach ( $unicode_minus as $input => $label ) {
+	$parsed = Sparkknife_Ledger_Money::parse_amount(
+		Sparkknife_Ledger_Sanitizer::amount( $input )
+	);
+
+	spk_assert( is_wp_error( $parsed ), 'مبلغ منفی رد می‌شود: ' . $label );
+}
+
+// ── ۱۷: format() با شیء یا آرایه خطای مرگبار نمی‌دهد ─────────────────
+$bad_object = new WP_Error( 'x', 'خطا' );
+
+spk_equals( '—', Sparkknife_Ledger_Money::format( $bad_object ), 'format() با WP_Error خطای مرگبار نمی‌دهد' );
+spk_equals( '—', Sparkknife_Ledger_Money::format( array( 1, 2 ) ), 'format() با آرایه خطای مرگبار نمی‌دهد' );
+
+// ── ۱۸: خروجی CSV با ورودی ناقص خطای مرگبار نمی‌دهد ─────────────────
+$export = new Sparkknife_Ledger_Export_Service();
+
+$incomplete_reports = array(
+	'آرایه خالی'          => array(),
+	'بدون range و summary' => array( 'person' => (object) array( 'name' => 'تست', 'phone' => '0912', 'status' => 'active' ) ),
+	'range خالی'          => array( 'person' => (object) array( 'name' => 'تست', 'phone' => '0912', 'status' => 'active' ), 'range' => array() ),
+	'summary خالی'        => array( 'person' => (object) array( 'name' => 'تست', 'phone' => '0912', 'status' => 'active' ), 'summary' => array() ),
+);
+
+foreach ( $incomplete_reports as $label => $input ) {
+	$threw = false;
+
+	try {
+		$out = $export->person_report_rows( $input );
+	} catch ( Throwable $e ) {
+		$threw = true;
+		$out   = array();
+	}
+
+	spk_assert( ! $threw, 'CSV با ورودی ناقص کرش نمی‌کند: ' . $label );
+	spk_assert( is_array( $out ) && ! empty( $out ), 'CSV با ورودی ناقص ردیف برمی‌گرداند: ' . $label );
+}
+
+// ── ۱۹: مرتب‌سازی گزارش با مقادیر مساوی پایدار است ──────────────────
+$report_service = Sparkknife_Ledger_Report_Service::instance();
+
+$sort_a = $report_service->get_summary_report( array( 'orderby' => 'balance', 'order' => 'asc', 'per_page' => 100 ) );
+$sort_b = $report_service->get_summary_report( array( 'orderby' => 'balance', 'order' => 'asc', 'per_page' => 100 ) );
+
+spk_equals(
+	wp_json_encode( array_column( $sort_a['rows'], 'id' ) ),
+	wp_json_encode( array_column( $sort_b['rows'], 'id' ) ),
+	'مرتب‌سازی با مقادیر مساوی بین دو اجرا پایدار است'
+);
+
+// هیچ شخصی نباید در صفحه‌بندی تکرار یا حذف شود.
+$paged_ids = array();
+$page_size = 2;
+$page_max  = (int) ceil( $sort_a['total'] / $page_size ) + 1;
+
+for ( $p = 1; $p <= $page_max; $p++ ) {
+	$page = $report_service->get_summary_report(
+		array( 'orderby' => 'balance', 'order' => 'asc', 'per_page' => $page_size, 'page' => $p )
+	);
+
+	foreach ( $page['rows'] as $row ) {
+		$paged_ids[] = (int) $row['id'];
+	}
+}
+
+spk_equals(
+	count( $paged_ids ),
+	count( array_unique( $paged_ids ) ),
+	'صفحه‌بندی گزارش هیچ شخصی را تکرار نمی‌کند'
+);
+
+spk_equals(
+	(int) $sort_a['total'],
+	count( $paged_ids ),
+	'صفحه‌بندی گزارش همه اشخاص را پوشش می‌دهد'
+);
+
+// ── ۲۰: پیام خالی اعلان رندر نمی‌شود ───────────────────────────────
+// redirect_back_with() اعلانی با پیام خالی ثبت می‌کند تا کاربر را به فرم
+// بازگرداند. پیش‌تر این حالت یک جعبه خطای توخالی نشان می‌داد.
+delete_transient( 'sparkknife_ledger_notice_' . get_current_user_id() );
+Sparkknife_Ledger_Admin_Loader::add_notice( 'error', '' );
+
+$empty_notice = get_transient( 'sparkknife_ledger_notice_' . get_current_user_id() );
+spk_assert( is_array( $empty_notice ), 'اعلان با پیام خالی ثبت می‌شود' );
+
+$loader_source = (string) file_get_contents( SPARKKNIFE_LEDGER_DIR . 'includes/class-sparkknife-ledger-admin-loader.php' );
+spk_assert(
+	1 === preg_match( '/if \( \'\' === trim\( \$text \) \) \{\s*return;/', $loader_source ),
+	'render_admin_notices پیام خالی را رندر نمی‌کند'
+);
+
+delete_transient( 'sparkknife_ledger_notice_' . get_current_user_id() );
+
+// ── ۲۱: flash_error پیام را دوبار نمایش نمی‌دهد ─────────────────────
+// پیام از ترنزینت form_errors در هدر و از add_notice در admin_notices
+// نمایش داده می‌شد؛ یعنی همان خطا دوبار به کاربر نشان داده می‌شد.
+$controller_source = (string) file_get_contents( SPARKKNIFE_LEDGER_DIR . 'includes/Admin/Controllers/class-sparkknife-ledger-admin-controller.php' );
+
+preg_match( '/private function flash_error\([^)]*\) \{(.*?)\n\t\}/s', $controller_source, $flash_body );
+
+spk_assert( ! empty( $flash_body[1] ), 'بدنه flash_error یافت شد' );
+
+// کامنت‌ها حذف می‌شوند تا فقط کد اجرایی سنجیده شود.
+$flash_code = preg_replace( '#/\*.*?\*/#s', '', $flash_body[1] );
+$flash_code = preg_replace( '#//.*$#m', '', (string) $flash_code );
+
+spk_assert(
+	false === strpos( (string) $flash_code, 'add_notice' ),
+	'flash_error خودش add_notice صدا نمی‌زند (جلوگیری از پیام تکراری)',
+	(string) $flash_code
+);
+
+// ── ۲۲: حذف داده فقط با عبارت تأیید دقیق ────────────────────────────
+$purge_source = (string) file_get_contents( SPARKKNIFE_LEDGER_DIR . 'includes/Admin/Controllers/class-sparkknife-ledger-admin-controller.php' );
+
+preg_match( '/private function handle_data_purge\([^)]*\) \{(.*?)\n\t\}/s', $purge_source, $purge_body );
+
+spk_assert( ! empty( $purge_body[1] ), 'بدنه handle_data_purge یافت شد' );
+
+// هر دو شرط محافظتی باید با return تمام شوند، نه فقط add_notice.
+$guard_returns = preg_match_all( '/add_notice\([^;]*;\s*\n\s*return;/s', $purge_body[1] );
+
+spk_assert(
+	$guard_returns >= 2,
+	'هر دو محافظت حذف داده با return پایان می‌یابند',
+	(string) $guard_returns
+);
+
+spk_assert(
+	false !== strpos( $purge_body[1], "'DELETE-ALL-DATA' !== \$confirm" ),
+	'حذف داده نیازمند عبارت دقیق DELETE-ALL-DATA است'
+);
+
+// ── ۲۳: uninstall گزینه‌های نسخه را در هر دو حالت پاک می‌کند ────────
+$uninstall_source = (string) file_get_contents( SPARKKNIFE_LEDGER_DIR . 'uninstall.php' );
+
+// delete_option نسخه باید هم در شاخه حذف کامل و هم در شاخه حفظ داده باشد.
+spk_assert(
+	2 === substr_count( $uninstall_source, "delete_option( 'sparkknife_ledger_db_version' );" ),
+	'uninstall نسخه دیتابیس را در هر دو حالت پاک می‌کند',
+	(string) substr_count( $uninstall_source, "delete_option( 'sparkknife_ledger_db_version' );" )
+);
+
+spk_assert(
+	2 === substr_count( $uninstall_source, "delete_option( 'sparkknife_ledger_version' );" ),
+	'uninstall نسخه افزونه را در هر دو حالت پاک می‌کند'
+);
 
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
