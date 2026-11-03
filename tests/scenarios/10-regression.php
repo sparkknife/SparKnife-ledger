@@ -929,6 +929,64 @@ spk_equals(
 	'روز آخر ماه در همان ماه شماری می‌شود'
 );
 
+// ── ۲۵ط: جمع زیر جدول، جمع ردیف‌های نمایش‌داده‌شده است ────────────
+// `totals` عمداً مستقل از جستجو و از کل بازه حساب می‌شود و برچسب کارت‌ها
+// «مجموع ... تمام اشخاص» است. اما همان عدد در `<tfoot>` جدول هم استفاده
+// می‌شد، پس با جستجویی که یک ردیف هزار تومانی داشت، «جمع کل» زیر جدول
+// ۱۰٬۰۰۰ نشان می‌داد در حالی که ستون فقط ۱٬۰۰۰ جمع می‌زد.
+$totals_person_a = 'شخص جمع‌آلف';
+$totals_person_b = 'شخص جمع‌ب';
+
+foreach ( array( $totals_person_a, $totals_person_b ) as $cleanup_name ) {
+	$wpdb->query(
+		$wpdb->prepare(
+			'DELETE FROM ' . Sparkknife_Ledger_DB::persons_table() . ' WHERE name = %s',
+			$cleanup_name
+		)
+	);
+}
+
+$totals_id_a = $ps->create( array( 'name' => $totals_person_a, 'phone' => '09125551001' ) );
+$totals_id_b = $ps->create( array( 'name' => $totals_person_b, 'phone' => '09125551002' ) );
+
+$txn_svc->create(
+	array(
+		'person_id' => $totals_id_a,
+		'type'      => 'income',
+		'amount'    => '1000',
+		'txn_date'  => '1403/05/01',
+	)
+);
+$txn_svc->create(
+	array(
+		'person_id' => $totals_id_b,
+		'type'      => 'income',
+		'amount'    => '9000',
+		'txn_date'  => '1403/05/02',
+	)
+);
+
+$filtered_report = $report_svc->get_summary_report(
+	array(
+		'search'     => $totals_person_a,
+		'range'      => 'all',
+		'for_export' => true,
+	)
+);
+
+spk_assert( isset( $filtered_report['filtered_totals'] ), 'گزارش جمع ردیف‌های فیلترشده را دارد' );
+
+spk_equals( '1', (string) count( $filtered_report['rows'] ), 'جستجو یک ردیف برمی‌گرداند' );
+spk_equals( $filtered_report['rows'][0]['income'], $filtered_report['filtered_totals']['income'], 'جمع فیلترشده با تنها ردیف برابر است' );
+spk_assert(
+	Sparkknife_Ledger_Amount::cmp( $filtered_report['filtered_totals']['income'], $filtered_report['totals']['income'] ) < 0,
+	'جمع فیلترشده از جمع کل کمتر است'
+);
+
+// بدون فیلتر، هر دو جمع باید یکی باشند.
+$unfiltered_report = $report_svc->get_summary_report( array( 'range' => 'all', 'for_export' => true ) );
+spk_equals( $unfiltered_report['totals']['income'], $unfiltered_report['filtered_totals']['income'], 'بدون فیلتر جمع فیلترشده با جمع کل یکی است' );
+
 // ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
 $p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
 $p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱

@@ -235,9 +235,30 @@ class Sparkknife_Ledger_Export_Service {
 		$rows[] = array( __( 'تهیه‌کننده', 'sparkknife-ledger' ), wp_get_current_user()->display_name );
 		$rows[] = array();
 
-		$rows[] = array( __( 'مجموع ورودی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['income'] ) );
-		$rows[] = array( __( 'مجموع خروجی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['expense'] ) );
-		$rows[] = array( __( 'مانده کل', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['balance'] ) );
+		/*
+		 * اگر فیلتری (جستجو، نوع یا وضعیت) فعال باشد، ردیف‌های فایل با
+		 * جمع کل بازه یکی نیستند. هر دو عدد نوشته می‌شوند تا کاربر
+		 * فایلی نداشته باشد که جمع بالایش با جمع ستون‌هایش نمی‌خواند.
+		 */
+		$has_filter = ! empty( $report['filters']['search'] ) || ! empty( $report['filters']['type'] ) || ! empty( $report['filters']['status'] );
+
+		if ( $has_filter && isset( $report['filtered_totals'] ) ) {
+			$filtered = $report['filtered_totals'];
+
+			$rows[] = array( __( 'مجموع ورودی‌ها (ردیف‌های این فایل)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $filtered['income'] ) );
+			$rows[] = array( __( 'مجموع خروجی‌ها (ردیف‌های این فایل)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $filtered['expense'] ) );
+			$rows[] = array( __( 'مانده (ردیف‌های این فایل)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $filtered['balance'] ) );
+			$rows[] = array();
+
+			$rows[] = array( __( 'مجموع ورودی‌ها (کل بازه، بدون فیلتر)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['income'] ) );
+			$rows[] = array( __( 'مجموع خروجی‌ها (کل بازه، بدون فیلتر)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['expense'] ) );
+			$rows[] = array( __( 'مانده کل (بدون فیلتر)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['balance'] ) );
+		} else {
+			$rows[] = array( __( 'مجموع ورودی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['income'] ) );
+			$rows[] = array( __( 'مجموع خروجی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['expense'] ) );
+			$rows[] = array( __( 'مانده کل', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['balance'] ) );
+		}
+
 		$rows[] = array();
 
 		$rows[] = array(

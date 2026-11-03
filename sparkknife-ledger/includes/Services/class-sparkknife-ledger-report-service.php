@@ -332,6 +332,27 @@ class Sparkknife_Ledger_Report_Service {
 			$comparison[ $row['account_status'] ] = isset( $comparison[ $row['account_status'] ] ) ? $comparison[ $row['account_status'] ] + 1 : 1;
 		}
 
+		/*
+		 * جمع ردیف‌های فیلترشده.
+		 *
+		 * `totals` عمداً مستقل از جستجو و از کل بازه حساب می‌شود و برچسبش
+		 * هم «مجموع ... تمام اشخاص» است. اما همان عدد در `<tfoot>` جدول
+		 * هم استفاده می‌شد، یعنی زیر ستون‌هایی که فقط ردیف‌های فیلترشده
+		 * را نشان می‌دادند. با جستجویی که یک ردیف هزار تومانی داشت،
+		 * «جمع کل» زیر جدول ۱۰٬۰۰۰ نشان می‌داد.
+		 *
+		 * `filtered_totals` جمع همان ردیف‌هایی است که واقعاً روی صفحه‌اند.
+		 */
+		$filtered_income  = '0';
+		$filtered_expense = '0';
+
+		foreach ( $rows as $row ) {
+			$filtered_income  = Sparkknife_Ledger_Amount::add( $filtered_income, $row['income'] );
+			$filtered_expense = Sparkknife_Ledger_Amount::add( $filtered_expense, $row['expense'] );
+		}
+
+		$filtered_balance = Sparkknife_Ledger_Amount::sub( $filtered_income, $filtered_expense );
+
 		return array(
 			'range'      => $range,
 			'filters'    => array(
@@ -358,6 +379,15 @@ class Sparkknife_Ledger_Report_Service {
 				'income_formatted'  => Sparkknife_Ledger_Money::format( $income ),
 				'expense_formatted' => Sparkknife_Ledger_Money::format( $expense ),
 				'balance_formatted' => Sparkknife_Ledger_Money::format( $balance ),
+			),
+			'filtered_totals' => array(
+				'income'            => $filtered_income,
+				'expense'           => $filtered_expense,
+				'balance'           => $filtered_balance,
+				'count'             => count( $rows ),
+				'income_formatted'  => Sparkknife_Ledger_Money::format( $filtered_income ),
+				'expense_formatted' => Sparkknife_Ledger_Money::format( $filtered_expense ),
+				'balance_formatted' => Sparkknife_Ledger_Money::format( $filtered_balance ),
 			),
 			'comparison' => $comparison,
 			'persons'    => Sparkknife_Ledger_Person_Repository::instance()->get_all(),

@@ -251,13 +251,25 @@ Sparkknife_Ledger_Renderer::view(
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
+				<?php
+				/*
+				 * جمع ستون‌های همین جدول.
+				 *
+				 * `$totals` جمع کل بازه است (مستقل از جستجو) و در کارت‌های
+				 * بالای صفحه با برچسب «مجموع ... تمام اشخاص» نمایش داده
+				 * می‌شود. زیر جدول اما باید جمع همان ردیف‌هایی باشد که
+				 * کاربر می‌بیند؛ وگرنه با یک ردیف هزار تومانی، «جمع کل»
+				 * زیر جدول ۱۰٬۰۰۰ نشان می‌داد.
+				 */
+				$foot = isset( $report['filtered_totals'] ) ? $report['filtered_totals'] : $totals;
+				?>
 				<tfoot>
 					<tr>
 						<th scope="row"><?php esc_html_e( 'جمع کل', 'sparkknife-ledger' ); ?></th>
-						<th class="spk-money-positive"><?php echo esc_html( $totals['income_formatted'] ); ?></th>
-						<th class="spk-money-negative"><?php echo esc_html( $totals['expense_formatted'] ); ?></th>
-						<th class="<?php echo ! Sparkknife_Ledger_Money::is_negative( $totals['balance'] ) ? 'spk-money-positive' : 'spk-money-negative'; ?>">
-							<?php echo esc_html( $totals['balance_formatted'] ); ?>
+						<th class="spk-money-positive"><?php echo esc_html( $foot['income_formatted'] ); ?></th>
+						<th class="spk-money-negative"><?php echo esc_html( $foot['expense_formatted'] ); ?></th>
+						<th class="<?php echo ! Sparkknife_Ledger_Money::is_negative( $foot['balance'] ) ? 'spk-money-positive' : 'spk-money-negative'; ?>">
+							<?php echo esc_html( $foot['balance_formatted'] ); ?>
 						</th>
 						<th colspan="4"></th>
 					</tr>

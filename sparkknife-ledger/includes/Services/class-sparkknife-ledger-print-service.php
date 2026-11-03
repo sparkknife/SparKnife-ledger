@@ -217,11 +217,19 @@ class Sparkknife_Ledger_Print_Service {
 				<?php endif; ?>
 			</tbody>
 			<tfoot>
+				<?php
+				/*
+				 * جمع ستون‌های همین جدول، نه جمع کل بازه. کارت‌های بالای
+				 * صفحه جمع کل را نشان می‌دهند؛ زیر جدول باید جمع همان
+				 * ردیف‌هایی باشد که چاپ شده‌اند.
+				 */
+				$foot = isset( $report['filtered_totals'] ) ? $report['filtered_totals'] : $totals;
+				?>
 				<tr>
 					<th colspan="3"><?php esc_html_e( 'جمع کل', 'sparkknife-ledger' ); ?></th>
-					<th><?php echo esc_html( $totals['income_formatted'] ); ?></th>
-					<th><?php echo esc_html( $totals['expense_formatted'] ); ?></th>
-					<th><?php echo esc_html( $totals['balance_formatted'] ); ?></th>
+					<th><?php echo esc_html( $foot['income_formatted'] ); ?></th>
+					<th><?php echo esc_html( $foot['expense_formatted'] ); ?></th>
+					<th><?php echo esc_html( $foot['balance_formatted'] ); ?></th>
 					<th></th>
 				</tr>
 			</tfoot>
