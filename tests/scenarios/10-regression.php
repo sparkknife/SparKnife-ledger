@@ -1836,6 +1836,49 @@ parse_str( (string) wp_parse_url( $tricky, PHP_URL_QUERY ), $tricky_params );
 
 spk_assert( ! isset( $tricky_params['action'] ), 'هیچ پارامتر جعلی از مقدار جستجو ساخته نمی‌شود' );
 
+// ── ۲۵ح: جستجوی تاریخچه تغییرات کار می‌کند ────────────────────────
+// `Audit_Repository::query()` پارامتر `search` را در `wp_parse_args()`
+// نداشت، پس هر مقداری که می‌رسید بی‌صدا نادیده گرفته می‌شد و همهٔ
+// رکوردها برمی‌گشت. با هزاران رکورد ممیزی، پیدا کردن یک تغییر عملاً
+// ناممکن بود.
+
+global $wpdb;
+
+$audit_repo  = Sparkknife_Ledger_Audit_Repository::instance();
+$audit_table = Sparkknife_Ledger_DB::audit_table();
+
+$marker = 'نشانه‌جستجو' . wp_rand( 10000, 99999 );
+
+Sparkknife_Ledger_Audit_Service::instance()->log(
+	'person',
+	999001,
+	'test',
+	array( 'note' => $marker ),
+	sprintf( 'رکورد آزمون %s', $marker )
+);
+
+$all_audit = $audit_repo->query( array( 'per_page' => 200 ) );
+$all_count = (int) $all_audit['total'];
+
+spk_assert( $all_count > 0, 'تاریخچه رکورد دارد' );
+
+$found = $audit_repo->query( array( 'search' => $marker, 'per_page' => 200 ) );
+
+spk_equals( 1, (int) $found['total'], 'جستجو فقط رکورد منطبق را برمی‌گرداند' );
+
+$not_found = $audit_repo->query( array( 'search' => 'هیچ‌چیز' . $marker, 'per_page' => 200 ) );
+
+spk_equals( 0, (int) $not_found['total'], 'جستجوی بی‌نتیجه صفر برمی‌گرداند، نه همه' );
+spk_assert( (int) $not_found['total'] < $all_count, 'تعداد نتایج از کل رکوردها کمتر است' );
+
+// الگوی LIKE در جستجو باید escape شود، نه اینکه wildcard شود.
+$wildcard = $audit_repo->query( array( 'search' => '%', 'per_page' => 200 ) );
+
+spk_assert(
+	(int) $wildcard['total'] < $all_count,
+	'علامت درصد در جستجو wildcard نمی‌شود'
+);
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
