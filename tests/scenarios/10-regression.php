@@ -2236,6 +2236,104 @@ foreach ( $declared as $key ) {
 
 spk_equals( array(), $unused, 'هیچ مقدار بی‌مصرفی به مرورگر نمی‌رود' );
 
+// ── ۲۵ض: جمع کل گزارش با مجموع ردیف‌های نمایش‌داده‌شده یکی است ───────
+//
+// ردیف‌ها از `Person_Repository::get_all()` می‌آمدند که فقط اشخاص
+// حذف‌نشده را برمی‌گرداند، ولی جمع کل از `sum_by_type()` روی **کل** جدول
+// تراکنش‌ها گرفته می‌شد. اگر شخصی تراکنش داشت و بعد حذف نرم می‌شد
+// (سرویس حذف نمی‌گذارد، ولی داده می‌تواند دستی تغییر کند)، مبلغش در
+// «مجموع درآمد» می‌آمد بی‌آنکه هیچ ردیفی توضیحش دهد.
+//
+// این بدترین نوع باگ گزارش است: هیچ خطایی نمی‌دهد، جدول درست به نظر
+// می‌رسد، و عددی که کاربر جمع می‌زند با عدد چاپ‌شده نمی‌خواند.
+
+global $wpdb;
+
+$rp_persons = Sparkknife_Ledger_DB::persons_table();
+$rp_txns    = Sparkknife_Ledger_DB::transactions_table();
+
+$rp_live = Sparkknife_Ledger_Person_Repository::instance()->insert(
+	array( 'name' => 'زنده ' . $marker, 'phone' => '09127770001', 'description' => '', 'status' => 'active' )
+);
+$rp_ghost = Sparkknife_Ledger_Person_Repository::instance()->insert(
+	array( 'name' => 'روح ' . $marker, 'phone' => '09127770002', 'description' => '', 'status' => 'active' )
+);
+
+spk_assert( $rp_live > 0 && $rp_ghost > 0, 'دو شخص آزمایشی ساخته شدند' );
+
+$rp_txn = Sparkknife_Ledger_Transaction_Service::instance();
+
+$rp_txn->create(
+	array( 'person_id' => $rp_live, 'type' => 'income', 'amount' => '1000', 'txn_date' => '2026-11-01', 'description' => '', 'reference' => '' )
+);
+$rp_txn->create(
+	array( 'person_id' => $rp_ghost, 'type' => 'income', 'amount' => '3000', 'txn_date' => '2026-11-01', 'description' => '', 'reference' => '' )
+);
+
+// حذف نرم دستی — همان چیزی که از phpMyAdmin یا مهاجرت نیمه‌کاره ممکن است پیش بیاید.
+$wpdb->query(
+	$wpdb->prepare( "UPDATE {$rp_persons} SET deleted_at = %s, status = 'inactive' WHERE id = %d", current_time( 'mysql' ), $rp_ghost )
+);
+
+$rp_report = Sparkknife_Ledger_Report_Service::instance()->get_summary_report( array( 'range' => 'all' ) );
+
+// شخص حذف‌شده باید در ردیف‌ها بماند، با نشانهٔ حذف.
+$rp_names    = wp_list_pluck( $rp_report['rows'], 'name' );
+$rp_has_live = false;
+$rp_ghost_row = null;
+
+foreach ( $rp_report['rows'] as $rp_row ) {
+	if ( false !== mb_strpos( (string) $rp_row['name'], $marker ) ) {
+		if ( (int) $rp_row['id'] === (int) $rp_ghost ) {
+			$rp_ghost_row = $rp_row;
+		} else {
+			$rp_has_live = true;
+		}
+	}
+}
+
+spk_assert( $rp_has_live, 'شخص زنده در ردیف‌های گزارش هست' );
+spk_assert( null !== $rp_ghost_row, 'شخص حذف‌شده با تراکنش از ردیف‌ها ناپدید نمی‌شود' );
+
+if ( null !== $rp_ghost_row ) {
+	spk_assert( ! empty( $rp_ghost_row['deleted_at'] ), 'ردیف شخص حذف‌شده نشانهٔ حذف را حمل می‌کند' );
+	spk_assert( '0' !== (string) $rp_ghost_row['income'], 'مبلغ شخص حذف‌شده در ردیفش دیده می‌شود' );
+}
+
+// و مهم‌تر از همه: مجموع ردیف‌ها باید با جمع کل بخواند.
+$rp_sum = '0';
+
+foreach ( $rp_report['rows'] as $rp_row ) {
+	$rp_sum = Sparkknife_Ledger_Amount::add( $rp_sum, $rp_row['income'] );
+}
+
+spk_equals(
+	(string) Sparkknife_Ledger_Amount::normalize( $rp_report['totals']['income'] ),
+	(string) Sparkknife_Ledger_Amount::normalize( $rp_sum ),
+	'مجموع درآمد ردیف‌ها با جمع کل گزارش یکی است'
+);
+
+// فهرست خالی باید صفر بدهد، نه همه — وگرنه حذف همه اشخاص جمع قبلی را نگه می‌داشت.
+$rp_empty = Sparkknife_Ledger_Transaction_Repository::instance()->sum_by_type(
+	array( 'person_ids' => array(), 'status' => '' )
+);
+
+spk_equals( '0', (string) $rp_empty['income'], 'فهرست شخص خالی، جمع صفر می‌دهد نه کل' );
+spk_equals( 0, (int) $rp_empty['count'], 'فهرست شخص خالی هیچ تراکنشی نمی‌شمارد' );
+
+// گزارش فردی شخص حذف‌شده باید باز شود تا لینک ردیف نشکند.
+$rp_person_report = Sparkknife_Ledger_Report_Service::instance()->get_person_report( $rp_ghost, array( 'range' => 'all' ) );
+
+spk_assert( ! is_wp_error( $rp_person_report ), 'گزارش فردی شخص حذف‌شده باز می‌شود' );
+
+if ( ! is_wp_error( $rp_person_report ) ) {
+	spk_equals( '30000000', (string) $rp_person_report['summary']['income'], 'مبلغ گزارش فردی شخص حذف‌شده درست است' );
+}
+
+// تمیزکاری.
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$rp_txns} WHERE person_id IN (%d, %d)", $rp_live, $rp_ghost ) );
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$rp_persons} WHERE id IN (%d, %d)", $rp_live, $rp_ghost ) );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();

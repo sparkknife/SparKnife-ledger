@@ -222,7 +222,10 @@ Sparkknife_Ledger_Renderer::view(
 								<a class="spk-link-strong" href="<?php echo esc_url( Sparkknife_Ledger_Renderer::url( 'reports', array( 'person_id' => $row['id'] ) ) ); ?>">
 									<?php echo esc_html( $row['name'] ); ?>
 								</a>
-								<?php if ( 'inactive' === $row['status'] ) : ?>
+								<?php if ( ! empty( $row['deleted_at'] ) ) : ?>
+									<?php /* ردیف حذف‌شده‌ای که تراکنش دارد؛ جمعش در گزارش هست و باید تفکیک‌شدنی باشد. */ ?>
+									<span class="spk-badge is-danger"><?php esc_html_e( 'حذف‌شده', 'sparkknife-ledger' ); ?></span>
+								<?php elseif ( 'inactive' === $row['status'] ) : ?>
 									<span class="spk-badge is-muted"><?php esc_html_e( 'غیرفعال', 'sparkknife-ledger' ); ?></span>
 								<?php endif; ?>
 							</td>
