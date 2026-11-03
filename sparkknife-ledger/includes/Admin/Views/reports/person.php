@@ -166,8 +166,8 @@ require __DIR__ . '/../partials/nav.php';
 					printf(
 						/* translators: 1: transactions, 2: void */
 						esc_html__( '%1$s تراکنش معتبر · %2$s باطل‌شده', 'sparkknife-ledger' ),
-						esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $summary['count'] ) ),
-						esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $summary['void_count'] ) )
+						esc_html( Sparkknife_Ledger_Money::digits( (string) $summary['count'] ) ),
+						esc_html( Sparkknife_Ledger_Money::digits( (string) $summary['void_count'] ) )
 					);
 					?>
 				</span>
@@ -215,7 +215,7 @@ require __DIR__ . '/../partials/nav.php';
 				printf(
 					/* translators: %s: count */
 					esc_html__( '%s تراکنش با فیلتر نوع/جستجوی فعلی مطابقت دارد؛ مبالغ ستون‌های بالا مطابق تعریف مانده، همه تراکنش‌های معتبر بازه را شامل می‌شود.', 'sparkknife-ledger' ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $report['filtered']['count'] ) )
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $report['filtered']['count'] ) )
 				);
 				?>
 			</span>

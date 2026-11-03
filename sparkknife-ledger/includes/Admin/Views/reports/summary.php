@@ -92,7 +92,7 @@ $total_persons = count( $report['all_rows'] );
 				printf(
 					/* translators: %s: count */
 					esc_html__( '%s تراکنش', 'sparkknife-ledger' ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $totals['count'] ) )
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $totals['count'] ) )
 				);
 				?>
 			</span>
@@ -114,15 +114,15 @@ $total_persons = count( $report['all_rows'] );
 		<div class="spk-stat__icon"><span class="dashicons dashicons-groups" aria-hidden="true"></span></div>
 		<div class="spk-stat__body">
 			<span class="spk-stat__label"><?php esc_html_e( 'اشخاص در گزارش', 'sparkknife-ledger' ); ?></span>
-			<span class="spk-stat__value"><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $total_persons ) ); ?></span>
+			<span class="spk-stat__value"><?php echo esc_html( Sparkknife_Ledger_Money::digits( (string) $total_persons ) ); ?></span>
 			<span class="spk-stat__meta">
 				<?php
 				printf(
 					/* translators: 1: positive, 2: negative, 3: settled */
 					esc_html__( 'مثبت: %1$s · منفی: %2$s · تسویه: %3$s', 'sparkknife-ledger' ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $comparison['positive'] ) ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $comparison['negative'] ) ),
-					esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $comparison['settled'] ) )
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $comparison['positive'] ) ),
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $comparison['negative'] ) ),
+					esc_html( Sparkknife_Ledger_Money::digits( (string) $comparison['settled'] ) )
 				);
 				?>
 			</span>
@@ -249,7 +249,7 @@ Sparkknife_Ledger_Renderer::view(
 								?>
 							</td>
 							<td data-label="<?php esc_attr_e( 'تعداد تراکنش', 'sparkknife-ledger' ); ?>">
-								<?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $row['count'] ) ); ?>
+								<?php echo esc_html( Sparkknife_Ledger_Money::digits( (string) $row['count'] ) ); ?>
 							</td>
 							<td data-label="<?php esc_attr_e( 'مقایسه', 'sparkknife-ledger' ); ?>">
 								<span class="spk-minibar" aria-hidden="true">
@@ -313,15 +313,15 @@ Sparkknife_Ledger_Renderer::view(
 	<h2 class="spk-card__title"><?php esc_html_e( 'مقایسه وضعیت مالی اشخاص', 'sparkknife-ledger' ); ?></h2>
 	<div class="spk-comparison">
 		<div class="spk-comparison__item spk-comparison__item--positive">
-			<span class="spk-comparison__count"><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $comparison['positive'] ) ); ?></span>
+			<span class="spk-comparison__count"><?php echo esc_html( Sparkknife_Ledger_Money::digits( (string) $comparison['positive'] ) ); ?></span>
 			<span class="spk-comparison__label"><?php esc_html_e( 'اشخاص دارای مانده مثبت', 'sparkknife-ledger' ); ?></span>
 		</div>
 		<div class="spk-comparison__item spk-comparison__item--negative">
-			<span class="spk-comparison__count"><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $comparison['negative'] ) ); ?></span>
+			<span class="spk-comparison__count"><?php echo esc_html( Sparkknife_Ledger_Money::digits( (string) $comparison['negative'] ) ); ?></span>
 			<span class="spk-comparison__label"><?php esc_html_e( 'اشخاص دارای مانده منفی', 'sparkknife-ledger' ); ?></span>
 		</div>
 		<div class="spk-comparison__item spk-comparison__item--settled">
-			<span class="spk-comparison__count"><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $comparison['settled'] ) ); ?></span>
+			<span class="spk-comparison__count"><?php echo esc_html( Sparkknife_Ledger_Money::digits( (string) $comparison['settled'] ) ); ?></span>
 			<span class="spk-comparison__label"><?php esc_html_e( 'حساب‌های تسویه‌شده', 'sparkknife-ledger' ); ?></span>
 		</div>
 	</div>

@@ -991,7 +991,6 @@ spk_equals( $unfiltered_report['totals']['income'], $unfiltered_report['filtered
 // `section_keys()` برای نام ناشناخته آرایه خالی برمی‌گرداند و شرط
 // `! empty( $section_keys )` آن را رد می‌کرد، پس `$sanitized` دست‌نخورده
 // می‌ماند و همه چک‌باکس‌ها صفر می‌شدند — همان باگ پاس اول، از راه دیگر.
-$settings_before = Sparkknife_Ledger_Settings::all();
 
 $unknown_section = Sparkknife_Ledger_Settings::save( array( 'settings_section' => 'not_a_real_tab' ), false );
 
@@ -1036,7 +1035,7 @@ spk_equals(
 );
 
 // بازگرداندن تنظیمات اولیه.
-Sparkknife_Ledger_Settings::save( $settings_before, false );
+Sparkknife_Ledger_Settings::save( array( 'show_welcome_panel' => 1, 'use_persian_digits' => 1 ), false );
 Sparkknife_Ledger_Settings::flush_cache();
 
 // ── ۲۵ک: IP لاگ ممیزی با هدر جعل‌شدنی عوض نمی‌شود ────────────────
@@ -2004,6 +2003,81 @@ spk_assert(
 	(int) $blank_result['total'] >= 0,
 	'جستجو با عبارت فقط-نیم‌فاصله نتیجهٔ معتبر می‌دهد'
 );
+
+// ── ۲۵ذ: هر تنظیمی که در فرم هست باید در خروجی هم اثر داشته باشد ──────
+//
+// دو تنظیم **مرده** بودند: در فرم نشان داده می‌شدند، ذخیره می‌شدند، و
+// هیچ‌جا خوانده نمی‌شدند. مدیر تیک را برمی‌داشت، پیام «ذخیره شد» می‌گرفت و
+// هیچ اتفاقی نمی‌افتاد. تنظیم مرده بدتر از نبودن تنظیم است، چون کاربر فکر
+// می‌کند کنترل دارد.
+
+$settings_before = Sparkknife_Ledger_Settings::all();
+
+// (الف) show_welcome_panel — پنل خوش‌آمد باید با تنظیم خاموش شود.
+Sparkknife_Ledger_Settings::save( array( 'show_welcome_panel' => 0 ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+spk_equals( 0, (int) Sparkknife_Ledger_Settings::get( 'show_welcome_panel' ), 'تنظیم پنل خوش‌آمد ذخیره می‌شود' );
+
+// ویو داشبورد باید این تنظیم را بخواند؛ با آینه‌کردن شرط همان فایل بررسی می‌شود.
+ob_start();
+$can_persons = Sparkknife_Ledger_Capabilities::current_user_can( 'sparkknife_view_persons' );
+$stats       = array( 'persons_total' => 0, 'transactions_all' => 0 );
+$dashboard_file = SPARKKNIFE_LEDGER_DIR . 'includes/Admin/Views/dashboard/index.php';
+$dashboard_src  = (string) file_get_contents( $dashboard_file );
+ob_end_clean();
+
+spk_assert(
+	false !== mb_strpos( $dashboard_src, "get( 'show_welcome_panel'" ),
+	'داشبورد تنظیم پنل خوش‌آمد را می‌خواند'
+);
+
+Sparkknife_Ledger_Settings::save( array( 'show_welcome_panel' => 1 ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+// (ب) use_persian_digits — شمارنده‌ها باید همان ارقامی را داشته باشند که مبلغ‌ها.
+Sparkknife_Ledger_Settings::save( array( 'use_persian_digits' => 0 ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+spk_equals( '1234', Sparkknife_Ledger_Money::digits( '1234' ), 'با ارقام لاتین، شمارنده لاتین می‌شود' );
+
+$latin_format = Sparkknife_Ledger_Money::format( '123450000' );
+
+spk_assert(
+	false === mb_strpos( $latin_format, '۱' ),
+	'مبلغ با تنظیم لاتین، رقم فارسی ندارد'
+);
+
+Sparkknife_Ledger_Settings::save( array( 'use_persian_digits' => 1 ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+spk_equals( '۱۲۳۴', Sparkknife_Ledger_Money::digits( '1234' ), 'با ارقام فارسی، شمارنده فارسی می‌شود' );
+
+// `to_persian_digits()` همچنان خام می‌ماند (برای جاهایی که فارسی الزامی است).
+spk_equals(
+	'۱۲۳۴',
+	Sparkknife_Ledger_Money::to_persian_digits( '1234' ),
+	'to_persian_digits مستقل از تنظیم، همیشه فارسی می‌دهد'
+);
+
+// هیچ ویویی نباید مستقیم `to_persian_digits()` را برای شمارنده صدا بزند.
+$views_dir   = SPARKKNIFE_LEDGER_DIR . 'includes/Admin/Views/';
+$raw_digits  = array();
+$view_files  = glob( $views_dir . '*.php' );
+$view_files  = array_merge( $view_files, glob( $views_dir . '*/*.php' ) );
+
+foreach ( $view_files as $view_file ) {
+	$src = (string) file_get_contents( $view_file );
+
+	if ( false !== mb_strpos( $src, 'Money::to_persian_digits' ) ) {
+		$raw_digits[] = basename( $view_file );
+	}
+}
+
+spk_equals( array(), $raw_digits, 'هیچ ویویی to_persian_digits را مستقیم صدا نمی‌زند' );
+
+Sparkknife_Ledger_Settings::save( $settings_before, false );
+Sparkknife_Ledger_Settings::flush_cache();
 
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );

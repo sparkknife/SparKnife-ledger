@@ -409,7 +409,7 @@ $currency_presets  = Sparkknife_Ledger_Money::currency_presets();
 									</span>
 								<?php endif; ?>
 							</td>
-							<td><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( $table['rows'] ) ); ?></td>
+							<td><?php echo esc_html( Sparkknife_Ledger_Money::digits( $table['rows'] ) ); ?></td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>

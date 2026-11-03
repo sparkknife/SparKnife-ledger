@@ -114,7 +114,7 @@ $object_labels = array(
 			printf(
 				/* translators: %s: count */
 				esc_html__( 'رویدادهای ثبت‌شده (%s)', 'sparkknife-ledger' ),
-				esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $result['total'] ) )
+				esc_html( Sparkknife_Ledger_Money::digits( (string) $result['total'] ) )
 			);
 			?>
 		</h2>
