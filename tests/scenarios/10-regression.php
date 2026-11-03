@@ -266,6 +266,71 @@ if ( '' === trim( $doc_output ) ) {
 	spk_assert( false !== stripos( $doc_output, 'charset' ), 'سند چاپ کدگذاری دارد' );
 }
 
+// ── ۱۱: شماره سند حتی با درج دستی یکتا می‌ماند ──────────────────────
+$txn_service = new Sparkknife_Ledger_Transaction_Service();
+$txn_table   = Sparkknife_Ledger_DB::transactions_table();
+
+$first_ref = $txn_service->generate_reference( current_time( 'Y-m-d' ) );
+
+global $wpdb;
+$wpdb->query(
+	$wpdb->prepare(
+		"INSERT INTO {$txn_table} (reference, person_id, type, amount, txn_date, status, created_at, updated_at)
+		 VALUES (%s, 0, 'income', '10000', %s, 'posted', %s, %s)",
+		$first_ref,
+		current_time( 'Y-m-d' ),
+		current_time( 'mysql' ),
+		current_time( 'mysql' )
+	)
+);
+
+$second_ref = $txn_service->generate_reference( current_time( 'Y-m-d' ) );
+
+spk_assert( $second_ref !== $first_ref, 'شماره سند تکراری تولید نمی‌شود', $first_ref . ' / ' . $second_ref );
+
+$duplicate_refs = $wpdb->get_results( "SELECT reference, COUNT(*) c FROM {$txn_table} GROUP BY reference HAVING c > 1" );
+spk_assert( empty( $duplicate_refs ), 'هیچ شماره سند تکراری در دیتابیس نیست', (string) count( $duplicate_refs ) );
+
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$txn_table} WHERE reference = %s", $first_ref ) );
+
+// ── ۱۲: کد مرده در JS وجود ندارد ───────────────────────────────────
+$js = (string) file_get_contents( SPARKKNIFE_LEDGER_DIR . 'assets/js/admin.js' );
+
+spk_assert( false === strpos( $js, 'initLiveSearch' ), 'تابع جستجوی زنده مرده حذف شده است' );
+
+// هر شناسه‌ای که JS مستقیم صدا می‌زند باید در view ها وجود داشته باشد.
+preg_match_all( "/getElementById\(\s*'([a-z-]+)'/", $js, $js_ids );
+
+foreach ( array_unique( $js_ids[1] ) as $element_id ) {
+	$found = false;
+	foreach ( glob( SPARKKNIFE_LEDGER_DIR . 'includes/Admin/Views/**/*.php' ) as $view_file ) {
+		if ( false !== strpos( (string) file_get_contents( $view_file ), $element_id ) ) {
+			$found = true;
+			break;
+		}
+	}
+
+	spk_assert( $found, 'شناسه JS در view وجود دارد: ' . $element_id );
+}
+
+// ── ۱۳: کلیدهای تنظیمات خوانده‌شده همگی تعریف شده‌اند ────────────────
+$all_settings_keys = array_keys( Sparkknife_Ledger_Settings::defaults() );
+
+$missing_keys = array();
+foreach ( glob( SPARKKNIFE_LEDGER_DIR . 'includes/**/*.php' ) as $php_file ) {
+	$source = (string) file_get_contents( $php_file );
+
+	if ( preg_match_all( "/Settings::get\(\s*'([a-z_]+)'/", $source, $matches ) ) {
+		foreach ( $matches[1] as $key ) {
+			if ( ! in_array( $key, $all_settings_keys, true ) && ! in_array( $key, $missing_keys, true ) ) {
+				$missing_keys[] = $key;
+			}
+		}
+	}
+}
+
+spk_assert( empty( $missing_keys ), 'همه کلیدهای تنظیمات خوانده‌شده تعریف شده‌اند', implode( ', ', $missing_keys ) );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
