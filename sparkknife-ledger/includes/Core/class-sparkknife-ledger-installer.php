@@ -188,14 +188,19 @@ class Sparkknife_Ledger_Installer {
 		 * بماند، نسخه هنوز به‌روز است ولی جدولی در کار نیست. پیش‌تر این حالت
 		 * هرگز ترمیم نمی‌شد و افزونه برای همیشه خراب می‌ماند.
 		 */
-		$tables_ok = Sparkknife_Ledger_DB::tables_exist();
+		$tables_ok  = Sparkknife_Ledger_DB::tables_exist();
+		$structure_ok = $tables_ok && self::structure_is_intact();
 
-		if ( $installed === SPARKKNIFE_LEDGER_DB_VERSION && $tables_ok ) {
+		if ( $installed === SPARKKNIFE_LEDGER_DB_VERSION && $structure_ok ) {
 			return;
 		}
 
-		if ( $installed === SPARKKNIFE_LEDGER_DB_VERSION && ! $tables_ok ) {
-			// نسخه به‌روز است ولی جداول نیستند: بازسازی بدون مهاجرت.
+		if ( $installed === SPARKKNIFE_LEDGER_DB_VERSION && ! $structure_ok ) {
+			/*
+			 * نسخه به‌روز است ولی جداول نیستند یا ناقص‌اند: بازسازی بدون
+			 * مهاجرت. `dbDelta` جدول موجود را با ستون‌های غایب تکمیل
+			 * می‌کند و داده‌های موجود را دست نمی‌زند.
+			 */
 			self::create_tables();
 			Sparkknife_Ledger_DB::flush_table_cache();
 			Sparkknife_Ledger_Settings::install_defaults();
@@ -215,6 +220,29 @@ class Sparkknife_Ledger_Installer {
 		}
 
 		self::store_versions();
+	}
+
+	/**
+	 * آیا ساختار همه جدول‌ها کامل است؟
+	 *
+	 * @return bool
+	 */
+	private static function structure_is_intact() {
+		$required = array(
+			Sparkknife_Ledger_DB::persons_table()      => array( 'id', 'name', 'phone', 'status', 'deleted_at', 'created_at', 'updated_at' ),
+			Sparkknife_Ledger_DB::transactions_table() => array( 'id', 'reference', 'person_id', 'type', 'amount', 'txn_date', 'status', 'created_at' ),
+			Sparkknife_Ledger_DB::audit_table()        => array( 'id', 'object_type', 'object_id', 'action', 'changes', 'created_at' ),
+		);
+
+		foreach ( $required as $table => $columns ) {
+			$missing = Sparkknife_Ledger_DB::missing_columns( $table, $columns );
+
+			if ( ! empty( $missing ) ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -387,25 +415,58 @@ class Sparkknife_Ledger_Installer {
 	public static function get_health_report() {
 		global $wpdb;
 
+		/*
+		 * هر جدول با ستون‌های کلیدی‌اش سنجیده می‌شود.
+		 *
+		 * پیش‌تر فقط وجود جدول بررسی می‌شد. جدولی که ساختش نصفه ماند
+		 * (فقط ستون id) وجود داشت، پس گزارش «ok» می‌داد در حالی که
+		 * ثبت در آن شکست می‌خورد و ممیزی بی‌صدا گم می‌شد.
+		 */
 		$tables = array(
-			__( 'اشخاص', 'sparkknife-ledger' )       => Sparkknife_Ledger_DB::persons_table(),
-			__( 'تراکنش‌ها', 'sparkknife-ledger' )   => Sparkknife_Ledger_DB::transactions_table(),
-			__( 'تاریخچه تغییرات', 'sparkknife-ledger' ) => Sparkknife_Ledger_DB::audit_table(),
+			array(
+				'label'   => __( 'اشخاص', 'sparkknife-ledger' ),
+				'table'   => Sparkknife_Ledger_DB::persons_table(),
+				'columns' => array( 'id', 'name', 'phone', 'status', 'deleted_at', 'created_at', 'updated_at' ),
+			),
+			array(
+				'label'   => __( 'تراکنش‌ها', 'sparkknife-ledger' ),
+				'table'   => Sparkknife_Ledger_DB::transactions_table(),
+				'columns' => array( 'id', 'reference', 'person_id', 'type', 'amount', 'txn_date', 'status', 'created_at' ),
+			),
+			array(
+				'label'   => __( 'تاریخچه تغییرات', 'sparkknife-ledger' ),
+				'table'   => Sparkknife_Ledger_DB::audit_table(),
+				'columns' => array( 'id', 'object_type', 'object_id', 'action', 'changes', 'created_at' ),
+			),
 		);
 
 		$report = array();
 
-		foreach ( $tables as $label => $table ) {
+		foreach ( $tables as $definition ) {
+			$label = $definition['label'];
+			$table = $definition['table'];
+
 			$suppress = $wpdb->suppress_errors( true );
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- نام جدول داخلی و آماده‌شده.
 			$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table;
 			$wpdb->suppress_errors( $suppress );
 
+			$missing_columns = $exists ? Sparkknife_Ledger_DB::missing_columns( $table, $definition['columns'] ) : array();
+
+			if ( ! $exists ) {
+				$status = 'missing';
+			} elseif ( ! empty( $missing_columns ) ) {
+				$status = 'broken';
+			} else {
+				$status = 'ok';
+			}
+
 			$report[] = array(
-				'label'  => $label,
-				'table'  => $table,
-				'status' => $exists ? 'ok' : 'missing',
-				'rows'   => $exists ? (string) Sparkknife_Ledger_DB::count_rows( $table ) : '—',
+				'label'           => $label,
+				'table'           => $table,
+				'status'          => $status,
+				'missing_columns' => $missing_columns,
+				'rows'            => 'ok' === $status ? (string) Sparkknife_Ledger_DB::count_rows( $table ) : '—',
 			);
 		}
 
