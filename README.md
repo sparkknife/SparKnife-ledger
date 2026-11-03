@@ -5,7 +5,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-5.8%2B-21759b)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-777bb4)](https://www.php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-blue)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Tests](https://img.shields.io/badge/tests-378%20passing-brightgreen)](#تستها)
+[![Tests](https://img.shields.io/badge/tests-383%20passing-brightgreen)](#تستها)
 
 ---
 
@@ -172,7 +172,12 @@ sparkknife-ledger/
 └── readme.txt
 ```
 
-معماری کامل در [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) و راهنمای نصب/استفاده در [`docs/INSTALLATION.md`](docs/INSTALLATION.md).
+| سند | محتوا |
+| --- | --- |
+| [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | نصب، تنظیمات، استفاده روزمره، رفع اشکال |
+| [`docs/STAGING.md`](docs/STAGING.md) | نصب آزمایشی و پشتیبان‌گیری (پیش از نصب روی سایت واقعی) |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | لایه‌ها، جریان داده، تصمیم‌های طراحی |
+| [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار |
 
 ### قواعد کد
 
@@ -258,7 +263,7 @@ add_filter( 'sparkknife_ledger_export_formats', function ( $formats ) {
 php tests/run-tests.php /path/to/wp-load.php
 ```
 
-پوشش: **۳۷۸ assertion در ۱۰ سناریو**
+پوشش: **۳۸۳ assertion در ۱۰ سناریو**
 
 | # | سناریو |
 | --- | --- |

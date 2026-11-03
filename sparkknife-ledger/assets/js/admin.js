@@ -6,7 +6,7 @@
  *   ۲) پیش‌نمایش لحظه‌ای و قالب‌بندی مبلغ
  *   ۳) نمایش فیلدهای بازه دلخواه
  *   ۴) اعتبارسنجی سمت کاربر فرم تراکنش
- *   ۵) جستجوی زنده در جدول‌های کوچک
+ *   ۵) پیش‌نمایش و پاک‌سازی ورودی تاریخ
  *
  * بدون وابستگی به فریم‌ورک؛ سازگار با jQuery موجود در وردپرس.
  */
@@ -134,9 +134,17 @@
 		var valid = true;
 
 		if ( amountInput ) {
-			var amount = toLatinDigits( amountInput.value ).replace( /[^\d.]/g, '' );
+			var rawAmount = toLatinDigits( amountInput.value );
+			var amount    = rawAmount.replace( /[^\d.]/g, '' );
 
-			if ( '' === amount || parseFloat( amount ) <= 0 ) {
+			/*
+			 * علامت منفی پیش از حذف نویسه‌ها بررسی می‌شود؛ وگرنه «-5» به «5»
+			 * تبدیل می‌شد و از اعتبارسنجی سمت کاربر رد می‌شد ولی سرور ردش
+			 * می‌کرد و کاربر پیام خطای متناقض می‌گرفت.
+			 */
+			var has_minus = /-/.test( rawAmount );
+
+			if ( has_minus || '' === amount || parseFloat( amount ) <= 0 ) {
 				markError( amountInput, strings.invalidAmount || 'مبلغ معتبر نیست.' );
 				valid = false;
 			} else {
@@ -274,31 +282,6 @@
 		toggle();
 	}
 
-	/* ۴) جستجوی زنده در جدول‌های کوچک ----------------------------- */
-	function initLiveSearch() {
-		var input = document.getElementById( 'spk-live-search' );
-
-		if ( ! input ) {
-			return;
-		}
-
-		var table = document.querySelector( '.spk-table' );
-
-		if ( ! table ) {
-			return;
-		}
-
-		input.addEventListener( 'input', function () {
-			var query = input.value.trim().toLowerCase();
-			var rows = table.querySelectorAll( 'tbody tr' );
-
-			Array.prototype.forEach.call( rows, function ( row ) {
-				var text = ( row.textContent || '' ).toLowerCase();
-				row.style.display = '' === query || text.indexOf( query ) !== -1 ? '' : 'none';
-			} );
-		} );
-	}
-
 	/* ۵) پیش‌نمایش تاریخ ------------------------------------------- */
 	function initDateInput() {
 		var input = document.querySelector( '[data-date-input]' );
@@ -322,7 +305,6 @@
 	function init() {
 		initAmountPreview();
 		initRangeToggle();
-		initLiveSearch();
 		initDateInput();
 	}
 
