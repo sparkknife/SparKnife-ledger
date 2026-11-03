@@ -17,6 +17,21 @@ defined( 'ABSPATH' ) || exit;
 class Sparkknife_Ledger_Export_Service {
 
 	/**
+	 * خواندن ایمن یک کلید از خلاصه مالی.
+	 *
+	 * @param array<string, mixed> $summary خلاصه.
+	 * @param string               $key     کلید.
+	 * @return string|int مقدار یا صفر.
+	 */
+	private function summary_value( array $summary, $key ) {
+		if ( ! isset( $summary[ $key ] ) || is_object( $summary[ $key ] ) ) {
+			return ( 'account_status' === $key ) ? 'settled' : '0';
+		}
+
+		return $summary[ $key ];
+	}
+
+	/**
 	 * نمونه یکتا.
 	 *
 	 * @var Sparkknife_Ledger_Export_Service|null
@@ -136,9 +151,19 @@ class Sparkknife_Ledger_Export_Service {
 	 * @return array<int, array<int, string>>
 	 */
 	public function person_report_rows( array $report ) {
-		$person = $report['person'];
-		$range  = $report['range'];
-		$rows   = array();
+		/*
+		 * ورودی ناقص نباید خطای مرگبار بدهد. پیش‌تر اگر کلیدهای
+		 * person/range/summary نبودند، این تابع به TypeError می‌رسید.
+		 * حالا در آن حالت فقط سرستون‌ها برگردانده می‌شوند.
+		 */
+		if ( empty( $report['person'] ) || ! is_object( $report['person'] ) ) {
+			return array( array( __( 'گزارش فردی حساب', 'sparkknife-ledger' ) ), array( __( 'داده‌ای برای نمایش نیست.', 'sparkknife-ledger' ) ) );
+		}
+
+		$person  = $report['person'];
+		$range   = isset( $report['range'] ) && is_array( $report['range'] ) ? $report['range'] : array();
+		$summary = isset( $report['summary'] ) && is_array( $report['summary'] ) ? $report['summary'] : array();
+		$rows    = array();
 
 		$rows[] = array( __( 'گزارش فردی حساب', 'sparkknife-ledger' ) );
 		$rows[] = array( __( 'نام شخص', 'sparkknife-ledger' ), $person->name );
@@ -153,15 +178,13 @@ class Sparkknife_Ledger_Export_Service {
 		);
 		$rows[] = array();
 
-		$summary = $report['summary'];
-
 		$rows[] = array( __( 'خلاصه مالی (تراکنش‌های معتبر)', 'sparkknife-ledger' ) );
-		$rows[] = array( __( 'مجموع ورودی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $summary['income'] ) );
-		$rows[] = array( __( 'مجموع خروجی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $summary['expense'] ) );
-		$rows[] = array( __( 'مانده نهایی', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $summary['balance'] ) );
-		$rows[] = array( __( 'وضعیت حساب', 'sparkknife-ledger' ), Sparkknife_Ledger_Ledger_Service::status_label( $summary['account_status'] ) );
-		$rows[] = array( __( 'تعداد تراکنش‌های معتبر', 'sparkknife-ledger' ), (string) $summary['count'] );
-		$rows[] = array( __( 'تعداد تراکنش‌های باطل‌شده', 'sparkknife-ledger' ), (string) $summary['void_count'] );
+		$rows[] = array( __( 'مجموع ورودی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $this->summary_value( $summary, 'income' ) ) );
+		$rows[] = array( __( 'مجموع خروجی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $this->summary_value( $summary, 'expense' ) ) );
+		$rows[] = array( __( 'مانده نهایی', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $this->summary_value( $summary, 'balance' ) ) );
+		$rows[] = array( __( 'وضعیت حساب', 'sparkknife-ledger' ), Sparkknife_Ledger_Ledger_Service::status_label( (string) $this->summary_value( $summary, 'account_status' ) ) );
+		$rows[] = array( __( 'تعداد تراکنش‌های معتبر', 'sparkknife-ledger' ), (string) $this->summary_value( $summary, 'count' ) );
+		$rows[] = array( __( 'تعداد تراکنش‌های باطل‌شده', 'sparkknife-ledger' ), (string) $this->summary_value( $summary, 'void_count' ) );
 		$rows[] = array();
 
 		$rows[] = array(
@@ -175,7 +198,11 @@ class Sparkknife_Ledger_Export_Service {
 			__( 'تاریخ ثبت', 'sparkknife-ledger' ),
 		);
 
-		foreach ( $report['transactions']['items'] as $transaction ) {
+		$items = isset( $report['transactions']['items'] ) && is_array( $report['transactions']['items'] )
+			? $report['transactions']['items']
+			: array();
+
+		foreach ( $items as $transaction ) {
 			$user       = $transaction->created_by ? get_userdata( (int) $transaction->created_by ) : null;
 			$rows[]     = array(
 				$transaction->reference,

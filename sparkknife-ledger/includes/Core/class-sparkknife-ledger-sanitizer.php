@@ -91,6 +91,14 @@ class Sparkknife_Ledger_Sanitizer {
 	 */
 	public static function amount( $value ) {
 		$value = Sparkknife_Ledger_Money::to_latin_digits( (string) $value );
+
+		/*
+		 * منفی‌های یونیکد پیش از پاک‌سازی به منفی ASCII تبدیل می‌شوند.
+		 * در غیر این صورت در همان مرحله حذف می‌شدند و «−۵» به «۵» تبدیل
+		 * می‌شد؛ یعنی مبلغ منفی، به‌عنوان مبلغ مثبت ثبت می‌شد.
+		 */
+		$value = str_replace( array( '−', '–', '—', '﹣' ), '-', (string) $value );
+
 		$value = str_replace( array( '٫', '،', '٬' ), array( '.', ',', '' ), $value );
 		$value = preg_replace( '/[^0-9.,\s\-]/', '', (string) $value );
 
