@@ -160,7 +160,7 @@ class Sparkknife_Ledger_Transaction_Service {
 				'type'        => array( 'from' => null, 'to' => $validated['type'] ),
 				'amount'      => array( 'from' => null, 'to' => Sparkknife_Ledger_Money::to_human( $validated['amount'] ) ),
 				'txn_date'    => array( 'from' => null, 'to' => $validated['txn_date'] ),
-				'description' => array( 'from' => null, 'to' => mb_substr( $validated['description'], 0, 200 ) ),
+				'description' => array( 'from' => null, 'to' => Sparkknife_Ledger_Sanitizer::limit( $validated['description'], 200 ) ),
 			),
 			sprintf(
 				/* translators: 1: reference, 2: amount, 3: type */
