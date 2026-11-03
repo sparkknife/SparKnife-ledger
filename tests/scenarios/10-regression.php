@@ -807,6 +807,32 @@ spk_equals( 'علی', Sparkknife_Ledger_Sanitizer::text( "\x01علی\x02" ), 'ک
 $invisible = $ps->create( array( 'name' => "\u{200B}\u{200C}", 'phone' => '09125550200' ) );
 spk_assert( is_wp_error( $invisible ), 'ساخت شخص با نام نامرئی رد می‌شود' );
 
+// ── ۲۵و: نام بلند بی‌صدا بریده نمی‌شود ────────────────────────────
+// `Sanitizer::text()` نام را بی‌صدا به ۱۹۰ نویسه می‌برید؛ کاربر نام
+// کاملی تایپ می‌کرد و نیمه دومش بدون هیچ پیامی گم می‌شد.
+spk_equals( 3, Sparkknife_Ledger_Sanitizer::length( 'علی' ), 'طول فارسی نویسه‌ای شمرده می‌شود' );
+spk_equals( 0, Sparkknife_Ledger_Sanitizer::length( '' ), 'طول رشته خالی صفر است' );
+
+$too_long = $ps->create(
+	array(
+		'name'  => str_repeat( 'ا', 200 ),
+		'phone' => '09125550300',
+	)
+);
+spk_assert( is_wp_error( $too_long ), 'نام بلندتر از ۱۹۰ نویسه رد می‌شود' );
+
+if ( is_wp_error( $too_long ) ) {
+	spk_assert(
+		false !== mb_strpos( $too_long->get_error_message(), '۱۹۰' ),
+		'پیام خطای نام بلند حد مجاز را می‌گوید',
+		$too_long->get_error_message()
+	);
+}
+
+// نام تک‌نویسه هم رد می‌شود (قبلاً به mbstring وابسته بود).
+$one_char = $ps->create( array( 'name' => 'ا', 'phone' => '09125550400' ) );
+spk_assert( is_wp_error( $one_char ), 'نام تک‌نویسه رد می‌شود' );
+
 // ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
 $p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
 $p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱

@@ -124,12 +124,23 @@ class Sparkknife_Ledger_Validator {
 		$validator = new self();
 		$person_id = absint( $person_id );
 
-		$name = Sparkknife_Ledger_Sanitizer::text( isset( $input['name'] ) ? $input['name'] : '', 190 );
+		/*
+		 * طول نام پیش از برش سنجیده می‌شود.
+		 *
+		 * پیش‌تر نام بلندتر از ۱۹۰ نویسه بی‌صدا بریده می‌شد: کاربر نام
+		 * کاملی تایپ می‌کرد، ذخیره می‌شد، و نیمه دومش بدون هیچ پیامی
+		 * گم می‌شد. حالا پیام صریح داده می‌شود تا کاربر کوتاه کند.
+		 */
+		$name_raw = Sparkknife_Ledger_Sanitizer::text( isset( $input['name'] ) ? $input['name'] : '', 400 );
+
+		$name = Sparkknife_Ledger_Sanitizer::limit( $name_raw, 190 );
 
 		if ( '' === $name ) {
 			$validator->add_error( 'name', __( 'نام شخص الزامی است.', 'sparkknife-ledger' ) );
-		} elseif ( function_exists( 'mb_strlen' ) && mb_strlen( $name ) < 2 ) {
+		} elseif ( Sparkknife_Ledger_Sanitizer::length( $name ) < 2 ) {
 			$validator->add_error( 'name', __( 'نام شخص باید حداقل دو نویسه باشد.', 'sparkknife-ledger' ) );
+		} elseif ( Sparkknife_Ledger_Sanitizer::length( $name_raw ) > 190 ) {
+			$validator->add_error( 'name', __( 'نام شخص بیش از حد بلند است؛ حداکثر ۱۹۰ نویسه مجاز است.', 'sparkknife-ledger' ) );
 		}
 
 		$phone = Sparkknife_Ledger_Sanitizer::phone( isset( $input['phone'] ) ? $input['phone'] : '' );

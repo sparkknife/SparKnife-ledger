@@ -343,6 +343,33 @@ class Sparkknife_Ledger_Sanitizer {
 	}
 
 	/**
+	 * طول رشته بر حسب نویسه (نه بایت).
+	 *
+	 * بدون mbstring، `strlen()` بایت می‌شمارد و یک نام فارسی سه‌حرفی
+	 * ۶ بایت است؛ هر مقایسه‌ای که با `strlen()` روی متن فارسی انجام شود
+	 * نتیجه نادرست می‌دهد. اینجا شمارش نویسه‌ای با `preg_match_all` انجام
+	 * می‌شود که به mbstring نیاز ندارد.
+	 *
+	 * @param string $value رشته.
+	 * @return int
+	 */
+	public static function length( $value ) {
+		$value = (string) $value;
+
+		if ( '' === $value ) {
+			return 0;
+		}
+
+		if ( function_exists( 'mb_strlen' ) ) {
+			return (int) mb_strlen( $value, 'UTF-8' );
+		}
+
+		$count = preg_match_all( '/./us', $value );
+
+		return false === $count ? strlen( $value ) : (int) $count;
+	}
+
+	/**
 	 * کوتاه کردن ایمن رشته.
 	 *
 	 * @param string $value رشته.
