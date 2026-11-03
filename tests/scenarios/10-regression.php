@@ -987,6 +987,58 @@ spk_assert(
 $unfiltered_report = $report_svc->get_summary_report( array( 'range' => 'all', 'for_export' => true ) );
 spk_equals( $unfiltered_report['totals']['income'], $unfiltered_report['filtered_totals']['income'], 'بدون فیلتر جمع فیلترشده با جمع کل یکی است' );
 
+// ── ۲۵ی: تب تنظیمات ناشناخته هیچ چیز را تغییر نمی‌دهد ─────────────
+// `section_keys()` برای نام ناشناخته آرایه خالی برمی‌گرداند و شرط
+// `! empty( $section_keys )` آن را رد می‌کرد، پس `$sanitized` دست‌نخورده
+// می‌ماند و همه چک‌باکس‌ها صفر می‌شدند — همان باگ پاس اول، از راه دیگر.
+$settings_before = Sparkknife_Ledger_Settings::all();
+
+$unknown_section = Sparkknife_Ledger_Settings::save( array( 'settings_section' => 'not_a_real_tab' ), false );
+
+spk_assert( is_wp_error( $unknown_section ), 'تب ناشناخته خطا برمی‌گرداند' );
+
+Sparkknife_Ledger_Settings::flush_cache();
+$settings_after = Sparkknife_Ledger_Settings::all();
+
+spk_equals(
+	(string) $settings_before['use_persian_digits'],
+	(string) $settings_after['use_persian_digits'],
+	'تب ناشناخته چک‌باکس ارقام فارسی را خاموش نمی‌کند'
+);
+spk_equals(
+	(string) $settings_before['require_void_reason'],
+	(string) $settings_after['require_void_reason'],
+	'تب ناشناخته دلیل ابطال را خاموش نمی‌کند'
+);
+spk_equals(
+	(string) $settings_before['allow_person_delete'],
+	(string) $settings_after['allow_person_delete'],
+	'تب ناشناخته حذف شخص را خاموش نمی‌کند'
+);
+
+// تب شناخته‌شده باید فقط کلیدهای خودش را عوض کند.
+Sparkknife_Ledger_Settings::save(
+	array(
+		'settings_section' => 'currency',
+		'currency_decimals' => 2,
+	),
+	false
+);
+Sparkknife_Ledger_Settings::flush_cache();
+
+$after_currency = Sparkknife_Ledger_Settings::all();
+
+spk_equals( '2', (string) $after_currency['currency_decimals'], 'تب ارز مقدار خودش را ذخیره می‌کند' );
+spk_equals(
+	(string) $settings_before['use_persian_digits'],
+	(string) $after_currency['use_persian_digits'],
+	'تب ارز تنظیمات تب‌های دیگر را دست نمی‌زند'
+);
+
+// بازگرداندن تنظیمات اولیه.
+Sparkknife_Ledger_Settings::save( $settings_before, false );
+Sparkknife_Ledger_Settings::flush_cache();
+
 // ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
 $p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
 $p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱
