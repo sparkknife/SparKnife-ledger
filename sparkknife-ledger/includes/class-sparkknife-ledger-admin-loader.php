@@ -155,7 +155,12 @@ class Sparkknife_Ledger_Admin_Loader {
 		wp_enqueue_script(
 			'sparkknife-ledger-admin',
 			SPARKKNIFE_LEDGER_URL . 'assets/js/admin.js',
-			array( 'jquery' ),
+			/*
+			 * بدون وابستگی. اسکریپت خودش نوشته شده و هیچ‌جا jQuery را صدا
+			 * نمی‌زند؛ وابستگی اعلام‌شده فقط jQuery را در هر صفحهٔ پنل این
+			 * افزونه بارگذاری می‌کرد.
+			 */
+			array(),
 			SPARKKNIFE_LEDGER_VERSION,
 			true
 		);
@@ -164,13 +169,18 @@ class Sparkknife_Ledger_Admin_Loader {
 			'sparkknife-ledger-admin',
 			'sparkknifeLedger',
 			array(
-				'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
-				'nonce'         => wp_create_nonce( 'sparkknife_ledger_ajax' ),
+				/*
+				 * `ajaxUrl`، `nonce` و `searchNoResult` پیش‌تر فرستاده
+				 * می‌شدند ولی هیچ‌جا در جاوااسکریپت خوانده نمی‌شدند:
+				 * افزونه هیچ endpoint‌ی در `wp_ajax_` ثبت نمی‌کند و جستجوی
+				 * زنده عمداً حذف شده است. ساختن یک nonce معتبر در HTML هر
+				 * صفحه، بی‌آنکه سروری آن را بپذیرد، فقط سطح حمله را باز
+				 * می‌کند.
+				 */
 				'currency'      => Sparkknife_Ledger_Money::currency_symbol(),
 				'separator'     => Sparkknife_Ledger_Money::thousands_separator(),
 				'persianDigits' => Sparkknife_Ledger_Money::uses_persian_digits() ? 1 : 0,
 				'decimals'      => Sparkknife_Ledger_Money::decimals(),
-				'isRtl'         => 1, // رابط پنل همیشه راست‌به‌چپ است؛ محتوا فارسی است.
 				'strings'       => array(
 					'confirmVoid'    => __( 'آیا از ابطال این تراکنش اطمینان دارید؟ این عملیات قابل بازگشت نیست.', 'sparkknife-ledger' ),
 					'confirmDelete'  => __( 'آیا از حذف این مورد اطمینان دارید؟', 'sparkknife-ledger' ),
@@ -178,7 +188,6 @@ class Sparkknife_Ledger_Admin_Loader {
 					'required'       => __( 'این فیلد الزامی است.', 'sparkknife-ledger' ),
 					'invalidAmount'  => __( 'مبلغ وارد‌شده معتبر نیست.', 'sparkknife-ledger' ),
 					'saved'          => __( 'ذخیره شد.', 'sparkknife-ledger' ),
-					'searchNoResult' => __( 'موردی یافت نشد.', 'sparkknife-ledger' ),
 				),
 			)
 		);
