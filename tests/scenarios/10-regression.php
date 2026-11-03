@@ -600,6 +600,108 @@ foreach ( array( null, '', '0000-00-00', 'garbage', '2025-02-30' ) as $bad_date 
 	spk_equals( '—', Sparkknife_Ledger_Date::format( $bad_date ), 'تاریخ نامعتبر خط تیره می‌دهد: ' . var_export( $bad_date, true ) );
 }
 
+// ── ۲۵: جستجو با املای عربی فارسی را پیدا می‌کند ──────────────────
+// کاربر با کیبورد عربی یا کپی از وب، «ي» و «ك» تایپ می‌کند. LIKE در
+// MySQL بایتی مقایسه می‌کند، پس جستجو نتیجه نمی‌داد.
+
+$ps = new Sparkknife_Ledger_Person_Service();
+
+$spelling_name = 'علی رضایی';
+
+global $wpdb;
+$wpdb->query(
+	$wpdb->prepare(
+		'DELETE FROM ' . Sparkknife_Ledger_DB::persons_table() . ' WHERE name = %s',
+		$spelling_name
+	)
+);
+
+$spelling_id = $ps->create( array( 'name' => $spelling_name, 'phone' => '09127778888' ) );
+spk_assert( ! is_wp_error( $spelling_id ), 'شخص برای آزمون املا ساخته شد' );
+
+$person_repo = Sparkknife_Ledger_Person_Repository::instance();
+
+$spellings = array(
+	'علی رضایی'                            => 'فارسی',
+	'علي رضائي'                            => 'عربی + همزه روی ی',
+	'على رضائى'                            => 'الف مقصوره',
+);
+
+foreach ( $spellings as $needle => $label ) {
+	$found = $person_repo->query( array( 'search' => $needle, 'page' => 1, 'per_page' => 10 ) );
+	spk_assert( $found['total'] >= 1, 'جستجوی «' . $label . '» شخص را پیدا می‌کند', (string) $found['total'] );
+}
+
+// «ک» عربی
+$k_name = 'کارخانه آزمون';
+$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . Sparkknife_Ledger_DB::persons_table() . ' WHERE name = %s', $k_name ) );
+$ps->create( array( 'name' => $k_name, 'phone' => '09127779999' ) );
+
+$k_arabic_query = mb_chr( 0x0643, 'UTF-8' ) . mb_chr( 0x0627, 'UTF-8' ) . mb_chr( 0x0631, 'UTF-8' ) . mb_chr( 0x062E, 'UTF-8' ) . mb_chr( 0x0627, 'UTF-8' ) . mb_chr( 0x0646, 'UTF-8' ) . mb_chr( 0x0647, 'UTF-8' );
+$k_search       = $person_repo->query( array( 'search' => $k_arabic_query, 'page' => 1, 'per_page' => 10 ) );
+
+spk_assert( $k_search['total'] >= 1, 'جستجو با «ك» عربی نام دارای «ک» را پیدا می‌کند', (string) $k_search['total'] );
+
+// ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
+$p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
+$p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱
+$p2 = mb_chr( 0x06F2, 'UTF-8' ); // ۲
+$p9 = mb_chr( 0x06F9, 'UTF-8' ); // ۹
+$a0 = mb_chr( 0x0660, 'UTF-8' ); // ٠
+$a1 = mb_chr( 0x0661, 'UTF-8' ); // ١
+$a2 = mb_chr( 0x0662, 'UTF-8' ); // ٢
+$a9 = mb_chr( 0x0669, 'UTF-8' ); // ٩
+
+$person_repo_digits = Sparkknife_Ledger_Person_Repository::instance();
+
+foreach ( array( '09125554444', $p0 . '۹۱۲۵۵۵۴۴۴۴', $a0 . '٩١٢٥٥٥٤٤٤٤' ) as $digit_query ) {
+	$digit_result = $person_repo_digits->query( array( 'search' => $digit_query, 'page' => 1, 'per_page' => 10 ) );
+	spk_assert( $digit_result['total'] >= 0, 'جستجوی شماره با ارقام: ' . $digit_query );
+}
+
+// خودِ تابع یکسان‌سازی باید ارقام را لاتین کند.
+spk_equals(
+	'0912',
+	Sparkknife_Ledger_Sanitizer::normalize_persian( $p0 . $p9 . $p1 . $p2 ),
+	'ارقام فارسی در جستجو لاتین می‌شوند'
+);
+
+spk_equals(
+	'0912',
+	Sparkknife_Ledger_Sanitizer::normalize_persian( $a0 . $a9 . $a1 . $a2 ),
+	'ارقام عربی در جستجو لاتین می‌شوند'
+);
+
+// ── ۲۷: مرتب‌سازی الفبایی فارسی ──────────────────────────────────
+// strcmp ترتیب بایتی UTF-8 می‌دهد: «پ» بعد از «د» و «چ» بعد از «ی».
+$sort_expected = array( 'امیر', 'بهرام', 'پرویز', 'تیرداد', 'جواد', 'چنگیز', 'حسن', 'داریوش', 'کیوان', 'گلناز' );
+
+$sort_input = $sort_expected;
+shuffle( $sort_input );
+
+usort(
+	$sort_input,
+	function ( $a, $b ) {
+		return strcmp(
+			Sparkknife_Ledger_Sanitizer::persian_sort_key( $a ),
+			Sparkknife_Ledger_Sanitizer::persian_sort_key( $b )
+		);
+	}
+);
+
+spk_equals(
+	wp_json_encode( $sort_expected ),
+	wp_json_encode( $sort_input ),
+	'مرتب‌سازی الفبایی فارسی: ا ب پ ت ج چ ح د ک گ',
+	wp_json_encode( $sort_input )
+);
+
+// «پ» باید پیش از «ت» بیاید (در UTF-8 بایت پ بزرگ‌تر است).
+spk_assert(
+	Sparkknife_Ledger_Sanitizer::persian_sort_key( 'پرویز' ) < Sparkknife_Ledger_Sanitizer::persian_sort_key( 'تیرداد' ),
+	'کلید مرتب‌سازی: پ پیش از ت'
+);
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();

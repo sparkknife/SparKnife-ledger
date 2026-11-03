@@ -206,7 +206,15 @@ class Sparkknife_Ledger_Report_Service {
 				$rows,
 				function ( $a, $b ) use ( $orderby, $order ) {
 					if ( 'name' === $orderby ) {
-						$result = strcmp( $a['name'], $b['name'] );
+						/*
+						 * strcmp ترتیب بایتی UTF-8 می‌دهد که برای فارسی
+						 * نادرست است («پ» بعد از «د» می‌آید). کلید
+						 * مرتب‌سازی الفبایی فارسی استفاده می‌شود.
+						 */
+						$result = strcmp(
+							Sparkknife_Ledger_Sanitizer::persian_sort_key( $a['name'] ),
+							Sparkknife_Ledger_Sanitizer::persian_sort_key( $b['name'] )
+						);
 					} elseif ( 'count' === $orderby ) {
 						$result = (int) $a['count'] <=> (int) $b['count'];
 					} else {

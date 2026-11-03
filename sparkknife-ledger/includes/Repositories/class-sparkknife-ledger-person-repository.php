@@ -102,12 +102,24 @@ class Sparkknife_Ledger_Person_Repository {
 		}
 
 		$search = trim( (string) $args['search'] );
+
 		if ( '' !== $search ) {
-			$like     = '%' . $wpdb->esc_like( $search ) . '%';
-			$where[]  = '(name LIKE %s OR phone LIKE %s OR description LIKE %s)';
-			$params[] = $like;
-			$params[] = $like;
-			$params[] = $like;
+			/*
+			 * جستجو با همه املای ممکن فارسی انجام می‌شود تا «علي» و «علی»
+			 * یکدیگر را پیدا کنند؛ LIKE در MySQL بایتی مقایسه می‌کند.
+			 */
+			$variants = Sparkknife_Ledger_Sanitizer::search_variants( $search );
+			$clauses  = array();
+
+			foreach ( $variants as $variant ) {
+				$like      = '%' . $wpdb->esc_like( $variant ) . '%';
+				$clauses[] = '(name LIKE %s OR phone LIKE %s OR description LIKE %s)';
+				$params[]  = $like;
+				$params[]  = $like;
+				$params[]  = $like;
+			}
+
+			$where[] = '(' . implode( ' OR ', $clauses ) . ')';
 		}
 
 		$orderby = in_array( $args['orderby'], self::sortable_columns(), true ) ? $args['orderby'] : 'created_at';

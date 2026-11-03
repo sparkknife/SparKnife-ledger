@@ -180,7 +180,23 @@ function spk_equals( $expected, $actual, $message ) {
 	Sparkknife_Ledger_Test_Reporter::equals( $expected, $actual, $message );
 }
 
+/**
+ * بازنشانی تنظیمات به حالت پیش‌فرض پیش از هر سناریو.
+ *
+ * بدون این کار، سناریوهایی که تنظیمات را تغییر می‌دهند (و بازش می‌گردانند)
+ * می‌توانند در صورت خطا در میانه کار، مقدار تغییر‌یافته را برای سناریوی
+ * بعدی باقی بگذارند و شکست‌های گیج‌کننده‌ای بسازند که ربطی به افزونه
+ * ندارند. هر سناریو باید از یک نقطه شروع یکسان آغاز شود.
+ *
+ * @return void
+ */
+function sparkknife_ledger_reset_settings() {
+	Sparkknife_Ledger_Settings::save( Sparkknife_Ledger_Settings::defaults(), false );
+	Sparkknife_Ledger_Settings::flush_cache();
+}
+
 // بارگذاری سناریوها.
+sparkknife_ledger_reset_settings();
 require_once __DIR__ . '/scenarios/01-install.php';
 require_once __DIR__ . '/scenarios/02-money.php';
 require_once __DIR__ . '/scenarios/03-persons.php';
