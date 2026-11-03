@@ -374,9 +374,16 @@ class Sparkknife_Ledger_Report_Service {
 		$data = Sparkknife_Ledger_Transaction_Repository::instance()->monthly_totals( $months );
 
 		foreach ( $data as $index => $row ) {
-			$data[ $index ]['label']            = Sparkknife_Ledger_Date::format( $row['key'] . '-01' );
+			/*
+			 * برچسب را مخزن ساخته است و از قبل با تقویم فعال هم‌خوان است.
+			 * پیش‌تر اینجا `Date::format( $row['key'] . '-01' )` صدا زده
+			 * می‌شد که کلید ماه میلادی را به شمسی تبدیل می‌کرد و برچسب
+			 * وسط ماه می‌افتاد («۱۴۰۵/۰۸/۱۰» به‌جای «آبان ۱۴۰۵»).
+			 */
 			$data[ $index ]['income_formatted']  = Sparkknife_Ledger_Money::format( $row['income'] );
 			$data[ $index ]['expense_formatted'] = Sparkknife_Ledger_Money::format( $row['expense'] );
+			$data[ $index ]['balance']           = Sparkknife_Ledger_Amount::sub( $row['income'], $row['expense'] );
+			$data[ $index ]['balance_formatted'] = Sparkknife_Ledger_Money::format( $data[ $index ]['balance'] );
 		}
 
 		return $data;
