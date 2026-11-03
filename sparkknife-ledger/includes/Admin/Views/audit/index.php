@@ -149,15 +149,15 @@ $object_labels = array(
 				<tbody>
 					<?php foreach ( $result['items'] as $entry ) : ?>
 						<?php
-						$user    = $entry->user_id ? get_userdata( (int) $entry->user_id ) : null;
-						$changes = $audit->decode_changes( $entry );
+						$stored_login = isset( $entry->user_login ) ? (string) $entry->user_login : '';
+						$changes      = $audit->decode_changes( $entry );
 						?>
 						<tr>
 							<td data-label="<?php esc_attr_e( 'زمان', 'sparkknife-ledger' ); ?>" class="spk-nowrap">
 								<?php echo esc_html( Sparkknife_Ledger_Date::format( $entry->created_at, true ) ); ?>
 							</td>
 							<td data-label="<?php esc_attr_e( 'کاربر', 'sparkknife-ledger' ); ?>">
-								<?php echo esc_html( $user ? $user->display_name : __( 'سیستم', 'sparkknife-ledger' ) ); ?>
+								<?php echo esc_html( sparkknife_ledger_user_label( $entry->user_id, $stored_login ) ); ?>
 							</td>
 							<td data-label="<?php esc_attr_e( 'موجودیت', 'sparkknife-ledger' ); ?>">
 								<?php echo esc_html( isset( $object_labels[ $entry->object_type ] ) ? $object_labels[ $entry->object_type ] : $entry->object_type ); ?>

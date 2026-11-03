@@ -247,7 +247,6 @@ class Sparkknife_Ledger_Export_Service {
 			: array();
 
 		foreach ( $items as $transaction ) {
-			$user       = $transaction->created_by ? get_userdata( (int) $transaction->created_by ) : null;
 			$rows[]     = array(
 				$transaction->reference,
 				$this->csv_date( $transaction->txn_date ),
@@ -255,7 +254,7 @@ class Sparkknife_Ledger_Export_Service {
 				$this->csv_amount( $transaction->amount ),
 				Sparkknife_Ledger_Transaction_Service::status_label( $transaction->status ),
 				(string) $transaction->description,
-				$user ? $user->display_name : __( 'نامشخص', 'sparkknife-ledger' ),
+				sparkknife_ledger_user_label( $transaction->created_by ),
 				$this->csv_date( $transaction->created_at, true ),
 			);
 		}

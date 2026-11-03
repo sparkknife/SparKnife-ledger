@@ -148,6 +148,7 @@ class Sparkknife_Ledger_Audit_Service {
 			'summary'     => $payload['summary'],
 			'ip_address'  => $payload['ip_address'],
 			'user_agent'  => $payload['user_agent'],
+			'user_login'  => $payload['user_login'],
 			'hash'        => $hash,
 		);
 
