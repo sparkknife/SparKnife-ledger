@@ -58,6 +58,15 @@ final class Sparkknife_Ledger_Plugin {
 		add_action( 'init', array( $this, 'load_textdomain' ), 1 );
 		add_action( 'init', array( $this, 'maybe_log_export_request' ), 20 );
 
+		/*
+		 * چندسایتی: سایت تازه‌ساخته‌شده در شبکه، جداول و تنظیمات خودش را
+		 * می‌گیرد. بدون این هوک، فعال‌سازی شبکه فقط سایت جاری را آماده
+		 * می‌کرد و سایت‌های بعدی با خطای «جدول یافت نشد» روبه‌رو می‌شدند.
+		 */
+		if ( is_multisite() ) {
+			add_action( 'wp_initialize_site', array( 'Sparkknife_Ledger_Installer', 'initialize_site' ), 100 );
+		}
+
 		if ( is_admin() ) {
 			Sparkknife_Ledger_Admin_Loader::instance()->init();
 		}

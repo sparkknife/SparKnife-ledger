@@ -44,6 +44,15 @@ class Sparkknife_Ledger_Amount {
 	 * @return string
 	 */
 	public static function normalize( $value ) {
+		/*
+		 * آرایه مقدار مالی نیست. بدون این بررسی، (string) روی آرایه هشدار
+		 * PHP می‌دهد و رشته «Array» تولید می‌کند که بعد به «0» تبدیل
+		 * می‌شود — نتیجه: نمایش بی‌صدای «۰ تومان» به‌جای مانده واقعی.
+		 */
+		if ( is_array( $value ) ) {
+			return '0';
+		}
+
 		if ( is_object( $value ) && method_exists( $value, '__toString' ) ) {
 			$value = (string) $value;
 		}
