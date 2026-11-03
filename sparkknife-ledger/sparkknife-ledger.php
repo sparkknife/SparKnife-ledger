@@ -62,6 +62,13 @@ require_once SPARKKNIFE_LEDGER_DIR . 'includes/Admin/Views/partials/render.php';
 register_activation_hook( __FILE__, array( 'Sparkknife_Ledger_Installer', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'Sparkknife_Ledger_Installer', 'deactivate' ) );
 
+/*
+ * فعال‌سازی شبکه‌ای: register_activation_hook در حالت شبکه فقط سایت جاری را
+ * آماده می‌کند. این هوک پیش از آن اجرا می‌شود و تنها وقتی $network_wide
+ * روشن است کار می‌کند تا در تک‌سایتی دوبار نصب انجام نشود.
+ */
+add_action( 'activate_' . SPARKKNIFE_LEDGER_BASENAME, array( 'Sparkknife_Ledger_Installer', 'activate_network' ) );
+
 // اجرای کم‌هزینه بررسی به‌روزرسانی اسکیما و مهاجرت تنظیمات در هر بار بارگذاری.
 add_action( 'plugins_loaded', array( 'Sparkknife_Ledger_Installer', 'maybe_upgrade' ), 5 );
 

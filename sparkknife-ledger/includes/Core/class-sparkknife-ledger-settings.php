@@ -62,6 +62,49 @@ class Sparkknife_Ledger_Settings {
 	}
 
 	/**
+	 * کلیدهای متعلق به هر تب تنظیمات.
+	 *
+	 * هر تب فرم جداگانه‌ای دارد و فقط فیلدهای خودش را ارسال می‌کند. برای
+	 * اینکه ذخیره یک تب، چک‌باکس‌های تب‌های دیگر را خاموش نکند، دامنه
+	 * به‌روزرسانی با این نگاشت محدود می‌شود.
+	 *
+	 * تب `display` و `general` هر دو در یک فرم هستند، پس کلیدهای هر دو
+	 * یکجا برمی‌گردد.
+	 *
+	 * @param string $section نام بخش.
+	 * @return array<int, string>
+	 */
+	public static function section_keys( $section ) {
+		$display_and_general = array(
+			'use_persian_digits',
+			'calendar',
+			'thousands_separator',
+			'per_page',
+			'reference_prefix',
+			'default_transaction_type',
+			'require_void_reason',
+			'allow_person_delete',
+			'show_welcome_panel',
+		);
+
+		$map = array(
+			'currency' => array(
+				'currency_type',
+				'custom_currency_label',
+				'custom_currency_symbol',
+				'custom_currency_code',
+				'currency_decimals',
+				'currency_position',
+			),
+			'display'  => $display_and_general,
+			'general'  => $display_and_general,
+			'data'     => array( 'delete_data_on_uninstall' ),
+		);
+
+		return isset( $map[ $section ] ) ? $map[ $section ] : array();
+	}
+
+	/**
 	 * ذخیره پیش‌فرض‌ها در زمان فعال‌سازی (بدون بازنویسی مقادیر موجود).
 	 *
 	 * @return void
@@ -186,21 +229,36 @@ class Sparkknife_Ledger_Settings {
 			$sanitized[ $checkbox ] = empty( $input[ $checkbox ] ) ? 0 : 1;
 		}
 
-		// محافظت: فرم‌هایی که فقط بخشی از فیلدها را دارند مقدار سایر فیلدها را از دست نمی‌دهند.
-		$sections = isset( $input['settings_section'] ) ? sanitize_key( $input['settings_section'] ) : 'all';
+		/*
+		 * محافظت: فرم‌ها فقط فیلدهای تب فعال را ارسال می‌کنند؛ چک‌باکسِ ارسال‌نشده
+		 * به معنی «خاموش» نیست، به معنی «در این فرم نبوده» است.
+		 *
+		 * فرم تنظیمات فیلد `active_tab` را می‌فرستد. اگر بخش مشخص شده باشد،
+		 * فقط کلیدهای همان بخش با ورودی جدید به‌روزرسانی می‌شوند و بقیه مقدار
+		 * قبلی خود را نگه می‌دارند.
+		 */
+		$sections = 'all';
+
+		if ( isset( $input['settings_section'] ) ) {
+			$sections = sanitize_key( $input['settings_section'] );
+		} elseif ( isset( $input['active_tab'] ) ) {
+			$sections = sanitize_key( $input['active_tab'] );
+		}
 
 		if ( 'all' !== $sections ) {
-			$kept = $current;
-			foreach ( $sanitized as $key => $value ) {
-				$kept[ $key ] = $value;
-			}
-			// فیلدهای مربوط به بخش‌های دیگر، همان مقدار قبلی را نگه می‌دارند.
-			foreach ( $defaults as $key => $value ) {
-				if ( ! array_key_exists( $key, $sanitized ) ) {
-					$kept[ $key ] = array_key_exists( $key, $current ) ? $current[ $key ] : $value;
+			$section_keys = self::section_keys( $sections );
+
+			if ( ! empty( $section_keys ) ) {
+				$kept = $current;
+
+				foreach ( $section_keys as $key ) {
+					if ( array_key_exists( $key, $sanitized ) ) {
+						$kept[ $key ] = $sanitized[ $key ];
+					}
 				}
+
+				$sanitized = $kept;
 			}
-			$sanitized = $kept;
 		}
 
 		$sanitized = array_merge( $defaults, $sanitized );
@@ -218,6 +276,17 @@ class Sparkknife_Ledger_Settings {
 
 		update_option( self::OPTION_KEY, $sanitized, false );
 		self::$cache = $sanitized;
+
+		/*
+		 * گزینه مستقل `delete_data_on_uninstall` را با آرایه تنظیمات هم‌گام
+		 * نگه می‌داریم؛ uninstall.php هر دو را می‌خواند و ناهم‌گامی باعث
+		 * می‌شد تنظیم روشن، در زمان حذف افزونه نادیده گرفته شود.
+		 */
+		update_option(
+			'sparkknife_ledger_delete_data_on_uninstall',
+			empty( $sanitized['delete_data_on_uninstall'] ) ? 'no' : 'yes',
+			false
+		);
 
 		if ( $log_change && ! empty( $changed ) ) {
 			// برای جلوگیری از ثبت مقادیر حساس، فقط کلیدها و مقادیر غیرحساس ثبت می‌شود.

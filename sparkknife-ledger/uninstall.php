@@ -62,7 +62,6 @@ function sparkknife_ledger_uninstall_site() {
 		// گزینه‌های تنظیمات و پیکربندی.
 		delete_option( Sparkknife_Ledger_Settings::OPTION_KEY );
 		delete_option( 'sparkknife_ledger_delete_data_on_uninstall' );
-		delete_option( 'sparkknife_ledger_settings_version' );
 
 		// دسترسی‌های سفارشی از همه نقش‌ها حذف می‌شود.
 		if ( class_exists( 'Sparkknife_Ledger_Capabilities' ) ) {

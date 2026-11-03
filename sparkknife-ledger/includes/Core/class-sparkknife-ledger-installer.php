@@ -104,6 +104,61 @@ class Sparkknife_Ledger_Installer {
 	}
 
 	/**
+	 * آماده‌سازی یک سایت تازه در شبکه چندسایتی.
+	 *
+	 * @param WP_Site $site سایت جدید.
+	 * @return void
+	 */
+	public static function initialize_site( $site ) {
+		if ( ! is_multisite() || ! $site instanceof WP_Site ) {
+			return;
+		}
+
+		switch_to_blog( (int) $site->blog_id );
+
+		self::create_tables();
+		Sparkknife_Ledger_Settings::install_defaults();
+		Sparkknife_Ledger_Capabilities::add_capabilities();
+		self::store_versions();
+
+		restore_current_blog();
+	}
+
+	/**
+	 * آماده‌سازی همه سایت‌های شبکه.
+	 *
+	 * هنگام فعال‌سازی شبکه‌ای فراخوانی می‌شود؛ وردپرس در آن حالت
+	 * register_activation_hook را فقط یک‌بار و برای سایت جاری اجرا می‌کند.
+	 *
+	 * @param bool $network_wide فعال‌سازی برای کل شبکه.
+	 * @return void
+	 */
+	public static function activate_network( $network_wide = false ) {
+		if ( ! $network_wide || ! is_multisite() ) {
+			// تک‌سایتی: register_activation_hook خودش نصب را انجام می‌دهد.
+			return;
+		}
+
+		$sites = get_sites(
+			array(
+				'fields' => 'ids',
+				'number' => 0,
+			)
+		);
+
+		foreach ( $sites as $site_id ) {
+			switch_to_blog( (int) $site_id );
+
+			self::create_tables();
+			Sparkknife_Ledger_Settings::install_defaults();
+			Sparkknife_Ledger_Capabilities::add_capabilities();
+			self::store_versions();
+
+			restore_current_blog();
+		}
+	}
+
+	/**
 	 * اجرا در زمان غیرفعال‌سازی.
 	 *
 	 * داده‌ها هرگز در زمان غیرفعال‌سازی حذف نمی‌شوند.
@@ -170,8 +225,8 @@ class Sparkknife_Ledger_Installer {
 			description text NULL,
 			status varchar(20) NOT NULL DEFAULT 'active',
 			created_by bigint(20) unsigned NOT NULL DEFAULT 0,
-			created_at datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-			updated_at datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+			created_at datetime DEFAULT NULL,
+			updated_at datetime DEFAULT NULL,
 			deleted_at datetime DEFAULT NULL,
 			PRIMARY KEY  (id),
 			KEY idx_status (status),
@@ -194,13 +249,13 @@ class Sparkknife_Ledger_Installer {
 			type varchar(20) NOT NULL DEFAULT 'income',
 			amount bigint(20) NOT NULL DEFAULT 0,
 			currency varchar(20) NOT NULL DEFAULT '',
-			txn_date date NOT NULL DEFAULT '0000-00-00',
+			txn_date date DEFAULT NULL,
 			description text NULL,
 			status varchar(20) NOT NULL DEFAULT 'posted',
 			created_by bigint(20) unsigned NOT NULL DEFAULT 0,
-			created_at datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+			created_at datetime DEFAULT NULL,
 			updated_by bigint(20) unsigned NOT NULL DEFAULT 0,
-			updated_at datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+			updated_at datetime DEFAULT NULL,
 			void_reason text NULL,
 			voided_by bigint(20) unsigned NOT NULL DEFAULT 0,
 			voided_at datetime DEFAULT NULL,
@@ -232,7 +287,7 @@ class Sparkknife_Ledger_Installer {
 			ip_address varchar(90) DEFAULT NULL,
 			user_agent varchar(255) DEFAULT NULL,
 			hash varchar(64) DEFAULT NULL,
-			created_at datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+			created_at datetime DEFAULT NULL,
 			PRIMARY KEY  (id),
 			KEY idx_object (object_type,object_id),
 			KEY idx_user (user_id),
