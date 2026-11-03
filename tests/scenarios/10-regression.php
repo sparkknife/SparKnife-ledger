@@ -1450,6 +1450,113 @@ if ( ! is_wp_error( $made ) ) {
 	Sparkknife_Ledger_Person_Service::instance()->delete( (int) $made );
 }
 
+// ── ۲۵ق: جمع فیلترشده با ردیف‌های جدول می‌خواند ───────────────────
+// `query()` وقتی وضعیتی انتخاب نشده باشد هیچ فیلتری روی status نمی‌گذارد
+// و ردیف‌های باطل‌شده را هم برمی‌گرداند. `sum_by_type()` پیش‌تر خالی را
+// به `active_only` تبدیل می‌کرد، پس جمع پایین جدول از تعداد ردیف‌ها کمتر
+// می‌شد: جدول ۵ ردیف نشان می‌داد و جمع می‌گفت ۴ — بدون توضیح.
+
+global $wpdb;
+
+$persons_service = Sparkknife_Ledger_Person_Service::instance();
+$txn_service     = Sparkknife_Ledger_Transaction_Service::instance();
+$report_service  = Sparkknife_Ledger_Report_Service::instance();
+$txn_repository  = Sparkknife_Ledger_Transaction_Repository::instance();
+
+$filter_person = $persons_service->create(
+	array(
+		'name'  => 'آزمون جمع فیلتر ' . wp_rand( 1000, 9999 ),
+		'phone' => '0921' . str_pad( (string) wp_rand( 1000000, 9999999 ), 7, '0', STR_PAD_LEFT ),
+	)
+);
+
+spk_assert( ! is_wp_error( $filter_person ), 'شخص آزمون جمع فیلتر ساخته می‌شود' );
+
+if ( ! is_wp_error( $filter_person ) ) {
+	$filter_person = (int) $filter_person;
+
+	$make_txn = function ( $type, $amount, $date, $description ) use ( $txn_service, $filter_person ) {
+		return $txn_service->create(
+			array(
+				'person_id'   => $filter_person,
+				'type'        => $type,
+				'amount'      => $amount,
+				'txn_date'    => $date,
+				'description' => $description,
+			)
+		);
+	};
+
+	$keep    = $make_txn( 'income', '100000', '1403/01/15', 'خرید کتاب' );
+	$to_void = $make_txn( 'income', '200000', '1403/02/20', 'خرید لوازم' );
+	$spend   = $make_txn( 'expense', '50000', '1403/03/10', 'فروش صندلی' );
+
+	spk_assert( ! is_wp_error( $keep ) && ! is_wp_error( $to_void ) && ! is_wp_error( $spend ), 'سه تراکنش آزمون ساخته می‌شوند' );
+
+	if ( ! is_wp_error( $to_void ) ) {
+		$void_result = $txn_service->void( (int) ( is_array( $to_void ) ? $to_void['id'] : $to_void ), 'آزمون' );
+		spk_assert( ! is_wp_error( $void_result ), 'تراکنش دوم ابطال می‌شود' );
+
+		$range_args = array(
+			'range'     => 'custom',
+			'date_from' => '2024-01-01',
+			'date_to'   => '2027-12-31',
+		);
+
+		// بدون فیلتر وضعیت: هر دو مبلغ ورودی باید در جمع باشند.
+		$filtered = $txn_repository->sum_by_type(
+			array(
+				'person_id' => $filter_person,
+				'date_from' => '2024-01-01',
+				'date_to'   => '2027-12-31',
+			)
+		);
+
+		$plain = Sparkknife_Ledger_Transaction_Repository::instance()->query(
+			array(
+				'person_id' => $filter_person,
+				'date_from' => '2024-01-01',
+				'date_to'   => '2027-12-31',
+				'per_page'  => 50,
+			)
+		);
+
+		spk_equals(
+			(int) $plain['total'],
+			(int) $filtered['count'],
+			'جمع بدون فیلتر وضعیت، همان تعداد ردیف‌های فهرست است'
+		);
+		spk_equals( 3, (int) $filtered['count'], 'هر سه ردیف — از جمله باطل‌شده — شمرده می‌شوند' );
+
+		// با فیلتر صریح posted، فقط معتبرها.
+		$posted = $txn_repository->sum_by_type(
+			array(
+				'person_id' => $filter_person,
+				'status'    => 'posted',
+				'date_from' => '2024-01-01',
+				'date_to'   => '2027-12-31',
+			)
+		);
+
+		spk_equals( 2, (int) $posted['count'], 'با status=posted فقط ردیف‌های معتبر شمرده می‌شوند' );
+
+		// گزارش فردی: `filtered` با `transactions.total` هم‌خوان است.
+		$person_report = $report_service->get_person_report( $filter_person, $range_args );
+
+		spk_assert( ! is_wp_error( $person_report ), 'گزارش فردی ساخته می‌شود' );
+
+		if ( ! is_wp_error( $person_report ) ) {
+			spk_equals(
+				(int) $person_report['transactions']['total'],
+				(int) $person_report['filtered']['count'],
+				'گزارش فردی: جمع فیلترشده = تعداد ردیف‌های فهرست'
+			);
+		}
+	}
+
+	$persons_service->delete( $filter_person );
+}
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
