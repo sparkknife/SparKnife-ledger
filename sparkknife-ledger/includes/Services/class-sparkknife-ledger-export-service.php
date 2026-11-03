@@ -97,6 +97,31 @@ class Sparkknife_Ledger_Export_Service {
 	 * @param string $scaled مبلغ مقیاس‌شده.
 	 * @return string
 	 */
+	/**
+	 * تاریخ برای فایل CSV: قالب ISO با ارقام لاتین.
+	 *
+	 * `Date::format()` تاریخ شمسی با ارقام فارسی می‌دهد («۱۴۰۳/۰۵/۱۰»).
+	 * Excel آن را تاریخ نمی‌شناسد، پس نمی‌شود مرتب کرد یا فیلتر بازه‌ای
+	 * زد. همان مشکلی که در ستون مبلغ بود، اینجا هم هست.
+	 *
+	 * تاریخ ذخیره‌شده (میلادی ISO) برای ماشین از هر چیزی بهتر است: Excel
+	 * و هر ابزار دیگری آن را تاریخ می‌شناسد. تاریخ شمسی همچنان در
+	 * سرصفحه گزارش با برچسب «بازه گزارش» می‌آید.
+	 *
+	 * @param string $date      تاریخ Y-m-d یا Y-m-d H:i:s.
+	 * @param bool   $with_time نمایش ساعت.
+	 * @return string
+	 */
+	private function csv_date( $date, $with_time = false ) {
+		$date = trim( (string) $date );
+
+		if ( '' === $date || 0 === strpos( $date, '0000-00-00' ) ) {
+			return '';
+		}
+
+		return $with_time && strlen( $date ) >= 19 ? substr( $date, 0, 19 ) : substr( $date, 0, 10 );
+	}
+
 	private function csv_amount( $scaled ) {
 		return (string) Sparkknife_Ledger_Money::to_human( $scaled );
 	}
@@ -190,6 +215,7 @@ class Sparkknife_Ledger_Export_Service {
 		$rows[] = array( __( 'بازه گزارش', 'sparkknife-ledger' ), $this->range_label( $range ) );
 		$rows[] = array( __( 'واحد پول', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::currency_label() );
 		$rows[] = array( __( 'تاریخ تهیه', 'sparkknife-ledger' ), Sparkknife_Ledger_Date::format( Sparkknife_Ledger_Date::now(), true ) );
+		$rows[] = array( __( 'تاریخ تهیه (ISO)', 'sparkknife-ledger' ), $this->csv_date( Sparkknife_Ledger_Date::now(), true ) );
 		$rows[] = array(
 			__( 'تهیه‌کننده', 'sparkknife-ledger' ),
 			wp_get_current_user()->display_name,
@@ -224,13 +250,13 @@ class Sparkknife_Ledger_Export_Service {
 			$user       = $transaction->created_by ? get_userdata( (int) $transaction->created_by ) : null;
 			$rows[]     = array(
 				$transaction->reference,
-				Sparkknife_Ledger_Date::format( $transaction->txn_date ),
+				$this->csv_date( $transaction->txn_date ),
 				Sparkknife_Ledger_Money::transaction_type_label( $transaction->type ),
 				$this->csv_amount( $transaction->amount ),
 				Sparkknife_Ledger_Transaction_Service::status_label( $transaction->status ),
 				(string) $transaction->description,
 				$user ? $user->display_name : __( 'نامشخص', 'sparkknife-ledger' ),
-				Sparkknife_Ledger_Date::format( $transaction->created_at, true ),
+				$this->csv_date( $transaction->created_at, true ),
 			);
 		}
 
@@ -250,6 +276,7 @@ class Sparkknife_Ledger_Export_Service {
 		$rows[] = array( __( 'بازه گزارش', 'sparkknife-ledger' ), $this->range_label( $report['range'] ) );
 		$rows[] = array( __( 'واحد پول', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::currency_label() );
 		$rows[] = array( __( 'تاریخ تهیه', 'sparkknife-ledger' ), Sparkknife_Ledger_Date::format( Sparkknife_Ledger_Date::now(), true ) );
+		$rows[] = array( __( 'تاریخ تهیه (ISO)', 'sparkknife-ledger' ), $this->csv_date( Sparkknife_Ledger_Date::now(), true ) );
 		$rows[] = array( __( 'تهیه‌کننده', 'sparkknife-ledger' ), wp_get_current_user()->display_name );
 		$rows[] = array();
 
@@ -319,8 +346,8 @@ class Sparkknife_Ledger_Export_Service {
 			return __( 'همه زمان‌ها', 'sparkknife-ledger' );
 		}
 
-		$from = ! empty( $range['from'] ) ? Sparkknife_Ledger_Date::format( $range['from'] ) : '—';
-		$to   = ! empty( $range['to'] ) ? Sparkknife_Ledger_Date::format( $range['to'] ) : '—';
+		$from = ! empty( $range['from'] ) ? $this->csv_date( $range['from'] ) : '';
+		$to   = ! empty( $range['to'] ) ? $this->csv_date( $range['to'] ) : '';
 
 		return sprintf(
 			/* translators: 1: from date, 2: to date */
