@@ -56,6 +56,22 @@ require __DIR__ . '/../partials/nav.php';
 $total_persons = count( $report['all_rows'] );
 ?>
 
+<?php
+/*
+ * خطای بازه تاریخ باید دیده شود.
+ *
+ * پیش‌تر این پیام فقط در گزارش فردی نمایش داده می‌شد. در گزارش تجمیعی —
+ * که صفحه اصلی گزارش‌هاست — کاربر تاریخ نامعتبر وارد می‌کرد و بی‌هیچ
+ * پیامی گزارشی با بازه نادیده‌گرفته‌شده می‌دید و آن را باور می‌کرد.
+ */
+?>
+<?php if ( ! empty( $range['error'] ) && is_wp_error( $range['error'] ) ) : ?>
+	<div class="spk-alert spk-alert--warning">
+		<span class="dashicons dashicons-warning" aria-hidden="true"></span>
+		<span><?php echo esc_html( $range['error']->get_error_message() ); ?></span>
+	</div>
+<?php endif; ?>
+
 <div class="spk-stats spk-stats--4">
 	<article class="spk-stat spk-stat--income">
 		<div class="spk-stat__icon"><span class="dashicons dashicons-download" aria-hidden="true"></span></div>

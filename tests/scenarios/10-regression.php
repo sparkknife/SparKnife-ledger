@@ -1747,6 +1747,54 @@ foreach ( $valid_amounts as $raw => $expected ) {
 	spk_equals( $expected, is_wp_error( $parsed ) ? 'خطا' : (string) $parsed, sprintf( 'مبلغ معتبر «%s» درست خوانده می‌شود', $raw ) );
 }
 
+// ── ۲۵ج: خطای تاریخ نامعتبر در همه گزارش‌ها دیده می‌شود ────────────
+// `resolve_range()` برای تاریخ نامعتبر `WP_Error` در `range['error']`
+// می‌گذاشت، ولی تنها گزارش فردی آن را نمایش می‌داد. در گزارش تجمیعی و
+// فهرست تراکنش‌ها کاربر بی‌هیچ پیامی گزارشی با بازه نادیده‌گرفته‌شده
+// می‌دید و آن را باور می‌کرد.
+
+$bad_range = Sparkknife_Ledger_Ledger_Service::resolve_range(
+	array(
+		'range'     => 'custom',
+		'date_from' => '2024-13-01',
+		'date_to'   => '2026-12-31',
+	)
+);
+
+spk_assert( isset( $bad_range['error'] ) && is_wp_error( $bad_range['error'] ), 'تاریخ نامعتبر خطا تولید می‌کند' );
+
+$summary_with_bad_range = Sparkknife_Ledger_Report_Service::instance()->get_summary_report(
+	array(
+		'range'     => 'custom',
+		'date_from' => '2024-13-01',
+		'date_to'   => '2026-12-31',
+	)
+);
+
+spk_assert(
+	isset( $summary_with_bad_range['range']['error'] ) && is_wp_error( $summary_with_bad_range['range']['error'] ),
+	'گزارش تجمیعی خطای بازه را به لایه نمایش می‌رساند'
+);
+
+// هر سه ویو باید پیام خطا را چاپ کنند.
+$views_to_check = array(
+	'includes/Admin/Views/reports/summary.php',
+	'includes/Admin/Views/transactions/list.php',
+	'includes/Admin/Views/reports/person.php',
+);
+
+$plugin_root = dirname( __DIR__, 2 ) . '/sparkknife-ledger/';
+
+foreach ( $views_to_check as $view_relative ) {
+	$view_path = $plugin_root . $view_relative;
+	$source    = is_readable( $view_path ) ? (string) file_get_contents( $view_path ) : '';
+
+	spk_assert(
+		false !== strpos( $source, "['error']" ),
+		sprintf( 'ویو %s خطای بازه را نمایش می‌دهد', basename( $view_relative ) )
+	);
+}
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
