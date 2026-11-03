@@ -175,7 +175,28 @@ class Sparkknife_Ledger_Money {
 	 * @param string $value ورودی.
 	 * @return string
 	 */
-	public static function to_persian_digits( $value ) {
+	/**
+	 * ارقام عددی برای نمایش در رابط کاربری، با احترام به تنظیم.
+	 *
+	 * `to_persian_digits()` همیشه تبدیل می‌کند و برای جایی است که ارقام فارسی
+	 * بخشی از قالب است (مثلاً شمارهٔ نسخه در پاصفحه). اما ویوها آن را برای
+	 * شمارنده‌ها، شمارهٔ صفحه و هر عدد دیگری صدا می‌زدند؛ نتیجه این بود که با
+	 * `use_persian_digits = 0` مبلغ‌ها لاتین می‌شدند ولی همان صفحه شمارهٔ
+	 * صفحه و تعداد ردیف‌ها را فارسی نشان می‌داد.
+	 *
+	 * این تابع همان تنظیمی را رعایت می‌کند که `format()` و `Date::format()`
+	 * رعایت می‌کنند، تا یک صفحه هرگز دو نوع رقم نداشته باشد.
+	 *
+	 * @param string|int $value مقدار.
+	 * @return string
+	 */
+	public static function digits( $value ) {
+		$value = (string) $value;
+
+		return self::uses_persian_digits() ? self::to_persian_digits( $value ) : $value;
+	}
+
+		public static function to_persian_digits( $value ) {
 		$persian = array( '۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹' );
 		$latin   = array( '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' );
 

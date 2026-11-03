@@ -48,12 +48,12 @@ $export_args = array(
 		<a class="spk-tab <?php echo 'deleted' !== $view ? 'is-active' : ''; ?>"
 			href="<?php echo esc_url( Sparkknife_Ledger_Renderer::url( 'persons' ) ); ?>">
 			<?php esc_html_e( 'اشخاص فعال', 'sparkknife-ledger' ); ?>
-			<span class="spk-count"><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) ( $stats['active'] + $stats['inactive'] ) ) ); ?></span>
+			<span class="spk-count"><?php echo esc_html( Sparkknife_Ledger_Money::digits( (string) ( $stats['active'] + $stats['inactive'] ) ) ); ?></span>
 		</a>
 		<a class="spk-tab <?php echo 'deleted' === $view ? 'is-active' : ''; ?>"
 			href="<?php echo esc_url( Sparkknife_Ledger_Renderer::url( 'persons', array( 'view' => 'deleted' ) ) ); ?>">
 			<?php esc_html_e( 'حذف‌شده‌ها', 'sparkknife-ledger' ); ?>
-			<span class="spk-count"><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( (string) $stats['deleted'] ) ); ?></span>
+			<span class="spk-count"><?php echo esc_html( Sparkknife_Ledger_Money::digits( (string) $stats['deleted'] ) ); ?></span>
 		</a>
 	</div>
 </div>
