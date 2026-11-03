@@ -211,15 +211,22 @@ class Sparkknife_Ledger_Sanitizer {
 	}
 
 	/**
-	 * متن ساده تک‌خطی.	/**
 	 * متن ساده تک‌خطی.
 	 *
-	 * @param mixed $value ورودی.
+	 * این تابع `wp_unslash()` نمی‌زند؛ حذف بک‌اسلش وظیفه فراخوان است و
+	 * باید دقیقاً یک بار، روی ابرگلوبال خام، انجام شود.
+	 *
+	 * پیش‌تر اینجا هم `wp_unslash()` بود و کنترلر هم آن را صدا می‌زد، پس
+	 * نامی مثل «بک‌اسلش\دار» دو بار unslash می‌شد و بک‌اسلشش **بی‌صدا**
+	 * حذف می‌گشت. کاربر نام را درست وارد می‌کرد و در فهرست چیز دیگری
+	 * می‌دید — بدون هیچ پیامی.
+	 *
+	 * @param mixed $value ورودی (بک‌اسلش‌هایش از قبل حذف شده).
 	 * @param int   $max_length حداکثر طول.
 	 * @return string
 	 */
 	public static function text( $value, $max_length = 190 ) {
-		$value = sanitize_text_field( wp_unslash( (string) $value ) );
+		$value = sanitize_text_field( (string) $value );
 		$value = self::strip_invisible( $value );
 		return self::limit( $value, $max_length );
 	}
@@ -227,12 +234,14 @@ class Sparkknife_Ledger_Sanitizer {
 	/**
 	 * متن چندخطی.
 	 *
-	 * @param mixed $value ورودی.
+	 * مانند `text()`، اینجا هم `wp_unslash()` زده نمی‌شود.
+	 *
+	 * @param mixed $value ورودی (بک‌اسلش‌هایش از قبل حذف شده).
 	 * @param int   $max_length حداکثر طول.
 	 * @return string
 	 */
 	public static function textarea( $value, $max_length = 2000 ) {
-		$value = sanitize_textarea_field( wp_unslash( (string) $value ) );
+		$value = sanitize_textarea_field( (string) $value );
 		$value = self::strip_invisible( $value, true );
 		return self::limit( $value, $max_length );
 	}
