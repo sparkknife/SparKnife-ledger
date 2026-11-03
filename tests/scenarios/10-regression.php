@@ -1071,6 +1071,30 @@ remove_filter( 'sparkknife_ledger_trust_proxy', '__return_true' );
 
 $_SERVER = $saved_server;
 
+// ── ۲۵ل: برش متن هرگز وسط نویسه UTF-8 نمی‌افتد ────────────────────
+// `substr()` روی UTF-8 می‌تواند یک نویسه چندبایتی را از وسط ببرد و
+// رشته خراب بسازد. User-Agent ورودی کاربر است و می‌تواند هر چیزی باشد؛
+// رشته خراب هم در نمایش مشکل می‌دهد و هم در JSON.
+$emoji_run = str_repeat( "\u{1F916}", 100 );
+$cut_run   = Sparkknife_Ledger_Sanitizer::limit( $emoji_run, 10 );
+
+spk_equals( 10, Sparkknife_Ledger_Sanitizer::length( $cut_run ), 'برش ایموجی ده نویسه می‌دهد' );
+spk_assert( false !== preg_match( '//u', $cut_run ), 'نتیجه برش، UTF-8 سالم است' );
+
+// برش وسط رشته مختلط.
+$mixed_run = "ab\u{1F916}cd\u{1F389}ef";
+$mixed_cut = Sparkknife_Ledger_Sanitizer::limit( $mixed_run, 4 );
+
+spk_equals( 4, Sparkknife_Ledger_Sanitizer::length( $mixed_cut ), 'برش مختلط چهار نویسه می‌دهد' );
+spk_assert( false !== preg_match( '//u', $mixed_cut ), 'برش مختلط هم UTF-8 سالم است' );
+
+// متن کوتاه‌تر از سقف دست‌نخورده می‌ماند.
+spk_equals( 'علی', Sparkknife_Ledger_Sanitizer::limit( 'علی', 190 ), 'متن کوتاه بریده نمی‌شود' );
+
+// متن فارسی بلند: ۱۹۰ نویسه، نه ۱۹۰ بایت.
+$long_persian = Sparkknife_Ledger_Sanitizer::limit( str_repeat( 'ی', 500 ), 190 );
+spk_equals( 190, Sparkknife_Ledger_Sanitizer::length( $long_persian ), 'سقف بر حسب نویسه اعمال می‌شود نه بایت' );
+
 // ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
 $p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
 $p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱

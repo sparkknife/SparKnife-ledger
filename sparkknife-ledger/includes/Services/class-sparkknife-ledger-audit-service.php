@@ -88,15 +88,24 @@ class Sparkknife_Ledger_Audit_Service {
 		$user_id = get_current_user_id();
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 
+		/*
+		 * همه برش‌ها نویسه‌ای است، نه بایتی.
+		 *
+		 * `substr()` روی UTF-8 می‌تواند یک نویسه را از وسط ببرد و رشته‌ای
+		 * خراب بسازد که نه درست نمایش داده می‌شود نه در JSON سالم است.
+		 * User-Agent هم ورودی کاربر است و می‌تواند هر چیزی باشد.
+		 */
 		$payload = array(
-			'object_type' => substr( (string) $object_type, 0, 30 ),
+			'object_type' => Sparkknife_Ledger_Sanitizer::limit( (string) $object_type, 30 ),
 			'object_id'   => (int) $object_id,
-			'action'      => substr( (string) $action, 0, 40 ),
+			'action'      => Sparkknife_Ledger_Sanitizer::limit( (string) $action, 40 ),
 			'user_id'     => $user_id,
 			'changes'     => $changes,
 			'summary'     => Sparkknife_Ledger_Sanitizer::textarea( $summary, 500 ),
 			'ip_address'  => $this->get_ip(),
-			'user_agent'  => isset( $_SERVER['HTTP_USER_AGENT'] ) ? substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ), 0, 255 ) : '',
+			'user_agent'  => isset( $_SERVER['HTTP_USER_AGENT'] )
+				? Sparkknife_Ledger_Sanitizer::limit( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ), 255 )
+				: '',
 			'user_login'  => $user ? $user->user_login : '',
 			'created_at'  => Sparkknife_Ledger_Date::now(),
 		);
