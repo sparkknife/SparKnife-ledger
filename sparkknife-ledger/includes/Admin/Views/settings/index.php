@@ -372,9 +372,42 @@ $currency_presets  = Sparkknife_Ledger_Money::currency_presets();
 							<td><?php echo esc_html( $table['label'] ); ?></td>
 							<td><code><?php echo esc_html( $table['table'] ); ?></code></td>
 							<td>
-								<span class="spk-badge <?php echo 'ok' === $table['status'] ? 'is-ok' : 'is-bad'; ?>">
-									<?php echo 'ok' === $table['status'] ? esc_html__( 'آماده', 'sparkknife-ledger' ) : esc_html__( 'یافت نشد', 'sparkknife-ledger' ); ?>
+								<?php
+								/*
+								 * سه حالت، نه دو.
+								 *
+								 * پیش‌تر هر وضعیت غیر از `ok` «یافت نشد» نمایش
+								 * داده می‌شد. جدولی که وجود دارد ولی ستون‌هایش
+								 * ناقص است (ساخت نصفه) «یافت نشد» نبود و این
+								 * پیام مدیر را به مسیر اشتباه می‌فرستاد.
+								 */
+								$spk_status = isset( $table['status'] ) ? (string) $table['status'] : 'missing';
+
+								if ( 'ok' === $spk_status ) {
+									$spk_badge_class = 'is-ok';
+									$spk_badge_label = __( 'آماده', 'sparkknife-ledger' );
+								} elseif ( 'broken' === $spk_status ) {
+									$spk_badge_class = 'is-bad';
+									$spk_badge_label = __( 'ناقص', 'sparkknife-ledger' );
+								} else {
+									$spk_badge_class = 'is-bad';
+									$spk_badge_label = __( 'یافت نشد', 'sparkknife-ledger' );
+								}
+								?>
+								<span class="spk-badge <?php echo esc_attr( $spk_badge_class ); ?>">
+									<?php echo esc_html( $spk_badge_label ); ?>
 								</span>
+								<?php if ( 'broken' === $spk_status && ! empty( $table['missing_columns'] ) ) : ?>
+									<span class="spk-muted spk-small">
+										<?php
+										printf(
+											/* translators: %s: comma separated column names */
+											esc_html__( 'ستون‌های غایب: %s', 'sparkknife-ledger' ),
+											esc_html( implode( '، ', array_map( 'strval', (array) $table['missing_columns'] ) ) )
+										);
+										?>
+									</span>
+								<?php endif; ?>
 							</td>
 							<td><?php echo esc_html( Sparkknife_Ledger_Money::to_persian_digits( $table['rows'] ) ); ?></td>
 						</tr>

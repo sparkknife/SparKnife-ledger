@@ -78,7 +78,20 @@ class Sparkknife_Ledger_Audit_Service {
 	 * @return int|false شناسه ردیف تاریخچه.
 	 */
 	public function log( $object_type, $object_id, $action, array $changes = array(), $summary = '' ) {
+		global $wpdb;
+
 		if ( ! Sparkknife_Ledger_DB::tables_exist() ) {
+			return false;
+		}
+
+		/*
+		 * وجود جدول کافی نیست: اگر ساختش نصفه ماند (مثلاً فقط ستون id)
+		 * درج در آن شکست می‌خورد و `$wpdb` خطای SQL را روی صفحه چاپ
+		 * می‌کند. پیش‌تر صفحه مدیر پر از HTML خطا می‌شد. اکنون ساختار
+		 * یک بار در هر درخواست سنجیده می‌شود و در صورت نقص، ثبت ممیزی
+		 * بی‌صدا کنار گذاشته می‌شود.
+		 */
+		if ( ! Sparkknife_Ledger_DB::audit_schema_is_intact() ) {
 			return false;
 		}
 
@@ -110,9 +123,20 @@ class Sparkknife_Ledger_Audit_Service {
 			'created_at'  => Sparkknife_Ledger_Date::now(),
 		);
 
-		$json    = wp_json_encode( $changes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-		$json    = is_string( $json ) ? $json : '{}';
-		$last    = Sparkknife_Ledger_Audit_Repository::instance()->last_hash();
+		$json = wp_json_encode( $changes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		$json = is_string( $json ) ? $json : '{}';
+
+		/*
+		 * اگر جدول ممیزی ناقص یا غایب باشد (مثلاً ساختش نصفه ماند)،
+		 * کوئری‌های زیر خطای SQL می‌دهند. `$wpdb` این خطاها را روی صفحه
+		 * چاپ می‌کند و صفحه مدیر را پر از HTML خطا می‌کند، در حالی که
+		 * ثبت ممیزی نباید هرگز جلوی کار اصلی را بگیرد یا صفحه را بشکند.
+		 * خطا سرکوب می‌شود؛ نتیجه همچنان `false` برمی‌گردد و گزارش سلامت
+		 * جدول را «خراب» نشان می‌دهد.
+		 */
+		$suppress_errors = $wpdb->suppress_errors( true );
+
+		$last = Sparkknife_Ledger_Audit_Repository::instance()->last_hash();
 		$hash    = hash( 'sha256', $last . '|' . $json . '|' . $payload['created_at'] . '|' . $user_id . '|' . wp_json_encode( $payload['object_type'] . $payload['object_id'] . $payload['action'], JSON_UNESCAPED_UNICODE ) );
 
 		$row = array(
@@ -128,6 +152,8 @@ class Sparkknife_Ledger_Audit_Service {
 		);
 
 		$id = Sparkknife_Ledger_Audit_Repository::instance()->insert( $row );
+
+		$wpdb->suppress_errors( $suppress_errors );
 
 		if ( false === $id ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
