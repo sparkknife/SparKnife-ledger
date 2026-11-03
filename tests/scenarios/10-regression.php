@@ -2148,6 +2148,94 @@ JS;
 	@unlink( $probe_file );
 }
 
+// ── ۲۵ص: هر چیزی که به مرورگر فرستاده می‌شود باید مصرف شود ────────────
+//
+// `ajaxUrl`، `nonce`، `searchNoResult` و `isRtl` در `wp_localize_script`
+// فرستاده می‌شدند ولی هیچ‌جا در جاوااسکریپت خوانده نمی‌شدند. افزونه هیچ
+// endpoint‌ی در `wp_ajax_` ثبت نمی‌کند؛ ساختن یک nonce معتبر در HTML هر
+// صفحه بی‌آنکه سروری بپذیردش، فقط سطح حمله را باز می‌کند.
+//
+// همچنین `jquery` به‌عنوان وابستگی اعلام شده بود در حالی که اسکریپت
+// هیچ‌جا jQuery را صدا نمی‌زند.
+
+$js_src   = (string) file_get_contents( SPARKKNIFE_LEDGER_DIR . 'assets/js/admin.js' );
+$loader   = (string) file_get_contents( SPARKKNIFE_LEDGER_DIR . 'includes/class-sparkknife-ledger-admin-loader.php' );
+
+// هیچ endpoint AJAX در کل افزونه نیست.
+$ajax_hooks = array();
+$php_files  = array_merge(
+	glob( SPARKKNIFE_LEDGER_DIR . 'includes/*.php' ),
+	glob( SPARKKNIFE_LEDGER_DIR . 'includes/*/*.php' ),
+	glob( SPARKKNIFE_LEDGER_DIR . 'includes/*/*/*.php' ),
+	glob( SPARKKNIFE_LEDGER_DIR . '*.php' )
+);
+
+foreach ( $php_files as $php_file ) {
+	$src = (string) file_get_contents( $php_file );
+
+	/*
+	 * فقط ثبت واقعی بررسی می‌شود، نه هر ذکری از نام قلاب.
+	 * جستجوی سادهٔ رشته، کامنت‌ها را هم می‌گیرد و تست را بی‌معنا می‌کند.
+	 */
+	if ( preg_match( '/add_action\s*\(\s*["\']wp_ajax(_nopriv)?_/', $src ) ) {
+		$ajax_hooks[] = basename( $php_file );
+	}
+}
+
+spk_equals( array(), $ajax_hooks, 'افزونه هیچ endpoint AJAX ثبت نمی‌کند' );
+
+// پس هیچ nonce یا آدرسی هم نباید به مرورگر برود.
+spk_assert(
+	false === mb_strpos( $loader, "'nonce'" ),
+	'nonce بدون endpoint به مرورگر فرستاده نمی‌شود'
+);
+spk_assert(
+	false === mb_strpos( $loader, "'ajaxUrl'" ),
+	'آدرس admin-ajax بدون endpoint فرستاده نمی‌شود'
+);
+spk_assert(
+	false === mb_strpos( $js_src, 'config.nonce' ) && false === mb_strpos( $js_src, 'config.ajaxUrl' ),
+	'جاوااسکریپت به nonce یا ajaxUrl وابسته نیست'
+);
+
+// وابستگی jQuery برداشته شد چون استفاده نمی‌شود.
+spk_assert(
+	false === mb_strpos( $js_src, 'jQuery(' ) && false === mb_strpos( $js_src, 'jQuery.' ),
+	'اسکریپت هیچ فراخوانی jQuery ندارد'
+);
+
+// هر کلیدی که در PHP ساخته می‌شود باید در JS مصرف شود یا صریحاً مجاز باشد.
+$declared = array();
+
+/*
+ * کلیدهای **سطح بالای** آرایهٔ پیکربندی.
+ *
+ * بریدن از `wp_localize_script` تا انتهای فایل، کلیدهای کد بعدی را هم
+ * می‌گیرد. کلیدهای سطح بالا دقیقاً با چهار تب تو رفتگی دارند و زیرکلیدهای
+ * `strings` با پنج تب، پس با لنگر ابتدای خط تفکیک می‌شوند.
+ */
+$localize_at = (int) mb_strpos( $loader, 'wp_localize_script' );
+$localize_end = (int) mb_strpos( $loader, ');', $localize_at );
+$config_block = substr( $loader, $localize_at, $localize_end - $localize_at );
+
+preg_match_all( "/^\t{4}'([a-zA-Z_]+)'\s*=>/m", $config_block, $matches );
+
+$declared = isset( $matches[1] ) ? $matches[1] : array();
+
+$unused = array();
+
+foreach ( $declared as $key ) {
+	if ( 'strings' === $key ) {
+		continue; // `config.strings.X` خوانده می‌شود، نه خودِ strings
+	}
+
+	if ( false === mb_strpos( $js_src, 'config.' . $key ) ) {
+		$unused[] = $key;
+	}
+}
+
+spk_equals( array(), $unused, 'هیچ مقدار بی‌مصرفی به مرورگر نمی‌رود' );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
