@@ -308,6 +308,109 @@ class Sparkknife_Ledger_Date {
 	}
 
 	/**
+	 * آیا تاریخ داده‌شده در آینده است؟
+	 *
+	 * مقایسه رشته‌ای است، نه با `strtotime()`.
+	 *
+	 * روی PHP ۳۲ بیتی `strtotime()` برای تاریخ‌های بعد از ۱۹ ژانویه ۲۰۳۸
+	 * مقدار `false` می‌دهد و `false > int` هم همیشه نادرست است؛ نتیجه این
+	 * بود که می‌شد تراکنشی با تاریخ ۲۰۴۰ ثبت کرد و بررسی «تاریخ آینده»
+	 * بی‌صدا از کار می‌افتاد. قالب `Y-m-d` با طول ثابت، مرتب‌سازی لغوی
+	 * درستی دارد، پس مقایسه مستقیم رشته کافی و مصون از سرریز است.
+	 *
+	 * یک روز رواداری دارد: ثبت تراکنش با تاریخ فردا (اختلاف منطقه زمانی یا
+	 * ثبت شبانه) مجاز است.
+	 *
+	 * @param string $date تاریخ به قالب Y-m-d.
+	 * @return bool
+	 */
+	public static function is_future( $date ) {
+		$date = substr( trim( (string) $date ), 0, 10 );
+
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+			return false;
+		}
+
+		$tomorrow = self::shift_days( self::today(), 1 );
+
+		return '' !== $tomorrow && strcmp( $date, $tomorrow ) > 0;
+	}
+
+	/**
+	 * جابه‌جایی تاریخ به اندازه چند روز، بدون `strtotime()`.
+	 *
+	 * @param string $date تاریخ Y-m-d.
+	 * @param int    $days تعداد روز (می‌تواند منفی باشد).
+	 * @return string تاریخ جدید یا رشته خالی در صورت نامعتبر بودن ورودی.
+	 */
+	private static function shift_days( $date, $days ) {
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', (string) $date, $m ) ) {
+			return '';
+		}
+
+		$year  = (int) $m[1];
+		$month = (int) $m[2];
+		$day   = (int) $m[3];
+
+		if ( ! checkdate( $month, $day, $year ) ) {
+			return '';
+		}
+
+		$day += (int) $days;
+
+		/*
+		 * نرمال‌سازی ساده: روز ممکن است از بازه ماه بیرون بزند. چون فقط
+		 * به جابه‌جایی یک‌روزه نیاز داریم، همین اندازه کافی است.
+		 */
+		if ( $day < 1 ) {
+			--$month;
+			if ( $month < 1 ) {
+				$month = 12;
+				--$year;
+			}
+			$day += self::days_in_month( $year, $month );
+		} elseif ( $day > self::days_in_month( $year, $month ) ) {
+			$day -= self::days_in_month( $year, $month );
+			++$month;
+			if ( $month > 12 ) {
+				$month = 1;
+				++$year;
+			}
+		}
+
+		return sprintf( '%04d-%02d-%02d', $year, $month, $day );
+	}
+
+	/**
+	 * تعداد روزهای یک ماه میلادی.
+	 *
+	 * @param int $year  سال.
+	 * @param int $month ماه.
+	 * @return int
+	 */
+	private static function days_in_month( $year, $month ) {
+		$days = array( 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 );
+
+		if ( 2 === (int) $month && self::is_gregorian_leap( $year ) ) {
+			return 29;
+		}
+
+		return isset( $days[ $month - 1 ] ) ? $days[ $month - 1 ] : 30;
+	}
+
+	/**
+	 * آیا سال میلادی کبیسه است؟
+	 *
+	 * @param int $year سال.
+	 * @return bool
+	 */
+	private static function is_gregorian_leap( $year ) {
+		$year = (int) $year;
+
+		return ( 0 === $year % 4 && 0 !== $year % 100 ) || 0 === $year % 400;
+	}
+
+	/**
 	 * تاریخ و زمان فعلی برای ثبت در دیتابیس.
 	 *
 	 * @return string
