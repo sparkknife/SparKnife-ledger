@@ -209,7 +209,7 @@ $export_url = wp_nonce_url(
 				$action_labels = Sparkknife_Ledger_Audit_Service::instance()->actions();
 				foreach ( $history as $entry ) :
 					$changes    = Sparkknife_Ledger_Audit_Service::instance()->decode_changes( $entry );
-					$user       = $entry->user_id ? get_userdata( (int) $entry->user_id ) : null;
+					$entry_user = sparkknife_ledger_user_label( $entry->user_id, isset( $entry->user_login ) ? $entry->user_login : '' );
 					?>
 					<li>
 						<span class="spk-timeline__dot" aria-hidden="true"></span>
@@ -217,9 +217,7 @@ $export_url = wp_nonce_url(
 							<strong><?php echo esc_html( isset( $action_labels[ $entry->action ] ) ? $action_labels[ $entry->action ] : $entry->action ); ?></strong>
 							<span class="spk-timeline__time">
 								<?php echo esc_html( Sparkknife_Ledger_Date::format( $entry->created_at, true ) ); ?>
-								<?php if ( $user ) : ?>
-									· <?php echo esc_html( $user->display_name ); ?>
-								<?php endif; ?>
+								· <?php echo esc_html( $entry_user ); ?>
 							</span>
 							<?php if ( ! empty( $changes ) ) : ?>
 								<ul class="spk-changes">
@@ -262,8 +260,7 @@ $export_url = wp_nonce_url(
 				<dt><?php esc_html_e( 'ثبت‌کننده', 'sparkknife-ledger' ); ?></dt>
 				<dd>
 					<?php
-					$creator = $person->created_by ? get_userdata( (int) $person->created_by ) : null;
-					echo esc_html( $creator ? $creator->display_name : __( 'نامشخص', 'sparkknife-ledger' ) );
+					echo esc_html( sparkknife_ledger_user_label( $person->created_by ) );
 					?>
 				</dd>
 			</div>

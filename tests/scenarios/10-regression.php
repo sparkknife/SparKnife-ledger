@@ -1879,6 +1879,77 @@ spk_assert(
 	'علامت درصد در جستجو wildcard نمی‌شود'
 );
 
+// ── ۲۵خ: تاریخچه می‌گوید **چه کسی** تغییر داده، حتی اگر حسابش حذف شده باشد ──
+//
+// ویوها پیش‌تر با `get_userdata()` مستقیم نام کاربر را می‌گرفتند. اگر کاربر
+// حذف شده باشد این تابع `false` می‌دهد و همه‌جا «سیستم» نشان داده می‌شد —
+// یعنی دفتر ممیزی ادعا می‌کرد سیستم تغییر را داده، در حالی که یک انسان داده
+// بود. برای یک دفتر ممیزی این مهم‌ترین اطلاعات رکورد است.
+
+global $wpdb;
+
+$ghost_uid = wp_create_user( 'spk_ghost_' . $marker, 'pass1234', $marker . '_ghost@example.com' );
+
+spk_assert( ! is_wp_error( $ghost_uid ) && $ghost_uid > 0, 'کاربر آزمایشی ساخته شد' );
+
+/*
+ * نام ورود از `sanitize_user()` می‌گذرد و نویسه‌های غیرلاتین را حذف می‌کند،
+ * پس «spk_ghost_نشانه‌جستجو29140» به «spk_ghost_29140» تبدیل می‌شود. مقدار
+ * واقعی ذخیره‌شده را از خود وردپرس می‌خوانیم، نه از چیزی که فرستادیم.
+ */
+$ghost_login = (string) get_userdata( $ghost_uid )->user_login;
+$prev_user   = get_current_user_id();
+
+wp_set_current_user( $ghost_uid );
+$ghost_audit_id = Sparkknife_Ledger_Audit_Service::instance()->log(
+	'person',
+	999777,
+	'update',
+	array( 'note' => $marker ),
+	sprintf( 'تغییر با کاربر %s', $marker )
+);
+wp_set_current_user( $prev_user );
+
+spk_assert( false !== $ghost_audit_id && $ghost_audit_id > 0, 'رکورد ممیزی با کاربر آزمایشی ثبت شد' );
+
+// نام ورود در خود رکورد ذخیره می‌شود تا پس از حذف کاربر هم باقی بماند.
+$ghost_row = $wpdb->get_row(
+	$wpdb->prepare( "SELECT user_id, user_login FROM {$audit_table} WHERE id = %d", $ghost_audit_id )
+);
+
+spk_equals( $ghost_login, isset( $ghost_row->user_login ) ? $ghost_row->user_login : null, 'نام ورود کاربر در رکورد ذخیره می‌شود' );
+spk_equals( (string) $ghost_uid, (string) $ghost_row->user_id, 'شناسه کاربر درست ذخیره می‌شود' );
+spk_equals( $ghost_login, sparkknife_ledger_user_label( $ghost_uid, $ghost_row->user_login ), 'برای کاربر موجود، نام نمایشی برمی‌گردد' );
+
+require_once ABSPATH . 'wp-admin/includes/user.php';
+wp_delete_user( $ghost_uid );
+
+spk_assert( false === get_userdata( $ghost_uid ), 'کاربر واقعاً حذف شد' );
+
+$ghost_label = sparkknife_ledger_user_label( $ghost_uid, $ghost_row->user_login );
+
+spk_assert( false !== mb_strpos( $ghost_label, $ghost_login ), 'نام ورود کاربر حذف‌شده در برچسب می‌ماند' );
+spk_assert( false === mb_strpos( $ghost_label, 'سیستم' ), 'کاربر حذف‌شده «سیستم» نامیده نمی‌شود' );
+
+// رکوردهای قدیمی که نام ورود ندارند باید حداقل شماره کاربر را نشان دهند،
+// نه «سیستم» دروغین.
+$ghost_no_login = sparkknife_ledger_user_label( $ghost_uid, '' );
+
+spk_assert( false !== mb_strpos( $ghost_no_login, (string) $ghost_uid ), 'بدون نام ورود، شماره کاربر نمایش داده می‌شود' );
+spk_assert( false === mb_strpos( $ghost_no_login, 'سیستم' ), 'بدون نام ورود هم «سیستم» گفته نمی‌شود' );
+
+// تنها جایی که «سیستم» درست است: عملیات بدون کاربر (user_id = 0).
+spk_equals( 'سیستم', sparkknife_ledger_user_label( 0, '' ), 'عملیات سیستمی واقعی «سیستم» نام می‌گیرد' );
+spk_equals( 'سیستم', sparkknife_ledger_user_label( 0, 'ignored' ), 'user_id صفر با نام ورود هم «سیستم» می‌ماند' );
+
+// جستجوی ممیزی باید نام کاربر حذف‌شده را هم پیدا کند.
+$ghost_search = $audit_repo->query( array( 'search' => $ghost_login, 'per_page' => 200 ) );
+
+spk_equals( 1, (int) $ghost_search['total'], 'جستجو نام کاربر حذف‌شده را پیدا می‌کند' );
+
+// ستون اختیاری user_login باید بدون خطا تشخیص داده شود.
+spk_assert( Sparkknife_Ledger_DB::audit_schema_has_user_login(), 'ستون user_login ساخته شده است' );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();

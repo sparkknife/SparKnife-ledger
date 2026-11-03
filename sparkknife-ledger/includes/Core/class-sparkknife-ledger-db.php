@@ -114,6 +114,13 @@ class Sparkknife_Ledger_DB {
 	private static $audit_schema_cache = null;
 
 	/**
+	 * کش وجود ستون اختیاری user_login.
+	 *
+	 * @var bool|null
+	 */
+	private static $audit_user_login_cache = null;
+
+	/**
 	 * آیا جداول افزونه نصب شده‌اند؟
 	 *
 	 * @param bool $force_recheck نادیده‌گرفتن کش.
@@ -241,6 +248,26 @@ class Sparkknife_Ledger_DB {
 	}
 
 	/**
+	 * آیا ستون اختیاری `user_login` در جدول ممیزی وجود دارد؟
+	 *
+	 * این ستون بعدها اضافه شد؛ اگر `dbDelta` هنوز اجرا نشده باشد، ارجاع
+	 * به آن کوئری را می‌شکند. نتیجه برای هر درخواست کش می‌شود.
+	 *
+	 * @return bool
+	 */
+	public static function audit_schema_has_user_login() {
+		if ( null !== self::$audit_user_login_cache ) {
+			return self::$audit_user_login_cache;
+		}
+
+		$missing = self::missing_columns( self::audit_table(), array( 'user_login' ) );
+
+		self::$audit_user_login_cache = empty( $missing );
+
+		return self::$audit_user_login_cache;
+	}
+
+	/**
 	 * باطل‌کردن کش وضعیت جداول.
 	 *
 	 * پس از ساخت یا حذف جداول (نصب، مهاجرت، پاک‌سازی داده‌ها، حذف افزونه)
@@ -250,8 +277,9 @@ class Sparkknife_Ledger_DB {
 	 * @return void
 	 */
 	public static function flush_table_cache() {
-		self::$tables_exist_cache = null;
-		self::$audit_schema_cache = null;
+		self::$tables_exist_cache    = null;
+		self::$audit_schema_cache    = null;
+		self::$audit_user_login_cache = null;
 	}
 
 	/**

@@ -54,11 +54,24 @@ class Sparkknife_Ledger_Audit_Repository {
 			'created_at'  => Sparkknife_Ledger_Date::now(),
 		);
 
+		$formats = array( '%s', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s' );
+
+		/*
+		 * ستون `user_login` بعدها اضافه شد. اگر هنوز ساخته نشده باشد،
+		 * فرستادنش درج را با خطای SQL می‌شکند و **همهٔ** تاریخچه از آن
+		 * به بعد از دست می‌رود؛ پس فقط وقتی ستون وجود دارد فرستاده
+		 * می‌شود.
+		 */
+		if ( Sparkknife_Ledger_DB::audit_schema_has_user_login() ) {
+			$row['user_login'] = isset( $data['user_login'] ) ? substr( (string) $data['user_login'], 0, 60 ) : '';
+			$formats[]         = '%s';
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$inserted = $wpdb->insert(
 			Sparkknife_Ledger_DB::audit_table(),
 			$row,
-			array( '%s', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
+			$formats
 		);
 
 		return false === $inserted ? false : (int) $wpdb->insert_id;
@@ -121,11 +134,25 @@ class Sparkknife_Ledger_Audit_Repository {
 			 * می‌کرد جستجو کار کرده. با هزاران رکورد ممیزی، پیدا کردن
 			 * یک تغییر عملاً ناممکن بود.
 			 */
-			$like     = '%' . $wpdb->esc_like( (string) $args['search'] ) . '%';
-			$where[]  = '(summary LIKE %s OR changes LIKE %s OR ip_address LIKE %s)';
-			$params[] = $like;
-			$params[] = $like;
-			$params[] = $like;
+			$like   = '%' . $wpdb->esc_like( (string) $args['search'] ) . '%';
+			$fields = array( 'summary', 'changes', 'ip_address' );
+
+			/*
+			 * ستون `user_login` در نسخه‌های پیشین افزونه وجود نداشت و
+			 * `dbDelta` ممکن است هنوز آن را نساخته باشد (مثلاً زمانی که
+			 * به‌روزرسانی خودکار اجرا نشده). ارجاع به ستون ناموجود، کوئری
+			 * را با خطای SQL می‌شکند و کل صفحه ممیزی خالی می‌شود؛ پس
+			 * وجودش یک بار بررسی و نتیجه کش می‌شود.
+			 */
+			if ( Sparkknife_Ledger_DB::audit_schema_has_user_login() ) {
+				$fields[] = 'user_login';
+			}
+
+			$where[] = '(' . implode( ' LIKE %s OR ', $fields ) . ' LIKE %s)';
+
+			foreach ( $fields as $unused ) {
+				$params[] = $like;
+			}
 		}
 
 		if ( ! empty( $args['date_from'] ) ) {
