@@ -83,7 +83,25 @@ class Sparkknife_Ledger_Export_Service {
 		return apply_filters( 'sparkknife_ledger_export_formats', $formats );
 	}
 
-	/**
+		/**
+	 * مبلغ برای فایل CSV: عدد خام، بدون واحد پول.
+	 *
+	 * `Money::format()` برای نمایش روی صفحه ساخته شده: ارقام فارسی می‌کند
+	 * و برچسب واحد پول می‌چسباند («۱,۰۰۰ تومان»). در Excel این یک رشته
+	 * متنی است، نه عدد، پس کاربر نمی‌تواند جمع بزند، فیلتر کند یا نمودار
+	 * بکشد — و برای فایل صادراتی حسابداری این یعنی فایل عملاً بی‌مصرف.
+	 *
+	 * اینجا مقدار با ارقام لاتین نوشته می‌شود تا Excel آن را عدد بشناسد.
+	 * واحد پول در ردیف جداگانه سرصفحه می‌آید.
+	 *
+	 * @param string $scaled مبلغ مقیاس‌شده.
+	 * @return string
+	 */
+	private function csv_amount( $scaled ) {
+		return (string) Sparkknife_Ledger_Money::to_human( $scaled );
+	}
+
+/**
 	 * پاک‌سازی سلول CSV برای جلوگیری از CSV Injection.
 	 *
 	 * هر مقدار آغازشده با = + - @ یا TAB/RG با یک آپاستروف بی‌خطر می‌شود.
@@ -179,9 +197,9 @@ class Sparkknife_Ledger_Export_Service {
 		$rows[] = array();
 
 		$rows[] = array( __( 'خلاصه مالی (تراکنش‌های معتبر)', 'sparkknife-ledger' ) );
-		$rows[] = array( __( 'مجموع ورودی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $this->summary_value( $summary, 'income' ) ) );
-		$rows[] = array( __( 'مجموع خروجی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $this->summary_value( $summary, 'expense' ) ) );
-		$rows[] = array( __( 'مانده نهایی', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $this->summary_value( $summary, 'balance' ) ) );
+		$rows[] = array( __( 'مجموع ورودی‌ها', 'sparkknife-ledger' ), $this->csv_amount( $this->summary_value( $summary, 'income' ) ) );
+		$rows[] = array( __( 'مجموع خروجی‌ها', 'sparkknife-ledger' ), $this->csv_amount( $this->summary_value( $summary, 'expense' ) ) );
+		$rows[] = array( __( 'مانده نهایی', 'sparkknife-ledger' ), $this->csv_amount( $this->summary_value( $summary, 'balance' ) ) );
 		$rows[] = array( __( 'وضعیت حساب', 'sparkknife-ledger' ), Sparkknife_Ledger_Ledger_Service::status_label( (string) $this->summary_value( $summary, 'account_status' ) ) );
 		$rows[] = array( __( 'تعداد تراکنش‌های معتبر', 'sparkknife-ledger' ), (string) $this->summary_value( $summary, 'count' ) );
 		$rows[] = array( __( 'تعداد تراکنش‌های باطل‌شده', 'sparkknife-ledger' ), (string) $this->summary_value( $summary, 'void_count' ) );
@@ -208,7 +226,7 @@ class Sparkknife_Ledger_Export_Service {
 				$transaction->reference,
 				Sparkknife_Ledger_Date::format( $transaction->txn_date ),
 				Sparkknife_Ledger_Money::transaction_type_label( $transaction->type ),
-				Sparkknife_Ledger_Money::format( $transaction->amount ),
+				$this->csv_amount( $transaction->amount ),
 				Sparkknife_Ledger_Transaction_Service::status_label( $transaction->status ),
 				(string) $transaction->description,
 				$user ? $user->display_name : __( 'نامشخص', 'sparkknife-ledger' ),
@@ -245,18 +263,18 @@ class Sparkknife_Ledger_Export_Service {
 		if ( $has_filter && isset( $report['filtered_totals'] ) ) {
 			$filtered = $report['filtered_totals'];
 
-			$rows[] = array( __( 'مجموع ورودی‌ها (ردیف‌های این فایل)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $filtered['income'] ) );
-			$rows[] = array( __( 'مجموع خروجی‌ها (ردیف‌های این فایل)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $filtered['expense'] ) );
-			$rows[] = array( __( 'مانده (ردیف‌های این فایل)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $filtered['balance'] ) );
+			$rows[] = array( __( 'مجموع ورودی‌ها (ردیف‌های این فایل)', 'sparkknife-ledger' ), $this->csv_amount( $filtered['income'] ) );
+			$rows[] = array( __( 'مجموع خروجی‌ها (ردیف‌های این فایل)', 'sparkknife-ledger' ), $this->csv_amount( $filtered['expense'] ) );
+			$rows[] = array( __( 'مانده (ردیف‌های این فایل)', 'sparkknife-ledger' ), $this->csv_amount( $filtered['balance'] ) );
 			$rows[] = array();
 
-			$rows[] = array( __( 'مجموع ورودی‌ها (کل بازه، بدون فیلتر)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['income'] ) );
-			$rows[] = array( __( 'مجموع خروجی‌ها (کل بازه، بدون فیلتر)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['expense'] ) );
-			$rows[] = array( __( 'مانده کل (بدون فیلتر)', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['balance'] ) );
+			$rows[] = array( __( 'مجموع ورودی‌ها (کل بازه، بدون فیلتر)', 'sparkknife-ledger' ), $this->csv_amount( $report['totals']['income'] ) );
+			$rows[] = array( __( 'مجموع خروجی‌ها (کل بازه، بدون فیلتر)', 'sparkknife-ledger' ), $this->csv_amount( $report['totals']['expense'] ) );
+			$rows[] = array( __( 'مانده کل (بدون فیلتر)', 'sparkknife-ledger' ), $this->csv_amount( $report['totals']['balance'] ) );
 		} else {
-			$rows[] = array( __( 'مجموع ورودی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['income'] ) );
-			$rows[] = array( __( 'مجموع خروجی‌ها', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['expense'] ) );
-			$rows[] = array( __( 'مانده کل', 'sparkknife-ledger' ), Sparkknife_Ledger_Money::format( $report['totals']['balance'] ) );
+			$rows[] = array( __( 'مجموع ورودی‌ها', 'sparkknife-ledger' ), $this->csv_amount( $report['totals']['income'] ) );
+			$rows[] = array( __( 'مجموع خروجی‌ها', 'sparkknife-ledger' ), $this->csv_amount( $report['totals']['expense'] ) );
+			$rows[] = array( __( 'مانده کل', 'sparkknife-ledger' ), $this->csv_amount( $report['totals']['balance'] ) );
 		}
 
 		$rows[] = array();
@@ -278,9 +296,9 @@ class Sparkknife_Ledger_Export_Service {
 				(string) $index,
 				$row['name'],
 				(string) $row['phone'],
-				Sparkknife_Ledger_Money::format( $row['income'] ),
-				Sparkknife_Ledger_Money::format( $row['expense'] ),
-				Sparkknife_Ledger_Money::format( $row['balance'] ),
+				$this->csv_amount( $row['income'] ),
+				$this->csv_amount( $row['expense'] ),
+				$this->csv_amount( $row['balance'] ),
 				Sparkknife_Ledger_Ledger_Service::status_label( $row['account_status'] ),
 				(string) $row['count'],
 			);
