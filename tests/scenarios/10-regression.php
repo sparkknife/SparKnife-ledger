@@ -1039,6 +1039,38 @@ spk_equals(
 Sparkknife_Ledger_Settings::save( $settings_before, false );
 Sparkknife_Ledger_Settings::flush_cache();
 
+// ── ۲۵ک: IP لاگ ممیزی با هدر جعل‌شدنی عوض نمی‌شود ────────────────
+// `X-Forwarded-For` همیشه بر `REMOTE_ADDR` اولویت داشت، پس هر کاربری
+// می‌توانست هر IP دلخواهی را در لاگ ممیزی ثبت کند. در دفتر مالی، IP
+// ابزار ردیابی است؛ اگر قابل جعل باشد، ارزش اثباتی لاگ از بین می‌رود.
+$audit_service = Sparkknife_Ledger_Audit_Service::instance();
+$ip_method     = new ReflectionMethod( $audit_service, 'get_ip' );
+$ip_method->setAccessible( true );
+
+$saved_server = $_SERVER;
+
+// پیش‌فرض: هدر پروکسی نادیده گرفته می‌شود.
+$_SERVER['REMOTE_ADDR']          = '203.0.113.7';
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.99';
+
+spk_equals( '203.0.113.7', $ip_method->invoke( $audit_service ), 'IP واقعی بر هدر جعل‌شدنی مقدم است' );
+
+// بدون REMOTE_ADDR هم هدر پذیرفته نمی‌شود.
+unset( $_SERVER['REMOTE_ADDR'] );
+spk_equals( '', $ip_method->invoke( $audit_service ), 'بدون IP واقعی، هدر تنها پذیرفته نمی‌شود' );
+
+// با فعال‌سازی صریح، هدر پذیرفته می‌شود (برای سایت پشت پروکسی).
+$_SERVER['REMOTE_ADDR']          = '203.0.113.7';
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.1, 198.51.100.2';
+
+add_filter( 'sparkknife_ledger_trust_proxy', '__return_true' );
+
+spk_equals( '198.51.100.2', $ip_method->invoke( $audit_service ), 'با اتکا به پروکسی، آخرین آدرس زنجیره گرفته می‌شود' );
+
+remove_filter( 'sparkknife_ledger_trust_proxy', '__return_true' );
+
+$_SERVER = $saved_server;
+
 // ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
 $p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
 $p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱
