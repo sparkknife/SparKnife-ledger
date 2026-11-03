@@ -36,9 +36,9 @@ $description = __( 'اطلاعات کامل تراکنش، وضعیت محاسب
 require __DIR__ . '/../partials/header.php';
 require __DIR__ . '/../partials/nav.php';
 
-$creator = $transaction->created_by ? get_userdata( (int) $transaction->created_by ) : null;
-$updater = $transaction->updated_by ? get_userdata( (int) $transaction->updated_by ) : null;
-$voider = $transaction->voided_by ? get_userdata( (int) $transaction->voided_by ) : null;
+$creator = sparkknife_ledger_user_label( $transaction->created_by );
+$updater = sparkknife_ledger_user_label( $transaction->updated_by );
+$voider  = sparkknife_ledger_user_label( $transaction->voided_by );
 $detail_url = Sparkknife_Ledger_Renderer::url( 'transactions', array( 'action' => 'view', 'id' => (int) $transaction->id ) );
 ?>
 
@@ -53,7 +53,7 @@ $detail_url = Sparkknife_Ledger_Renderer::url( 'transactions', array( 'action' =
 					/* translators: 1: date, 2: user */
 					esc_html__( 'تاریخ ابطال: %1$s · کاربر ابطال‌کننده: %2$s', 'sparkknife-ledger' ),
 					esc_html( Sparkknife_Ledger_Date::format( $transaction->voided_at, true ) ),
-					esc_html( $voider ? $voider->display_name : __( 'نامشخص', 'sparkknife-ledger' ) )
+					esc_html( $voider )
 				);
 				?>
 			</p>
@@ -139,14 +139,14 @@ $detail_url = Sparkknife_Ledger_Renderer::url( 'transactions', array( 'action' =
 				</div>
 				<div>
 					<dt><?php esc_html_e( 'کاربر ثبت‌کننده', 'sparkknife-ledger' ); ?></dt>
-					<dd><?php echo esc_html( $creator ? $creator->display_name : __( 'نامشخص', 'sparkknife-ledger' ) ); ?></dd>
+					<dd><?php echo esc_html( $creator ); ?></dd>
 				</div>
 				<div>
 					<dt><?php esc_html_e( 'آخرین ویرایش', 'sparkknife-ledger' ); ?></dt>
 					<dd>
 						<?php echo esc_html( Sparkknife_Ledger_Date::format( $transaction->updated_at, true ) ); ?>
-						<?php if ( $updater && (int) $transaction->updated_by !== (int) $transaction->created_by ) : ?>
-							<span class="spk-muted">· <?php echo esc_html( $updater->display_name ); ?></span>
+						<?php if ( (int) $transaction->updated_by !== (int) $transaction->created_by ) : ?>
+							<span class="spk-muted">· <?php echo esc_html( $updater ); ?></span>
 						<?php endif; ?>
 					</dd>
 				</div>
@@ -171,7 +171,7 @@ $detail_url = Sparkknife_Ledger_Renderer::url( 'transactions', array( 'action' =
 					</div>
 					<div>
 						<dt><?php esc_html_e( 'کاربر ابطال‌کننده', 'sparkknife-ledger' ); ?></dt>
-						<dd><?php echo esc_html( $voider ? $voider->display_name : __( 'نامشخص', 'sparkknife-ledger' ) ); ?></dd>
+						<dd><?php echo esc_html( $voider ); ?></dd>
 					</div>
 				</dl>
 			</section>
@@ -189,7 +189,7 @@ $detail_url = Sparkknife_Ledger_Renderer::url( 'transactions', array( 'action' =
 					<?php foreach ( $history as $entry ) : ?>
 						<?php
 						$changes = Sparkknife_Ledger_Audit_Service::instance()->decode_changes( $entry );
-						$user    = $entry->user_id ? get_userdata( (int) $entry->user_id ) : null;
+						$entry_user = sparkknife_ledger_user_label( $entry->user_id, isset( $entry->user_login ) ? $entry->user_login : '' );
 						?>
 						<li>
 							<span class="spk-timeline__dot" aria-hidden="true"></span>
@@ -197,9 +197,7 @@ $detail_url = Sparkknife_Ledger_Renderer::url( 'transactions', array( 'action' =
 								<strong><?php echo esc_html( isset( $action_labels[ $entry->action ] ) ? $action_labels[ $entry->action ] : $entry->action ); ?></strong>
 								<span class="spk-timeline__time">
 									<?php echo esc_html( Sparkknife_Ledger_Date::format( $entry->created_at, true ) ); ?>
-									<?php if ( $user ) : ?>
-										· <?php echo esc_html( $user->display_name ); ?>
-									<?php endif; ?>
+									· <?php echo esc_html( $entry_user ); ?>
 								</span>
 								<?php if ( ! empty( $changes ) ) : ?>
 									<ul class="spk-changes">

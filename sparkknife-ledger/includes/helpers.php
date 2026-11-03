@@ -108,6 +108,50 @@ if ( ! function_exists( 'sparkknife_ledger_can' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sparkknife_ledger_user_label' ) ) {
+	/**
+	 * نام نمایشی کاربر برای تاریخچه‌ها و گزارش‌ها.
+	 *
+	 * اگر کاربر حذف شده باشد `get_userdata()` مقدار `false` می‌دهد. ویوها
+	 * پیش‌تر در این حالت «سیستم» نشان می‌دادند، یعنی تاریخچه ادعا می‌کرد
+	 * سیستم تغییر را داده — در حالی که یک انسان داده بود. در یک دفتر
+	 * ممیزی، پاسخ «چه کسی» مهم‌ترین بخش رکورد است؛ پس نام ورود ذخیره‌شده
+	 * در خود رکورد را برمی‌گردانیم.
+	 *
+	 * @param int    $user_id شناسه کاربر.
+	 * @param string $fallback نام ورود ذخیره‌شده در رکورد (اختیاری).
+	 * @return string
+	 */
+	function sparkknife_ledger_user_label( $user_id, $fallback = '' ) {
+		$user_id = (int) $user_id;
+
+		/*
+		 * شناسه صفر یعنی «بدون کاربر» — عملیات خودکار (مهاجرت، به‌روزرسانی،
+		 * اجرای زمان‌بندی‌شده). این تنها حالتی است که «سیستم» پاسخ درست
+		 * است، پس پیش از هر چیز بررسی می‌شود.
+		 */
+		if ( $user_id <= 0 ) {
+			return __( 'سیستم', 'sparkknife-ledger' );
+		}
+
+		$user = get_userdata( $user_id );
+
+		if ( $user ) {
+			return (string) $user->display_name;
+		}
+
+		$fallback = trim( (string) $fallback );
+
+		if ( '' !== $fallback ) {
+			/* translators: %s: نام ورود کاربر حذف‌شده. */
+			return sprintf( __( '%s (حساب حذف‌شده)', 'sparkknife-ledger' ), $fallback );
+		}
+
+		/* translators: %s: شناسه کاربر. */
+		return sprintf( __( 'کاربر #%s (حذف‌شده)', 'sparkknife-ledger' ), (string) $user_id );
+	}
+}
+
 if ( ! function_exists( 'sparkknife_ledger_admin_url' ) ) {
 	/**
 	 * تولید نشانی صفحه‌های پنل مدیریت افزونه.

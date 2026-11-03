@@ -254,7 +254,7 @@ class Sparkknife_Ledger_Print_Service {
 				sprintf(
 					/* translators: 1: user name, 2: date */
 					__( 'تهیه‌کننده: %1$s — تاریخ: %2$s', 'sparkknife-ledger' ),
-					$user->display_name,
+					$user->exists() ? $user->display_name : __( 'سیستم', 'sparkknife-ledger' ),
 					Sparkknife_Ledger_Date::format( Sparkknife_Ledger_Date::now(), true )
 				)
 			),

@@ -229,8 +229,8 @@ $form_url = $is_edit
 						<dt><?php esc_html_e( 'ثبت‌کننده', 'sparkknife-ledger' ); ?></dt>
 						<dd>
 							<?php
-							$creator = $transaction->created_by ? get_userdata( (int) $transaction->created_by ) : null;
-							echo esc_html( $creator ? $creator->display_name : __( 'نامشخص', 'sparkknife-ledger' ) );
+							$creator = sparkknife_ledger_user_label( $transaction->created_by );
+							echo esc_html( $creator );
 							?>
 						</dd>
 					</div>

@@ -333,6 +333,7 @@ class Sparkknife_Ledger_Installer {
 			summary text NULL,
 			ip_address varchar(90) DEFAULT NULL,
 			user_agent varchar(255) DEFAULT NULL,
+			user_login varchar(60) DEFAULT NULL,
 			hash varchar(64) DEFAULT NULL,
 			created_at datetime DEFAULT NULL,
 			PRIMARY KEY  (id),
