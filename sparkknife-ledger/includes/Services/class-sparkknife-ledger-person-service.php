@@ -322,25 +322,76 @@ class Sparkknife_Ledger_Person_Service {
 			)
 		);
 
+		/*
+		 * مقایسه باید با همان قاعده‌ای باشد که جستجو استفاده می‌کند.
+		 *
+		 * پیش‌تر نام با `strcasecmp` خام مقایسه می‌شد، پس «علي رضایی» و
+		 * «علی رضایی» دو شخص جدا شمرده می‌شدند — در حالی که جستجو آن دو
+		 * را یکی می‌داند. کاربر می‌توانست برای یک نفر دو پرونده بسازد و
+		 * بعد در گزارش‌ها دنبال «مانده واقعی» بگردد.
+		 *
+		 * شماره هم با `\D` پاک می‌شد که ارقام فارسی و عربی را **حذف**
+		 * می‌کند، نه تبدیل؛ پس «۰۹۱۲۱۱۱۰۰۰۱» به رشته خالی می‌رسید.
+		 */
+		$needle_name  = $this->duplicate_name_key( $name );
+		$needle_phone = $this->duplicate_phone_key( $phone );
+
 		foreach ( $result['items'] as $item ) {
 			if ( (int) $item->id === (int) $exclude ) {
 				continue;
 			}
 
-			if ( 0 !== strcasecmp( trim( $item->name ), trim( $name ) ) ) {
+			if ( $this->duplicate_name_key( $item->name ) !== $needle_name ) {
 				continue;
 			}
 
-			// اگر هر دو شماره خالی باشند، نام یکسان کافی نیست مگر تلفن هم یکسان باشد.
-			if ( '' === trim( (string) $item->phone ) && '' === trim( (string) $phone ) ) {
+			$item_phone = $this->duplicate_phone_key( $item->phone );
+
+			/*
+			 * اگر هیچ‌کدام شماره ندارند، نام یکسان کافی است.
+			 * اگر یکی شماره دارد و دیگری نه، دو شخص متفاوت‌اند.
+			 */
+			if ( '' === $item_phone && '' === $needle_phone ) {
 				return true;
 			}
 
-			if ( preg_replace( '/\D/', '', (string) $item->phone ) === preg_replace( '/\D/', '', (string) $phone ) ) {
+			if ( '' !== $item_phone && $item_phone === $needle_phone ) {
 				return true;
 			}
 		}
 
 		return false;
+	}
+
+	/**
+	 * کلید مقایسه نام برای تشخیص تکراری.
+	 *
+	 * همان یکسان‌سازی فارسی که در جستجو به کار می‌رود، به‌علاوه حذف
+	 * فاصله‌های تکراری و نویسه‌های بی‌عرض.
+	 *
+	 * @param string $name نام.
+	 * @return string
+	 */
+	private function duplicate_name_key( $name ) {
+		$name = Sparkknife_Ledger_Sanitizer::normalize_persian( (string) $name );
+		$name = preg_replace( '/\s+/u', ' ', $name );
+
+		return mb_strtolower( trim( (string) $name ), 'UTF-8' );
+	}
+
+	/**
+	 * کلید مقایسه شماره تماس برای تشخیص تکراری.
+	 *
+	 * ارقام فارسی و عربی نخست به لاتین تبدیل می‌شوند و سپس هر نویسه
+	 * غیررقمی حذف می‌گردد. خروجی برای شماره‌های بدون رقم رشته خالی است
+	 * و فراخوان باید آن را «شماره ندارد» تفسیر کند.
+	 *
+	 * @param string $phone شماره.
+	 * @return string
+	 */
+	private function duplicate_phone_key( $phone ) {
+		$phone = Sparkknife_Ledger_Money::to_latin_digits( (string) $phone );
+
+		return (string) preg_replace( '/\D/', '', $phone );
 	}
 }
