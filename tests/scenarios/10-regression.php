@@ -1592,6 +1592,90 @@ foreach ( $prefix_cases as $input => $expected ) {
 Sparkknife_Ledger_Settings::save( $defaults_before, false );
 Sparkknife_Ledger_Settings::flush_cache();
 
+// ── ۲۵س۲: تشخیص تکراری با همان قاعده جستجو کار می‌کند ─────────────
+// `find_duplicate()` نام را با `strcasecmp` خام مقایسه می‌کرد، پس
+// «علي رضایی» و «علی رضایی» دو شخص جدا بودند — با اینکه جستجو آن دو را
+// یکی می‌داند. شماره هم با `\D` پاک می‌شد که ارقام فارسی را حذف
+// می‌کند، نه تبدیل؛ پس «۰۹۱۲…» به رشته خالی می‌رسید.
+
+$dup_service = Sparkknife_Ledger_Person_Service::instance();
+
+$dup_phone = '0935' . str_pad( (string) wp_rand( 1000000, 9999999 ), 7, '0', STR_PAD_LEFT );
+$dup_name  = 'آزمون تکراری ' . wp_rand( 1000, 9999 );
+
+$dup_first = $dup_service->create(
+	array(
+		'name'  => $dup_name,
+		'phone' => $dup_phone,
+	)
+);
+
+spk_assert( ! is_wp_error( $dup_first ), 'شخص مبنای آزمون تکراری ساخته می‌شود' );
+
+if ( ! is_wp_error( $dup_first ) ) {
+	$dup_first = (int) $dup_first;
+
+	// همان نام، همان شماره → رد.
+	$same = $dup_service->create(
+		array(
+			'name'  => $dup_name,
+			'phone' => $dup_phone,
+		)
+	);
+	spk_assert( is_wp_error( $same ), 'نام و شماره یکسان رد می‌شود' );
+
+	// نام با «ي» عربی → باید همان شخص شمرده شود.
+	$arabic_yeh = str_replace( 'ی', 'ي', $dup_name );
+	$with_yeh   = $dup_service->create(
+		array(
+			'name'  => $arabic_yeh,
+			'phone' => $dup_phone,
+		)
+	);
+	spk_assert( is_wp_error( $with_yeh ), 'نام با «ي» عربی با «ی» فارسی یکی شمرده می‌شود' );
+
+	// شماره با ارقام فارسی → باید همان شماره شمرده شود.
+	$persian_phone = '';
+	$latin_to_persian = array( '0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹' );
+	foreach ( str_split( $dup_phone ) as $digit ) {
+		$persian_phone .= $latin_to_persian[ $digit ];
+	}
+
+	$with_persian_digits = $dup_service->create(
+		array(
+			'name'  => $dup_name,
+			'phone' => $persian_phone,
+		)
+	);
+	spk_assert( is_wp_error( $with_persian_digits ), 'شماره با ارقام فارسی با لاتین یکی شمرده می‌شود' );
+
+	// شماره با خط تیره → همان شماره.
+	$dashed = substr( $dup_phone, 0, 4 ) . '-' . substr( $dup_phone, 4, 3 ) . '-' . substr( $dup_phone, 7 );
+	$with_dashes = $dup_service->create(
+		array(
+			'name'  => $dup_name,
+			'phone' => $dashed,
+		)
+	);
+	spk_assert( is_wp_error( $with_dashes ), 'خط تیره در شماره تفاوت نمی‌سازد' );
+
+	// شماره متفاوت با همان نام → مجاز (دو نفر هم‌نام).
+	$different_phone = '0935' . str_pad( (string) wp_rand( 1000000, 9999999 ), 7, '0', STR_PAD_LEFT );
+	$other = $dup_service->create(
+		array(
+			'name'  => $dup_name,
+			'phone' => $different_phone,
+		)
+	);
+	spk_assert( ! is_wp_error( $other ), 'دو شخص هم‌نام با شماره‌های متفاوت مجازند' );
+
+	if ( ! is_wp_error( $other ) ) {
+		$dup_service->delete( (int) $other );
+	}
+
+	$dup_service->delete( $dup_first );
+}
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
