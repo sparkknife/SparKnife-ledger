@@ -167,11 +167,19 @@ class Sparkknife_Ledger_Transaction_Repository {
 		}
 
 		if ( ! empty( $args['search'] ) ) {
-			$like     = '%' . $wpdb->esc_like( trim( (string) $args['search'] ) ) . '%';
-			$where[]  = '(t.reference LIKE %s OR t.description LIKE %s OR p.name LIKE %s)';
-			$params[] = $like;
-			$params[] = $like;
-			$params[] = $like;
+			// همه املای ممکن فارسی تا «علي» و «علی» یکدیگر را بیابند.
+			$variants = Sparkknife_Ledger_Sanitizer::search_variants( trim( (string) $args['search'] ) );
+			$clauses  = array();
+
+			foreach ( $variants as $variant ) {
+				$like      = '%' . $wpdb->esc_like( $variant ) . '%';
+				$clauses[] = '(t.reference LIKE %s OR t.description LIKE %s OR p.name LIKE %s)';
+				$params[]  = $like;
+				$params[]  = $like;
+				$params[]  = $like;
+			}
+
+			$where[] = '(' . implode( ' OR ', $clauses ) . ')';
 		}
 
 		return array( implode( ' AND ', $where ), $params );

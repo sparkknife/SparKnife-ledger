@@ -13,6 +13,205 @@ defined( 'ABSPATH' ) || exit;
 class Sparkknife_Ledger_Sanitizer {
 
 	/**
+	 * یکسان‌سازی نویسه‌های فارسی برای جستجو.
+	 *
+	 * کاربران ایرانی گاهی با کیبورد عربی یا از روی متن کپی‌شده تایپ
+	 * می‌کنند و «ي» (U+064A) و «ك» (U+0643) عربی به‌جای «ی» (U+06CC) و
+	 * «ک» (U+06A9) فارسی وارد می‌شود. این دو در دیتابیس نویسه‌های
+	 * متفاوتی هستند، بنابراین جستجوی «علي» شخصی با نام «علی» را پیدا
+	 * نمی‌کرد.
+	 *
+	 * همچنین «ة» به «ه» و «ۀ» به «ه» تبدیل می‌شود تا نام‌هایی مثل
+	 * «فاطمه» با هر املا پیدا شوند.
+	 *
+	 * این تابع فقط برای مقایسه استفاده می‌شود، نه برای ذخیره‌سازی؛
+	 * نامی که کاربر تایپ کرده همان‌طور که هست ذخیره می‌شود.
+	 *
+	 * @param string $value متن.
+	 * @return string متن یکسان‌شده.
+	 */
+	public static function normalize_persian( $value ) {
+		$map = array(
+			"ي" => "ی", // ي عربی
+			"ى" => "ی", // ى الف مقصوره
+			"ك" => "ک", // ك عربی
+			"ة" => "ه", // ة
+			"ۀ" => "ه", // ۀ
+			"ە" => "ه", // ە
+			"ئ" => "ی", // ئ (همزه روی ی) → ی
+		);
+
+		$value = strtr( (string) $value, $map );
+
+		/*
+		 * نیم‌فاصله (ZWNJ) و سایر فاصله‌های یونیکد حذف می‌شوند تا
+		 * «می‌رود» و «میرود» یکسان یابیده شوند.
+		 */
+		$value = preg_replace( '/[\x{200B}-\x{200F}\x{FEFF}]/u', '', (string) $value );
+
+		/*
+		 * ارقام فارسی و عربی به لاتین تبدیل می‌شوند.
+		 *
+		 * شماره تلفن‌ها با ارقام لاتین ذخیره می‌شوند، ولی کیبورد فارسی
+		 * ارقام فارسی تولید می‌کند؛ بدون این تبدیل، جستجوی «۰۹۱۲» هیچ
+		 * نتیجه‌ای نمی‌داد در حالی که «0912» کار می‌کرد.
+		 */
+		$value = Sparkknife_Ledger_Money::to_latin_digits( (string) $value );
+
+		return (string) $value;
+	}
+
+	/**
+	 * کلید مرتب‌سازی الفبایی فارسی.
+	 *
+	 * `strcmp` روی UTF-8 مقایسه بایتی می‌کند و برای فارسی ترتیب نادرست
+	 * می‌دهد: «پ» بعد از «د» می‌آید و «چ» بعد از «ی». این تابع هر
+	 * نویسه را به یک عدد بر اساس ترتیب الفبای فارسی تبدیل می‌کند.
+	 *
+	 * @param string $value متن.
+	 * @return string کلیدی که با strcmp مرتب‌سازی الفبایی فارسی می‌دهد.
+	 */
+	public static function persian_sort_key( $value ) {
+		static $order = null;
+
+		if ( null === $order ) {
+			$order = array(
+			"آ" => 0,
+			"ا" => 1,
+			"أ" => 2,
+			"إ" => 3,
+			"ء" => 4,
+			"ب" => 5,
+			"پ" => 6,
+			"ت" => 7,
+			"ث" => 8,
+			"ج" => 9,
+			"چ" => 10,
+			"ح" => 11,
+			"خ" => 12,
+			"د" => 13,
+			"ذ" => 14,
+			"ر" => 15,
+			"ز" => 16,
+			"ژ" => 17,
+			"س" => 18,
+			"ش" => 19,
+			"ص" => 20,
+			"ض" => 21,
+			"ط" => 22,
+			"ظ" => 23,
+			"ع" => 24,
+			"غ" => 25,
+			"ف" => 26,
+			"ق" => 27,
+			"ک" => 28,
+			"گ" => 29,
+			"ل" => 30,
+			"م" => 31,
+			"ن" => 32,
+			"و" => 33,
+			"ه" => 34,
+			"ی" => 35,
+			"ئ" => 36,
+			);
+		}
+
+		$value = self::normalize_persian( $value );
+		$value = function_exists( 'mb_strtolower' ) ? mb_strtolower( $value, 'UTF-8' ) : strtolower( $value );
+
+		$key   = '';
+		$chars = preg_split( '//u', $value, -1, PREG_SPLIT_NO_EMPTY );
+
+		foreach ( (array) $chars as $char ) {
+			if ( isset( $order[ $char ] ) ) {
+				// سه رقم برای هر نویسه تا مقایسه بایتی با ترتیب عددی هم‌خوان باشد.
+				$key .= sprintf( '%03d', $order[ $char ] );
+			} else {
+				$key .= sprintf( '%03d', 900 + ( ord( $char ) % 99 ) );
+			}
+		}
+
+		return $key;
+	}
+
+	/**
+	 * تولید نسخه‌های جایگزین یک عبارت جستجو برای جستجوی فارسی.
+	 *
+	 * `LIKE` در MySQL مقایسه بایتی می‌کند و «%s» فارسی و «%s» عربی دو
+	 * نویسه متفاوت‌اند؛ بنابراین جستجوی «علي» شخصی با نام «علی» را پیدا
+	 * نمی‌کرد. این تابع همه ترکیب‌های ممکن را می‌سازد تا در کوئری با OR
+	 * استفاده شوند.
+	 *
+	 * @param string $search عبارت جستجو.
+	 * @return array<int, string> نسخه‌ها؛ همیشه شامل خودِ عبارت.
+	 */
+	public static function search_variants( $search ) {
+		$search = (string) $search;
+
+		if ( '' === trim( $search ) ) {
+			return array();
+		}
+
+		/*
+		 * عبارت جستجو ابتدا یکسان‌سازی می‌شود (ی/ک عربی، ارقام فارسی،
+		 * نیم‌فاصله). سپس نسخه‌های جایگزین نویسه‌ای از آن ساخته می‌شوند.
+		 */
+		$search   = self::normalize_persian( $search );
+		$variants = array( $search );
+
+		/*
+		 * هر گروه، نویسه‌هایی است که کاربر ممکن است به‌جای هم تایپ کند.
+		 * هر دو جهت پوشش داده می‌شود تا جستجو برای داده‌های قدیمی که با
+		 * نویسه عربی ذخیره شده‌اند هم کار کند.
+		 */
+		$groups = array(
+			array( 'ی', 'ي', 'ى' ), // ی فارسی، ي عربی، ى
+			array( 'ک', 'ك' ),      // ک فارسی، ك عربی
+			array( 'ه', 'ة', 'ۀ' ), // ه، ة، ۀ
+		);
+
+		foreach ( $groups as $group ) {
+			$expanded = array();
+
+			foreach ( $variants as $variant ) {
+				$expanded[] = $variant;
+
+				foreach ( $group as $from ) {
+					if ( false === strpos( $variant, $from ) ) {
+						continue;
+					}
+
+					foreach ( $group as $to ) {
+						if ( $to !== $from ) {
+							$expanded[] = str_replace( $from, $to, $variant );
+						}
+					}
+				}
+			}
+
+			$variants = array_values( array_unique( $expanded ) );
+		}
+
+		/*
+		 * نسخه با ارقام فارسی هم تولید می‌شود تا رکوردهای قدیمی که شماره
+		 * را با ارقام فارسی ذخیره کرده‌اند پیدا شوند. جستجو با ارقام
+		 * لاتین و فارسی هر دو باید یک نتیجه بدهد.
+		 */
+		$with_persian_digits = array();
+
+		foreach ( $variants as $variant ) {
+			$with_persian_digits[] = Sparkknife_Ledger_Money::to_persian_digits( $variant );
+			$with_persian_digits[] = Sparkknife_Ledger_Money::to_arabic_digits( $variant );
+		}
+
+		$variants = array_values( array_unique( array_merge( $variants, $with_persian_digits ) ) );
+
+		// سقف ایمنی تا کوئری بیش از حد بزرگ نشود.
+		return array_slice( $variants, 0, 12 );
+	}
+
+	/**
+	 * متن ساده تک‌خطی.	/**
 	 * متن ساده تک‌خطی.
 	 *
 	 * @param mixed $value ورودی.
