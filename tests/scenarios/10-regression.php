@@ -555,6 +555,51 @@ spk_assert(
 	'uninstall نسخه افزونه را در هر دو حالت پاک می‌کند'
 );
 
+// ── ۲۴: نمایش تاریخ روی PHP ۳۲ بیتی هشدار نمی‌دهد ──────────────────
+// strtotime() برای سال‌های دور از محدوده int هشدار می‌دهد و تاریخ را
+// به خط تیره تبدیل می‌کند. این موارد باید بدون هشدار و درست نمایش یابند.
+$far_dates = array(
+	'1900-01-01' => '۱۲۷۸/۱۰/۱۱',
+	'2199-12-31' => '۱۵۷۸/۱۰/۱۰',
+);
+
+foreach ( $far_dates as $gregorian => $expected_jalali ) {
+	$warnings_raised = array();
+
+	set_error_handler(
+		function ( $errno, $errstr ) use ( &$warnings_raised ) {
+			$warnings_raised[] = $errstr;
+			return true;
+		}
+	);
+
+	$rendered = Sparkknife_Ledger_Date::format( $gregorian );
+
+	restore_error_handler();
+
+	spk_assert( empty( $warnings_raised ), 'نمایش تاریخ بدون هشدار PHP: ' . $gregorian, implode( ' | ', $warnings_raised ) );
+	spk_assert( false !== strpos( $rendered, $expected_jalali ), 'تاریخ دور درست نمایش داده می‌شود: ' . $gregorian, $rendered );
+}
+
+// همان مسیر برای ورودی فرم.
+$input_warnings = array();
+set_error_handler(
+	function ( $errno, $errstr ) use ( &$input_warnings ) {
+		$input_warnings[] = $errstr;
+		return true;
+	}
+);
+$input_value = Sparkknife_Ledger_Date::format_for_input( '2199-12-31' );
+restore_error_handler();
+
+spk_assert( empty( $input_warnings ), 'format_for_input بدون هشدار PHP' );
+spk_equals( '1578/10/10', $input_value, 'format_for_input تاریخ دور را درست می‌دهد' );
+
+// ورودی نامعتبر هم نباید هشدار بدهد.
+foreach ( array( null, '', '0000-00-00', 'garbage', '2025-02-30' ) as $bad_date ) {
+	spk_equals( '—', Sparkknife_Ledger_Date::format( $bad_date ), 'تاریخ نامعتبر خط تیره می‌دهد: ' . var_export( $bad_date, true ) );
+}
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
