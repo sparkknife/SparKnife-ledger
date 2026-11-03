@@ -221,7 +221,7 @@ class Sparkknife_Ledger_Validator {
 		if ( is_wp_error( $txn_date ) ) {
 			$validator->add_error( 'txn_date', $txn_date->get_error_message() );
 			$txn_date = '';
-		} elseif ( '' !== $txn_date && strtotime( $txn_date ) > strtotime( current_time( 'Y-m-d' ) . ' +1 day' ) ) {
+		} elseif ( '' !== $txn_date && Sparkknife_Ledger_Date::is_future( $txn_date ) ) {
 			$validator->add_error( 'txn_date', __( 'تاریخ تراکنش نمی‌تواند در آینده باشد.', 'sparkknife-ledger' ) );
 		}
 
