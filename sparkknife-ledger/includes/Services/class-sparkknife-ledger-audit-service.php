@@ -237,17 +237,66 @@ class Sparkknife_Ledger_Audit_Service {
 			$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
 		}
 
-		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			$forwarded = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) );
-			$parts     = explode( ',', $forwarded );
-			$candidate = trim( $parts[0] );
+		/*
+		 * `X-Forwarded-For` تنها وقتی پذیرفته می‌شود که سایت صریحاً اعلام
+		 * کند پشت پروکسی است.
+		 *
+		 * پیش‌تر این هدر همیشه بر `REMOTE_ADDR` اولویت داشت و هر کاربری
+		 * می‌توانست با فرستادن آن، هر IP دلخواهی را در لاگ ممیزی ثبت کند.
+		 * در دفتر مالی، IP ابزار ردیابی تغییرات است؛ اگر قابل جعل باشد،
+		 * ارزش اثباتی لاگ از بین می‌رود.
+		 *
+		 * برای فعال‌سازی، در `wp-config.php` بگذارید:
+		 *
+		 *     define( 'SPARKKNIFE_LEDGER_TRUST_PROXY', true );
+		 *
+		 * یا با فیلتر:
+		 *
+		 *     add_filter( 'sparkknife_ledger_trust_proxy', '__return_true' );
+		 *
+		 * و اگر پروکسی از نام میزبان خاصی می‌آید، آدرس‌های مجاز را با
+		 * فیلتر `sparkknife_ledger_trusted_proxies` محدود کنید.
+		 */
+		if ( ! $this->trusts_proxy() ) {
+			return $ip;
+		}
 
+		if ( empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+			return $ip;
+		}
+
+		$forwarded = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) );
+
+		/*
+		 * فقط آخرین (راست‌ترین) آدرس در زنجیره قابل اتکاست، چون بقیه را
+		 * خود کلاینت نوشته است. اگر `REMOTE_ADDR` یکی از پروکسی‌های مجاز
+		 * نباشد، هدر نادیده گرفته می‌شود.
+		 */
+		$parts = array_map( 'trim', explode( ',', $forwarded ) );
+
+		foreach ( $parts as $candidate ) {
 			if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) {
 				$ip = $candidate;
 			}
 		}
 
 		return $ip;
+	}
+
+	/**
+	 * آیا هدر پروکسی قابل اتکاست؟
+	 *
+	 * @return bool
+	 */
+	private function trusts_proxy() {
+		$trust = defined( 'SPARKKNIFE_LEDGER_TRUST_PROXY' ) && SPARKKNIFE_LEDGER_TRUST_PROXY;
+
+		/**
+		 * امکان اتکا به هدر `X-Forwarded-For`.
+		 *
+		 * @param bool $trust مقدار پیش‌فرض.
+		 */
+		return (bool) apply_filters( 'sparkknife_ledger_trust_proxy', $trust );
 	}
 
 	/**
