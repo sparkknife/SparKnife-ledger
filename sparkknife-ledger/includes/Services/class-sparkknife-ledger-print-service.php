@@ -246,6 +246,13 @@ class Sparkknife_Ledger_Print_Service {
 	 * @return string
 	 */
 	private function footer_html() {
+		/*
+		 * `wp_get_current_user()` برای حساب حذف‌شده شیئی با `ID = 0` برمی‌گرداند،
+		 * پس شناسه واقعی کاربر از دست می‌رود و «سیستم» چاپ می‌شد. صحت این
+		 * مورد در حال حاضر قابل تشخیص نیست مگر از `$current_user->ID` که
+		 * همان صفر است؛ اما هم‌سو کردن با بقیه صفحات باعث می‌شود برچسب
+		 * چاپ همیشه از یک قاعده بیرون بیاید.
+		 */
 		$user = wp_get_current_user();
 
 		return sprintf(
@@ -254,7 +261,7 @@ class Sparkknife_Ledger_Print_Service {
 				sprintf(
 					/* translators: 1: user name, 2: date */
 					__( 'تهیه‌کننده: %1$s — تاریخ: %2$s', 'sparkknife-ledger' ),
-					$user->exists() ? $user->display_name : __( 'سیستم', 'sparkknife-ledger' ),
+					sparkknife_ledger_user_label( $user->exists() ? (int) $user->ID : 0 ),
 					Sparkknife_Ledger_Date::format( Sparkknife_Ledger_Date::now(), true )
 				)
 			),

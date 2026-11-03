@@ -206,6 +206,26 @@ class Sparkknife_Ledger_Sanitizer {
 
 		$variants = array_values( array_unique( array_merge( $variants, $with_persian_digits ) ) );
 
+		/*
+		 * یکسان‌سازی می‌تواند **همهٔ** عبارت را حذف کند.
+		 *
+		 * نیم‌فاصله (`U+200C`) و دیگر نویسه‌های کنترلی قالب‌بندی توسط
+		 * `normalize_persian()` حذف می‌شوند. اگر کاربر فقط نیم‌فاصله
+		 * بفرستد، نتیجه رشتهٔ خالی است و `LIKE '%%'` **همهٔ** رکوردها را
+		 * برمی‌گرداند — یعنی جستجوی «هیچ» جواب «همه چیز» می‌داد.
+		 *
+		 * نسخه‌های خالی کنار گذاشته می‌شوند؛ اگر چیزی نماند، آرایهٔ خالی
+		 * می‌ماند و لایهٔ بالاتر هیچ شرط جستجویی نمی‌سازد.
+		 */
+		$variants = array_values(
+			array_filter(
+				$variants,
+				static function ( $variant ) {
+					return '' !== trim( (string) $variant );
+				}
+			)
+		);
+
 		// سقف ایمنی تا کوئری بیش از حد بزرگ نشود.
 		return array_slice( $variants, 0, 12 );
 	}

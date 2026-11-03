@@ -1950,6 +1950,61 @@ spk_equals( 1, (int) $ghost_search['total'], 'جستجو نام کاربر حذ�
 // ستون اختیاری user_login باید بدون خطا تشخیص داده شود.
 spk_assert( Sparkknife_Ledger_DB::audit_schema_has_user_login(), 'ستون user_login ساخته شده است' );
 
+// ── ۲۵د: یکسان‌سازی جستجو نباید عبارت را به «همه چیز» تبدیل کند ──────
+//
+// `normalize_persian()` نویسه‌های قالب‌بندی مثل نیم‌فاصله را حذف می‌کند.
+// اگر عبارت جستجو فقط از همین نویسه‌ها ساخته شده باشد، نسخهٔ یکسان‌شده
+// رشتهٔ خالی است و `LIKE '%%'` **همهٔ** رکوردها را برمی‌گرداند. یعنی
+// جستجوی «هیچ» پاسخ «همه چیز» می‌داد — همان الگوی باگ ۴۹، این بار در
+// لایهٔ جستجوی اشخاص.
+
+foreach ( array( "\u{200C}", "\u{200B}", " \u{200C} " ) as $blank_term ) {
+	$variants = Sparkknife_Ledger_Sanitizer::search_variants( $blank_term );
+
+	spk_equals(
+		array(),
+		$variants,
+		'عبارت فقط-قالب‌بندی هیچ نسخه‌ای تولید نمی‌کند: ' . bin2hex( $blank_term )
+	);
+}
+
+// هیچ‌کدام از نسخه‌های تولیدشده نباید خالی باشد.
+$variants_no_empty = Sparkknife_Ledger_Sanitizer::search_variants( 'علی ' . "\u{200C}" );
+
+spk_assert( ! empty( $variants_no_empty ), 'عبارت معتبر نسخه تولید می‌کند' );
+
+$has_empty = false;
+
+foreach ( $variants_no_empty as $variant ) {
+	if ( '' === trim( (string) $variant ) ) {
+		$has_empty = true;
+	}
+}
+
+spk_assert( false === $has_empty, 'هیچ نسخهٔ خالی در فهرست جستجو نیست' );
+
+// شناسه‌کردن «خالی» باید همان یکسان‌سازی را ببیند، نه `trim()` خالی.
+// `trim()` استاندارد PHP فقط فاصله و تب لاتین را می‌شناسد.
+spk_equals(
+	'',
+	trim( Sparkknife_Ledger_Sanitizer::normalize_persian( ' ' . "\u{200C}" . ' ' ) ),
+	'یکسان‌سازی، عبارت فقط-نیم‌فاصله را خالی می‌کند'
+);
+
+// پرسمان واقعی نباید بشکند.
+$blank_result = Sparkknife_Ledger_Person_Repository::instance()->query(
+	array( 'search' => "\u{200C}", 'per_page' => 100 )
+);
+
+spk_assert(
+	is_array( $blank_result ) && isset( $blank_result['total'] ),
+	'جستجو با عبارت فقط-نیم‌فاصله پرسمان را نمی‌شکند'
+);
+spk_assert(
+	(int) $blank_result['total'] >= 0,
+	'جستجو با عبارت فقط-نیم‌فاصله نتیجهٔ معتبر می‌دهد'
+);
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
