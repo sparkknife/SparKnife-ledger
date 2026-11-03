@@ -58,7 +58,28 @@ spk_assert( isset( $presets['this_month'], $presets['last_month'], $presets['thi
 
 $resolved = Sparkknife_Ledger_Ledger_Service::resolve_range( array( 'range' => 'this_month' ) );
 spk_assert( '' !== $resolved['from'] && '' !== $resolved['to'], 'محاسبه بازه این ماه' );
-spk_equals( gmdate( 'Y-m-01', strtotime( current_time( 'Y-m-d' ) ) ), $resolved['from'], 'ابتدای ماه جاری' );
+/*
+ * بازه «این ماه» تقویم‌آگاه است: در تقویم شمسی باید اول ماه شمسی باشد،
+ * نه اول ماه میلادی. این تست قبلاً همیشه تاریخ میلادی را انتظار داشت و
+ * در نتیجه باگ را تثبیت می‌کرد.
+ */
+if ( Sparkknife_Ledger_Date::uses_jalali() ) {
+	$today_ymd = current_time( 'Y-m-d' );
+
+	list( $jy, $jm ) = Sparkknife_Ledger_Date::gregorian_to_jalali(
+		(int) substr( $today_ymd, 0, 4 ),
+		(int) substr( $today_ymd, 5, 2 ),
+		(int) substr( $today_ymd, 8, 2 )
+	);
+
+	list( $egy, $egm, $egd ) = Sparkknife_Ledger_Date::jalali_to_gregorian( (int) $jy, (int) $jm, 1 );
+
+	$expected_month_start = sprintf( '%04d-%02d-%02d', $egy, $egm, $egd );
+} else {
+	$expected_month_start = gmdate( 'Y-m-01', strtotime( current_time( 'Y-m-d' ) ) );
+}
+
+spk_equals( $expected_month_start, $resolved['from'], 'ابتدای ماه جاری مطابق تقویم فعال' );
 
 // گزارش تجمیعی.
 $summary_report = $reports->get_summary_report();

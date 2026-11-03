@@ -332,13 +332,13 @@ class Sparkknife_Ledger_Ledger_Service {
 				'label' => __( 'همه زمان‌ها', 'sparkknife-ledger' ),
 			),
 			'this_month' => array(
-				'from'  => gmdate( 'Y-m-01', strtotime( $today ) ),
-				'to'    => gmdate( 'Y-m-t', strtotime( $today ) ),
+				'from'  => self::month_start( 0 ),
+				'to'    => self::month_end( 0 ),
 				'label' => __( 'این ماه', 'sparkknife-ledger' ),
 			),
 			'last_month' => array(
-				'from'  => gmdate( 'Y-m-01', strtotime( $today . ' -1 month' ) ),
-				'to'    => gmdate( 'Y-m-t', strtotime( $today . ' -1 month' ) ),
+				'from'  => self::month_start( -1 ),
+				'to'    => self::month_end( -1 ),
 				'label' => __( 'ماه گذشته', 'sparkknife-ledger' ),
 			),
 			'this_year'  => array(
@@ -361,6 +361,108 @@ class Sparkknife_Ledger_Ledger_Service {
 		);
 
 		return apply_filters( 'sparkknife_ledger_preset_ranges', $ranges );
+	}
+
+	/**
+	 * ابتدای ماه جاری (یا ماه‌های قبل) به میلادی.
+	 *
+	 * «ماه» بر اساس تقویم فعال محاسبه می‌شود.
+	 *
+	 * پیش‌تر این بازه‌ها همیشه میلادی بودند: در تقویم شمسی، «این ماه»
+	 * از ۱ نوامبر تا ۳۰ نوامبر می‌رفت، که در شمسی می‌شود ۱۰ آبان تا ۹ آذر
+	 * — نه یک ماه شمسی، بلکه یک بازه کج که هم بخشی از آبان را جا
+	 * می‌گذارد و هم بخشی از آذر را بی‌ربط شامل می‌شود. برای کاربری که
+	 * با تقویم شمسی کار می‌کند این عدد بی‌معنی است.
+	 *
+	 * @param int $offset جابه‌جایی ماه (۰ = این ماه، -۱ = ماه قبل).
+	 * @return string
+	 */
+	private static function month_start( $offset = 0 ) {
+		$offset = (int) $offset;
+
+		if ( ! Sparkknife_Ledger_Date::uses_jalali() ) {
+			$first = gmdate( 'Y-m-01', strtotime( current_time( 'Y-m-01' ) . ' ' . $offset . ' month' ) );
+
+			return $first;
+		}
+
+		list( $jy, $jm ) = self::current_jalali_ym();
+
+		$jm += $offset;
+
+		while ( $jm < 1 ) {
+			$jm += 12;
+			--$jy;
+		}
+
+		while ( $jm > 12 ) {
+			$jm -= 12;
+			++$jy;
+		}
+
+		list( $gy, $gm, $gd ) = Sparkknife_Ledger_Date::jalali_to_gregorian( $jy, $jm, 1 );
+
+		return sprintf( '%04d-%02d-%02d', $gy, $gm, $gd );
+	}
+
+	/**
+	 * انتهای ماه جاری (یا ماه‌های قبل) به میلادی.
+	 *
+	 * @param int $offset جابه‌جایی ماه.
+	 * @return string
+	 */
+	private static function month_end( $offset = 0 ) {
+		$offset = (int) $offset;
+
+		if ( ! Sparkknife_Ledger_Date::uses_jalali() ) {
+			$anchor = gmdate( 'Y-m-01', strtotime( current_time( 'Y-m-01' ) . ' ' . $offset . ' month' ) );
+
+			return gmdate( 'Y-m-t', strtotime( $anchor ) );
+		}
+
+		list( $jy, $jm ) = self::current_jalali_ym();
+
+		$jm += $offset;
+
+		while ( $jm < 1 ) {
+			$jm += 12;
+			--$jy;
+		}
+
+		while ( $jm > 12 ) {
+			$jm -= 12;
+			++$jy;
+		}
+
+		// طول ماه شمسی: نیمه اول سال ۳۱ روز، نیمه دوم ۳۰ روز، اسفند ۲۹ یا ۳۰.
+		if ( $jm <= 6 ) {
+			$jd = 31;
+		} elseif ( $jm <= 11 ) {
+			$jd = 30;
+		} else {
+			$jd = Sparkknife_Ledger_Date::is_jalali_leap( $jy ) ? 30 : 29;
+		}
+
+		list( $gy, $gm, $gd ) = Sparkknife_Ledger_Date::jalali_to_gregorian( $jy, $jm, $jd );
+
+		return sprintf( '%04d-%02d-%02d', $gy, $gm, $gd );
+	}
+
+	/**
+	 * سال و ماه شمسی امروز.
+	 *
+	 * @return array{0: int, 1: int}
+	 */
+	private static function current_jalali_ym() {
+		$today = current_time( 'Y-m-d' );
+
+		list( $jy, $jm ) = Sparkknife_Ledger_Date::gregorian_to_jalali(
+			(int) substr( $today, 0, 4 ),
+			(int) substr( $today, 5, 2 ),
+			(int) substr( $today, 8, 2 )
+		);
+
+		return array( (int) $jy, (int) $jm );
 	}
 
 	/**

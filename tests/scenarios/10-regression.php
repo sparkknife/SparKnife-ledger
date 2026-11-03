@@ -833,6 +833,56 @@ if ( is_wp_error( $too_long ) ) {
 $one_char = $ps->create( array( 'name' => 'ا', 'phone' => '09125550400' ) );
 spk_assert( is_wp_error( $one_char ), 'نام تک‌نویسه رد می‌شود' );
 
+// ── ۲۵ز: «این ماه» در تقویم شمسی، ماه شمسی است ───────────────────
+// بازه‌های آماده همیشه میلادی حساب می‌شدند: «این ماه» از ۱ تا ۳۰ نوامبر
+// می‌رفت که در شمسی می‌شود ۱۰ آبان تا ۹ آذر — نه یک ماه، بلکه بازه‌ای کج
+// که هم بخشی از آبان را جا می‌گذاشت و هم بخشی از آذر را بی‌ربط شامل می‌شد.
+$presets = Sparkknife_Ledger_Ledger_Service::preset_ranges();
+
+$month_start = $presets['this_month']['from'];
+$month_end   = $presets['this_month']['to'];
+
+spk_assert( '' !== $month_start && '' !== $month_end, 'بازه «این ماه» پر است' );
+spk_assert( $month_start <= $month_end, 'شروع ماه پیش از پایان آن است' );
+
+// شروع باید اول ماه شمسی باشد: ۱ فروردین تا ۱ اسفند.
+list( $sy, $sm, $sd ) = Sparkknife_Ledger_Date::gregorian_to_jalali(
+	(int) substr( $month_start, 0, 4 ),
+	(int) substr( $month_start, 5, 2 ),
+	(int) substr( $month_start, 8, 2 )
+);
+spk_equals( 1, (int) $sd, '«این ماه» از روز اول ماه شمسی شروع می‌شود' );
+
+// پایان باید آخرین روز همان ماه شمسی باشد.
+list( $ey, $em, $ed ) = Sparkknife_Ledger_Date::gregorian_to_jalali(
+	(int) substr( $month_end, 0, 4 ),
+	(int) substr( $month_end, 5, 2 ),
+	(int) substr( $month_end, 8, 2 )
+);
+spk_equals( (int) $sy, (int) $ey, 'سال شروع و پایان «این ماه» یکی است' );
+spk_equals( (int) $sm, (int) $em, 'ماه شروع و پایان «این ماه» یکی است' );
+
+$expected_last_day = (int) $sm <= 6 ? 31 : ( (int) $sm <= 11 ? 30 : ( Sparkknife_Ledger_Date::is_jalali_leap( (int) $sy ) ? 30 : 29 ) );
+spk_equals( $expected_last_day, (int) $ed, '«این ماه» تا آخرین روز ماه شمسی ادامه دارد' );
+
+// ماه گذشته باید ماه شمسی قبلی باشد.
+list( $py, $pm ) = Sparkknife_Ledger_Date::gregorian_to_jalali(
+	(int) substr( $presets['last_month']['from'], 0, 4 ),
+	(int) substr( $presets['last_month']['from'], 5, 2 ),
+	(int) substr( $presets['last_month']['from'], 8, 2 )
+);
+
+$expected_prev = (int) $sm - 1;
+$expected_prev_year = (int) $sy;
+
+if ( $expected_prev < 1 ) {
+	$expected_prev      = 12;
+	$expected_prev_year = (int) $sy - 1;
+}
+
+spk_equals( (string) $expected_prev, (string) $pm, '«ماه گذشته» ماه شمسی قبلی است' );
+spk_equals( (string) $expected_prev_year, (string) $py, 'سال «ماه گذشته» درست است' );
+
 // ── ۲۶: جستجو با ارقام فارسی ─────────────────────────────────────
 $p0 = mb_chr( 0x06F0, 'UTF-8' ); // ۰
 $p1 = mb_chr( 0x06F1, 'UTF-8' ); // ۱
