@@ -134,7 +134,12 @@ class Sparkknife_Ledger_Audit_Repository {
 			 * می‌کرد جستجو کار کرده. با هزاران رکورد ممیزی، پیدا کردن
 			 * یک تغییر عملاً ناممکن بود.
 			 */
-			$like   = '%' . $wpdb->esc_like( (string) $args['search'] ) . '%';
+			/*
+			 * روی `$wpdb->esc_like()` تکیه نمی‌کنیم: درایور SQLite وردپرس
+			 * آن را بی‌اثر پیاده کرده است و جستجوی `%` همهٔ ردیف‌ها را
+			 * برمی‌گرداند. `like_pattern()` خودش escape می‌کند.
+			 */
+			$like   = Sparkknife_Ledger_Sanitizer::like_pattern( (string) $args['search'] );
 			$fields = array( 'summary', 'changes', 'ip_address' );
 
 			/*
@@ -148,7 +153,17 @@ class Sparkknife_Ledger_Audit_Repository {
 				$fields[] = 'user_login';
 			}
 
-			$where[] = '(' . implode( ' LIKE %s OR ', $fields ) . ' LIKE %s)';
+			/*
+			 * `ESCAPE` باید روی هر شرط بیاید، نه یک بار برای کل عبارت:
+			 * هر ستون یک `LIKE` مستقل است.
+			 */
+			$clauses = array();
+
+			foreach ( $fields as $field ) {
+				$clauses[] = $field . " LIKE %s ESCAPE '" . Sparkknife_Ledger_Sanitizer::LIKE_ESCAPE . "'";
+			}
+
+			$where[] = '(' . implode( ' OR ', $clauses ) . ')';
 
 			foreach ( $fields as $unused ) {
 				$params[] = $like;

@@ -120,9 +120,12 @@ class Sparkknife_Ledger_Person_Repository {
 			$variants = Sparkknife_Ledger_Sanitizer::search_variants( $search );
 			$clauses  = array();
 
+			$esc = Sparkknife_Ledger_Sanitizer::LIKE_ESCAPE;
+
 			foreach ( $variants as $variant ) {
-				$like      = '%' . $wpdb->esc_like( $variant ) . '%';
-				$clauses[] = '(name LIKE %s OR phone LIKE %s OR description LIKE %s)';
+				// `like_pattern()` جای `esc_like()` که در SQLite بی‌اثر است.
+				$like      = Sparkknife_Ledger_Sanitizer::like_pattern( $variant );
+				$clauses[] = "(name LIKE %s ESCAPE '{$esc}' OR phone LIKE %s ESCAPE '{$esc}' OR description LIKE %s ESCAPE '{$esc}')";
 				$params[]  = $like;
 				$params[]  = $like;
 				$params[]  = $like;

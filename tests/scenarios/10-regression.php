@@ -1878,6 +1878,133 @@ spk_assert(
 	'علامت درصد در جستجو wildcard نمی‌شود'
 );
 
+// ── ۲۶: escape جستجو به درایور دیتابیس وابسته نیست ─────────────────────
+//
+// `$wpdb->esc_like()` فقط در MySQL درست کار می‌کند. درایور SQLite وردپرس
+// (SQLite Database Integration) آن را بی‌اثر پیاده کرده است:
+//
+//     esc_like('%')   → '%'      (نه '\%')
+//     esc_like('_')   → '_'
+//
+// یعنی روی SQLite جستجوی `%` **همهٔ** ردیف‌ها را می‌گیرد و `_` هر نویسه‌ای
+// را. پیشوند شمارهٔ تراکنش هم که `_` دارد، شمارهٔ بعدی را از ردیف اشتباه
+// حساب می‌کند.
+//
+// این تست به درایور وابسته نیست: خودِ escape و رفتار `LIKE` را با `ESCAPE`
+// صریح می‌سنجد، پس روی MySQL و SQLite یکسان نتیجه می‌دهد.
+
+spk_equals( '!', Sparkknife_Ledger_Sanitizer::LIKE_ESCAPE, 'نویسهٔ فرار، ! است — نه بک‌اسلش' );
+
+spk_equals( '%!%%', Sparkknife_Ledger_Sanitizer::like_pattern( '%' ), 'درصد escape می‌شود' );
+spk_equals( '%!_%', Sparkknife_Ledger_Sanitizer::like_pattern( '_' ), 'زیرخط escape می‌شود' );
+spk_equals( '%!!%', Sparkknife_Ledger_Sanitizer::like_pattern( '!' ), 'خودِ نویسهٔ فرار escape می‌شود' );
+spk_equals( '%علی%', Sparkknife_Ledger_Sanitizer::like_pattern( 'علی' ), 'متن ساده دست‌نخورده می‌ماند' );
+
+// بک‌اسلش دیگر نویسهٔ فرار نیست، پس نباید دست‌کاری شود.
+spk_assert(
+	false !== mb_strpos( Sparkknife_Ledger_Sanitizer::like_pattern( 'a\\b' ), '\\' ),
+	'بک‌اسلش در الگو دست‌نخورده می‌ماند'
+);
+
+spk_equals( 'علی%', Sparkknife_Ledger_Sanitizer::like_prefix( 'علی' ), 'like_prefix از ابتدا تطبیق می‌دهد' );
+spk_equals( 'pri!%fix%', Sparkknife_Ledger_Sanitizer::like_prefix( 'pri%fix' ), 'like_prefix درصد را escape می‌کند' );
+spk_equals( 'a!_b!_%', Sparkknife_Ledger_Sanitizer::like_prefix( 'a_b_' ), 'like_prefix همهٔ زیرخط‌ها را escape می‌کند' );
+
+/*
+ * آزمون رفتاری: نام‌هایی که wildcard می‌سازند. جستجوی `%` نباید همه را
+ * برگرداند و جستجوی `x_y` نباید `xzy` را بگیرد.
+ */
+$esc_persons = Sparkknife_Ledger_DB::persons_table();
+$esc_tag     = 'esc' . wp_rand( 10000, 99999 );
+
+$esc_pct = Sparkknife_Ledger_Person_Repository::instance()->insert(
+	array( 'name' => 'takhfif' . $esc_tag . '-50%', 'phone' => '09126660001', 'description' => '', 'status' => 'active' )
+);
+$esc_und = Sparkknife_Ledger_Person_Repository::instance()->insert(
+	array( 'name' => 'zir' . $esc_tag . '-khat_', 'phone' => '09126660002', 'description' => '', 'status' => 'active' )
+);
+$esc_xzy = Sparkknife_Ledger_Person_Repository::instance()->insert(
+	array( 'name' => 'zir' . $esc_tag . '-khatX', 'phone' => '09126660003', 'description' => '', 'status' => 'active' )
+);
+
+spk_assert( $esc_pct > 0 && $esc_und > 0 && $esc_xzy > 0, 'سه شخص آزمون escape ساخته شدند' );
+
+$esc_repo = Sparkknife_Ledger_Person_Repository::instance();
+
+// درصد: فقط شخصی که واقعاً درصد دارد.
+$esc_pct_result = $esc_repo->query( array( 'search' => '%', 'per_page' => 200 ) );
+$esc_pct_ids    = array_map( 'intval', wp_list_pluck( $esc_pct_result['items'], 'id' ) );
+
+spk_assert( in_array( (int) $esc_pct, $esc_pct_ids, true ), 'جستجوی درصد، شخص دارای درصد را پیدا می‌کند' );
+
+$esc_all = $esc_repo->query( array( 'per_page' => 200 ) );
+
+spk_assert(
+	(int) $esc_pct_result['total'] < (int) $esc_all['total'],
+	'جستجوی درصد همهٔ اشخاص را برنمی‌گرداند'
+);
+spk_assert(
+	! in_array( (int) $esc_und, $esc_pct_ids, true ),
+	'شخص بدون درصد در جستجوی درصد نمی‌آید'
+);
+
+// زیرخط: باید `khat_` را بگیرد و `khatX` را نه.
+$esc_und_result = $esc_repo->query( array( 'search' => $esc_tag . '-khat_', 'per_page' => 200 ) );
+$esc_und_ids    = array_map( 'intval', wp_list_pluck( $esc_und_result['items'], 'id' ) );
+
+spk_assert( in_array( (int) $esc_und, $esc_und_ids, true ), 'جستجوی زیرخط، شخص دارای زیرخط را پیدا می‌کند' );
+spk_assert( ! in_array( (int) $esc_xzy, $esc_und_ids, true ), 'زیرخط در جستجو هر نویسه‌ای را نمی‌گیرد' );
+
+// گزارش جمعی هم از همان مسیر جستجو می‌گذرد.
+$esc_report = Sparkknife_Ledger_Report_Service::instance()->get_summary_report(
+	array( 'range' => 'all', 'search' => '%' )
+);
+$esc_report_names = wp_list_pluck( $esc_report['rows'], 'name' );
+$esc_report_has_und = false;
+
+foreach ( $esc_report_names as $esc_name ) {
+	if ( false !== mb_strpos( (string) $esc_name, $esc_tag . '-khat_' ) ) {
+		$esc_report_has_und = true;
+	}
+}
+
+spk_assert( false === $esc_report_has_und, 'گزارش جمعی با جستجوی درصد، شخص بدون درصد را نمی‌آورد' );
+
+/*
+ * تولید شمارهٔ تراکنش با پیشوندی که زیرخط دارد.
+ *
+ * کوئری «آخرین شماره» با `LIKE 'PREFIX-YYYYMMDD-%'` کار می‌کند. اگر `_`
+ * escape نشود، در `LIKE` یعنی «هر نویسه» و شمارهٔ بعدی از ردیف پیشوند
+ * دیگری حساب می‌شود. با escape درست، `A_B` فقط با `A_B` تطبیق می‌یابد.
+ */
+$esc_prev_prefix = Sparkknife_Ledger_Settings::get( 'reference_prefix', 'TXN' );
+$esc_date        = '2026-11-04';
+
+Sparkknife_Ledger_Settings::save( array( 'reference_prefix' => 'A_B' ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+$esc_ref_a = Sparkknife_Ledger_Transaction_Service::instance()->generate_reference( $esc_date );
+
+spk_assert( is_string( $esc_ref_a ) && '' !== $esc_ref_a, 'تولید شماره با پیشوند زیرخط‌دار کار می‌کند' );
+spk_assert( 0 === strpos( $esc_ref_a, 'A_B-' ), 'شماره با همان پیشوند ساخته می‌شود' );
+
+// پیشوندی که با یک نویسه فرق دارد نباید شمارهٔ A_B را جلو ببرد.
+Sparkknife_Ledger_Settings::save( array( 'reference_prefix' => 'AxB' ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+$esc_ref_b = Sparkknife_Ledger_Transaction_Service::instance()->generate_reference( $esc_date );
+
+spk_assert(
+	false !== mb_strpos( (string) $esc_ref_b, '0001' ),
+	'پیشوند مشابه با نویسهٔ متفاوت شماره را جلو نمی‌برد'
+);
+
+Sparkknife_Ledger_Settings::save( array( 'reference_prefix' => $esc_prev_prefix ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+// پاک‌سازی.
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$esc_persons} WHERE id IN (%d, %d, %d)", $esc_pct, $esc_und, $esc_xzy ) );
+
 // ── ۲۵خ: تاریخچه می‌گوید **چه کسی** تغییر داده، حتی اگر حسابش حذف شده باشد ──
 //
 // ویوها پیش‌تر با `get_userdata()` مستقیم نام کاربر را می‌گرفتند. اگر کاربر

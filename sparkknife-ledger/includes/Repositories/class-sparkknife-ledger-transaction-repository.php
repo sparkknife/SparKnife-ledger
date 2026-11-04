@@ -194,9 +194,12 @@ class Sparkknife_Ledger_Transaction_Repository {
 			$variants = Sparkknife_Ledger_Sanitizer::search_variants( trim( (string) $args['search'] ) );
 			$clauses  = array();
 
+			$esc = Sparkknife_Ledger_Sanitizer::LIKE_ESCAPE;
+
 			foreach ( $variants as $variant ) {
-				$like      = '%' . $wpdb->esc_like( $variant ) . '%';
-				$clauses[] = '(t.reference LIKE %s OR t.description LIKE %s OR p.name LIKE %s)';
+				// `like_pattern()` جای `esc_like()` که در SQLite بی‌اثر است.
+				$like      = Sparkknife_Ledger_Sanitizer::like_pattern( $variant );
+				$clauses[] = "(t.reference LIKE %s ESCAPE '{$esc}' OR t.description LIKE %s ESCAPE '{$esc}' OR p.name LIKE %s ESCAPE '{$esc}')";
 				$params[]  = $like;
 				$params[]  = $like;
 				$params[]  = $like;

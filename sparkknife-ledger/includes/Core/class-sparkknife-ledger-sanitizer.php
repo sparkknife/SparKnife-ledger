@@ -438,6 +438,75 @@ class Sparkknife_Ledger_Sanitizer {
 	}
 
 	/**
+	 * نویسهٔ فرار برای `LIKE`.
+	 *
+	 * `!` انتخاب شد چون در SQL هیچ معنای خاصی ندارد. بک‌اسلش گزینهٔ
+	 * بدی است: MySQL و SQLite هر دو آن را در رشته‌های SQL تفسیر می‌کنند
+	 * و چند لایهٔ نقل‌قول (PHP → prepare → موتور) آن را ناپایدار
+	 * می‌کند.
+	 *
+	 * @var string
+	 */
+	const LIKE_ESCAPE = '!';
+
+	/**
+	 * آماده‌سازی عبارت برای `LIKE`.
+	 *
+	 * روی `$wpdb->esc_like()` تکیه نمی‌کنیم. آن تابع فقط در درایور MySQL
+	 * درست کار می‌کند؛ درایور SQLite وردپرس (SQLite Database
+	 * Integration) همان تابع را عملاً بی‌اثر پیاده کرده است:
+	 *
+	 *     esc_like('%')   → '%'      (نه '\%')
+	 *     esc_like('_')   → '_'
+	 *     esc_like('a%b') → 'a%b'
+	 *
+	 * نتیجه روی SQLite این بود که جستجوی `%` در همهٔ فهرست‌ها **همهٔ**
+	 * ردیف‌ها را برمی‌گرداند، `_` هر نویسه‌ای را می‌گرفت، و پیشوند
+	 * شمارهٔ تراکنش که `_` دارد شمارهٔ بعدی را از ردیف اشتباه حساب
+	 * می‌کرد.
+	 *
+	 * استفاده:
+	 *
+	 *     $sql = "… WHERE name LIKE %s ESCAPE '" . Sanitizer::LIKE_ESCAPE . "'";
+	 *     $wpdb->prepare( $sql, Sanitizer::like_pattern( $term ) );
+	 *
+	 * @param string $term عبارت خام کاربر.
+	 * @return string الگوی `LIKE` آماده برای `prepare()`.
+	 */
+	public static function like_pattern( $term ) {
+		return '%' . self::like_escape_wildcards( $term ) . '%';
+	}
+
+	/**
+	 * همان `like_pattern()` برای تطبیق از ابتدا (پیشوندها).
+	 *
+	 * @param string $term عبارت خام.
+	 * @return string
+	 */
+	public static function like_prefix( $term ) {
+		return self::like_escape_wildcards( $term ) . '%';
+	}
+
+	/**
+	 * جانشینی wildcard ها با نسخهٔ escape‌شده.
+	 *
+	 * ترتیب مهم است: نویسهٔ فرار **اول** escape می‌شود تا نتیجهٔ
+	 * escape‌های بعدی دوباره escape نشود.
+	 *
+	 * @param string $term عبارت خام.
+	 * @return string
+	 */
+	private static function like_escape_wildcards( $term ) {
+		$escape = self::LIKE_ESCAPE;
+
+		return str_replace(
+			array( $escape, '%', '_' ),
+			array( $escape . $escape, $escape . '%', $escape . '_' ),
+			(string) $term
+		);
+	}
+
+	/**
 	 * اعتبارسنجی Nonce و توقف در صورت خطا.
 	 *
 	 * @param string $action نام action.

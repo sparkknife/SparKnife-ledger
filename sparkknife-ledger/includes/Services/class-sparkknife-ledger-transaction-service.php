@@ -99,8 +99,8 @@ class Sparkknife_Ledger_Transaction_Service {
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$last = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT reference FROM {$table} WHERE reference LIKE %s ORDER BY id DESC LIMIT 1",
-				$wpdb->esc_like( $stem ) . '%'
+				"SELECT reference FROM {$table} WHERE reference LIKE %s ESCAPE '" . Sparkknife_Ledger_Sanitizer::LIKE_ESCAPE . "' ORDER BY id DESC LIMIT 1",
+				Sparkknife_Ledger_Sanitizer::like_prefix( $stem )
 			)
 		);
 
