@@ -31,7 +31,7 @@ define( 'SPARKKNIFE_LEDGER_URL', plugin_dir_url( __FILE__ ) );
 define( 'SPARKKNIFE_LEDGER_BASENAME', plugin_basename( __FILE__ ) );
 
 /** نسخه اسکیما؛ فقط هنگام تغییر ساختار جداول افزایش می‌یابد. */
-define( 'SPARKKNIFE_LEDGER_DB_VERSION', '1.0.0' );
+define( 'SPARKKNIFE_LEDGER_DB_VERSION', '1.1.0' );
 
 /** پیشوند جداول اختصاصی (بدون $wpdb->prefix که در زمان اجرا اضافه می‌شود). */
 define( 'SPARKKNIFE_LEDGER_TABLE_PREFIX', 'sparkknife_ledger_' );
