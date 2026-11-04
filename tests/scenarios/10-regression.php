@@ -2529,6 +2529,313 @@ if ( $warn_person > 0 ) {
 	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}sparkknife_ledger_persons WHERE id = %d", $warn_person ) );
 }
 
+// ── ۳۰: مرتب‌سازی الفبای فارسی در فهرست اشخاص ───────────────────────
+//
+// `ORDER BY name` مقایسهٔ بایتی UTF-8 می‌کند. پنج حرف فارسی بیرون از
+// بازهٔ `ا`–`ف` هستند:
+//
+//   پ U+067E · چ U+0686 · ک U+06A9 · گ U+06AF · ی U+06CC
+//
+// پس دیتابیس آن‌ها را **بعد از** `ی` می‌آورد:
+//   … مهدی · نازنین · هما · وحید · پرویز · چنگیز · کاوه · گلناز · یوسف
+//
+// یعنی فهرست اشخاص برای کاربر فارسی‌زبان مرتب نیست و پیدا کردن نام با
+// چشم ممکن نیست. درایور SQLite حتی `COLLATE` فارسی ندارد، پس مرتب‌سازی
+// در PHP و روی ستون ماندگارِ `sort_key` انجام می‌شود.
+//
+// این بلوک هم خودِ تابع کلید را می‌سنجد و هم سه مسیر واقعی کوئری را.
+
+$sort_expected = array( 'آرش', 'بهرام', 'پرویز', 'تارا', 'ثریا', 'جلال', 'چنگیز', 'حسن', 'خسرو', 'داوود', 'ذبیح', 'رستم', 'زهرا', 'ژاله', 'سارا', 'شیرین', 'صادق', 'ضیا', 'طاهره', 'ظریف', 'علی', 'غلام', 'فرهاد', 'قاسم', 'کاوه', 'گلناز', 'لیلا', 'مهدی', 'نازنین', 'وحید', 'هما', 'یوسف' );
+
+$sort_shuffled = $sort_expected;
+shuffle( $sort_shuffled );
+
+usort(
+	$sort_shuffled,
+	function ( $a, $b ) {
+		return strcmp(
+			Sparkknife_Ledger_Sanitizer::persian_sort_key( $a ),
+			Sparkknife_Ledger_Sanitizer::persian_sort_key( $b )
+		);
+	}
+);
+
+spk_equals(
+	wp_json_encode( $sort_expected ),
+	wp_json_encode( $sort_shuffled ),
+	'کلید مرتب‌سازی، هر ۳۲ حرف الفبای فارسی را درست می‌چیند',
+	wp_json_encode( $sort_shuffled )
+);
+
+/*
+ * حرف‌هایی که ترتیب بایتی خراب می‌کند، تک‌تک سنجیده می‌شوند تا اگر
+ * روزی کسی جدول ترتیب را دست بزند، دقیقاً همان جفت شکست بخورد.
+ */
+$sort_pairs = array(
+	array( 'آرش', 'بهرام', 'آ پیش از ب' ),
+	array( 'بهرام', 'پرویز', 'ب پیش از پ' ),
+	array( 'پرویز', 'تارا', 'پ پیش از ت — در UTF-8 پ بعد از ف است' ),
+	array( 'جلال', 'چنگیز', 'ج پیش از چ' ),
+	array( 'چنگیز', 'حسن', 'چ پیش از ح' ),
+	array( 'قاسم', 'کاوه', 'ق پیش از ک' ),
+	array( 'کاوه', 'گلناز', 'ک پیش از گ' ),
+	array( 'گلناز', 'لیلا', 'گ پیش از ل' ),
+	array( 'هما', 'یوسف', 'ه پیش از ی' ),
+);
+
+foreach ( $sort_pairs as $sort_pair ) {
+	spk_assert(
+		Sparkknife_Ledger_Sanitizer::persian_sort_key( $sort_pair[0] ) < Sparkknife_Ledger_Sanitizer::persian_sort_key( $sort_pair[1] ),
+		'کلید مرتب‌سازی: ' . $sort_pair[2]
+	);
+}
+
+/*
+ * ارقام باید ترتیب عددی بدهند، نه رقم‌به‌رقم.
+ * کدگذاری سادهٔ رقم‌به‌رقم «۱۰» را پیش از «۲» می‌آورد.
+ */
+$sort_numbers = array( 'شخص ۱', 'شخص ۲', 'شخص ۳', 'شخص ۹', 'شخص ۱۰', 'شخص ۱۰۰' );
+$sort_num_mixed = array_reverse( $sort_numbers );
+
+usort(
+	$sort_num_mixed,
+	function ( $a, $b ) {
+		return strcmp(
+			Sparkknife_Ledger_Sanitizer::persian_sort_key( $a ),
+			Sparkknife_Ledger_Sanitizer::persian_sort_key( $b )
+		);
+	}
+);
+
+spk_equals(
+	wp_json_encode( $sort_numbers ),
+	wp_json_encode( $sort_num_mixed ),
+	'کلید مرتب‌سازی، ارقام را عددی می‌چیند: ۱ · ۲ · ۹ · ۱۰ · ۱۰۰'
+);
+
+// حروف لاتین نباید با حروف فارسی قاطی شوند.
+spk_assert(
+	Sparkknife_Ledger_Sanitizer::persian_sort_key( 'Ali' ) !== Sparkknife_Ledger_Sanitizer::persian_sort_key( 'علی' ),
+	'کلید مرتب‌سازی، لاتین و فارسی را یکی نمی‌کند'
+);
+
+// «ي» و «ك» عربی باید همان کلید «ی» و «ک» فارسی بدهند.
+spk_equals(
+	Sparkknife_Ledger_Sanitizer::persian_sort_key( 'علی' ),
+	Sparkknife_Ledger_Sanitizer::persian_sort_key( "علي" ),
+	'کلید مرتب‌سازی، املای عربی «ي» را با «ی» یکی می‌کند'
+);
+
+spk_equals(
+	Sparkknife_Ledger_Sanitizer::persian_sort_key( 'کاوه' ),
+	Sparkknife_Ledger_Sanitizer::persian_sort_key( "كاوه" ),
+	'کلید مرتب‌سازی، املای عربی «ك» را با «ک» یکی می‌کند'
+);
+
+/*
+ * اکنون سه مسیر واقعی. نام‌ها عمداً طوری انتخاب شده‌اند که هر پنج حرف
+ * مشکل‌دار در آن‌ها باشد؛ با ترتیب بایتی، «پرویز» و «چنگیز» و «کاوه» و
+ * «گلناز» به انتهای فهرست می‌پریدند.
+ */
+$sort_marker = 'SORT' . wp_generate_password( 6, false, false );
+
+/*
+ * نام‌ها عمداً طوری چیده شده‌اند که **ترتیب بایتی و ترتیب فارسی
+ * مختلف** باشند. با نام‌هایی که فقط `پ چ ک گ ی` دارند و همه بعد از
+ * یک حرف پایه می‌آیند، هر دو ترتیب یکسان می‌شوند و آزمون چیزی را
+ * اثبات نمی‌کند.
+ *
+ *   ترتیب فارسی : پرویز · تارا · چنگیز · حسن · گلناز · لیلا
+ *   ترتیب بایتی : تارا · حسن · لیلا · پرویز · چنگیز · گلناز
+ */
+$sort_names = array(
+	'لیلا ' . $sort_marker,
+	'گلناز ' . $sort_marker,
+	'حسن ' . $sort_marker,
+	'چنگیز ' . $sort_marker,
+	'تارا ' . $sort_marker,
+	'پرویز ' . $sort_marker,
+);
+
+$sort_expected_names = array( 'پرویز', 'تارا', 'چنگیز', 'حسن', 'گلناز', 'لیلا' );
+
+$sort_ids = array();
+
+foreach ( $sort_names as $sort_name ) {
+	$sort_id = Sparkknife_Ledger_Person_Repository::instance()->insert(
+		array( 'name' => $sort_name, 'phone' => '', 'description' => '', 'status' => 'active' )
+	);
+
+	spk_assert( $sort_id > 0, 'شخص آزمایشی مرتب‌سازی ساخته شد: ' . $sort_name );
+
+	if ( $sort_id > 0 ) {
+		$sort_ids[] = (int) $sort_id;
+	}
+}
+
+// (۱) ستون sort_key هنگام درج پر می‌شود.
+global $wpdb;
+
+$sort_stored = $wpdb->get_var(
+	$wpdb->prepare(
+		"SELECT sort_key FROM {$wpdb->prefix}sparkknife_ledger_persons WHERE name = %s",
+		'پرویز ' . $sort_marker
+	)
+);
+
+spk_assert( ! empty( $sort_stored ), 'ستون sort_key هنگام درج شخص پر می‌شود' );
+
+// (۲) get_all() — فهرست انتخاب‌گر — با ترتیب فارسی برمی‌گردد.
+$sort_all = Sparkknife_Ledger_Person_Repository::instance()->get_all();
+$sort_seen = array();
+
+foreach ( $sort_all as $sort_row ) {
+	if ( false !== strpos( (string) $sort_row->name, $sort_marker ) ) {
+		$sort_seen[] = trim( str_replace( $sort_marker, '', (string) $sort_row->name ) );
+	}
+}
+
+spk_equals(
+	wp_json_encode( $sort_expected_names ),
+	wp_json_encode( $sort_seen ),
+	'get_all() نام‌ها را با الفبای فارسی می‌چیند، نه بایتی',
+	wp_json_encode( $sort_seen )
+);
+
+// (۳) query() با orderby=name — فهرست اصلی اشخاص.
+$sort_query = Sparkknife_Ledger_Person_Repository::instance()->query(
+	array( 'orderby' => 'name', 'order' => 'ASC', 'per_page' => 500, 'search' => $sort_marker )
+);
+
+$sort_query_names = array();
+
+foreach ( $sort_query['items'] as $sort_item ) {
+	$sort_query_names[] = trim( str_replace( $sort_marker, '', (string) $sort_item->name ) );
+}
+
+spk_equals(
+	wp_json_encode( $sort_expected_names ),
+	wp_json_encode( $sort_query_names ),
+	'query(orderby=name) با الفبای فارسی مرتب می‌شود',
+	wp_json_encode( $sort_query_names )
+);
+
+// جهت نزولی هم باید همین ترتیب را برگرداند.
+$sort_desc = Sparkknife_Ledger_Person_Repository::instance()->query(
+	array( 'orderby' => 'name', 'order' => 'DESC', 'per_page' => 500, 'search' => $sort_marker )
+);
+
+$sort_desc_names = array();
+
+foreach ( $sort_desc['items'] as $sort_item ) {
+	$sort_desc_names[] = trim( str_replace( $sort_marker, '', (string) $sort_item->name ) );
+}
+
+spk_equals(
+	wp_json_encode( array_reverse( $sort_expected_names ) ),
+	wp_json_encode( $sort_desc_names ),
+	'query(orderby=name, order=DESC) دقیقاً برعکس است',
+	wp_json_encode( $sort_desc_names )
+);
+
+/*
+ * (۴) ویرایش نام باید کلید را به‌روز کند.
+ * اگر نشود، شخص پس از تغییر نام در جای قدیمی فهرست می‌ماند — باگی که
+ * فقط با بازسازی کلید در insert دیده نمی‌شود.
+ */
+if ( ! empty( $sort_ids ) ) {
+	$sort_edit_id = $sort_ids[0];
+
+	Sparkknife_Ledger_Person_Repository::instance()->update(
+		$sort_edit_id,
+		array( 'name' => 'آذرین ' . $sort_marker, 'phone' => '', 'description' => '', 'status' => 'active' )
+	);
+
+	$sort_after_edit = Sparkknife_Ledger_Person_Repository::instance()->query(
+		array( 'orderby' => 'name', 'order' => 'ASC', 'per_page' => 500, 'search' => $sort_marker )
+	);
+
+	spk_equals(
+		'آذرین',
+		trim( str_replace( $sort_marker, '', (string) $sort_after_edit['items'][0]->name ) ),
+		'ویرایش نام، کلید مرتب‌سازی را به‌روز می‌کند (آ در ابتدای فهرست)'
+	);
+
+	spk_equals( count( $sort_names ), count( $sort_after_edit['items'] ), 'ویرایش نام شخص تازه نمی‌سازد' );
+}
+
+/*
+ * (۵) backfill: ردیف قدیمی که sort_key ندارد باید پر شود.
+ *
+ * مهاجرت مسیر واقعی ارتقاست؛ اگر این کار نکند، همهٔ اشخاص موجود پس از
+ * به‌روزرسانی با کلید خالی در ابتدای فهرست جمع می‌شوند — یعنی ترتیب
+ * دقیقاً همان‌قدر غلط می‌ماند که قبل از اصلاح بود.
+ */
+if ( ! empty( $sort_ids ) ) {
+	$backfill_id = $sort_ids[1];
+
+	$wpdb->query(
+		$wpdb->prepare(
+			"UPDATE {$wpdb->prefix}sparkknife_ledger_persons SET sort_key = '' WHERE id = %d",
+			$backfill_id
+		)
+	);
+
+	$backfill_count = Sparkknife_Ledger_Installer::backfill_sort_keys();
+
+	spk_assert( $backfill_count >= 1, 'backfill_sort_keys() ردیف بدون کلید را پیدا می‌کند' );
+
+	$backfill_key = $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT sort_key FROM {$wpdb->prefix}sparkknife_ledger_persons WHERE id = %d",
+			$backfill_id
+		)
+	);
+
+	spk_assert( ! empty( $backfill_key ), 'backfill_sort_keys() کلید خالی را پر می‌کند' );
+}
+
+/*
+ * (۶) رگرسیون صفحه‌بندی: مرتب‌سازی باید **پیش از** برش صفحه انجام شود.
+ *
+ * اگر کسی دوباره وسوسه شود که `LIMIT` را قبل از مرتب‌سازی PHP بگذارد،
+ * صفحهٔ دوم ردیف‌های اشتباه می‌دهد. با هفت ردیف و per_page=۳، سه صفحهٔ
+ * پشت‌سرهم باید همان مجموعهٔ مرتب‌شده را بدون تکرار و بدون جاافتادن
+ * بسازند.
+ */
+$sort_page_names = array();
+
+for ( $sort_page = 1; $sort_page <= 3; $sort_page++ ) {
+	$sort_page_result = Sparkknife_Ledger_Person_Repository::instance()->query(
+		array( 'orderby' => 'name', 'order' => 'ASC', 'per_page' => 3, 'page' => $sort_page, 'search' => $sort_marker )
+	);
+
+	foreach ( $sort_page_result['items'] as $sort_item ) {
+		$sort_page_names[] = trim( str_replace( $sort_marker, '', (string) $sort_item->name ) );
+	}
+}
+
+/*
+ * اولین شخص فهرست («لیلا») به «آذرین» تغییر نام یافت، پس در انتظار
+ * صفحه‌بندی «لیلا» نیست و «آذرین» اول آمده است. تعداد ردیف‌ها همان
+ * شش‌تاست: ویرایش نام ردیف تازه نمی‌سازد.
+ */
+$sort_page_expected = array( 'آذرین', 'پرویز', 'تارا', 'چنگیز', 'حسن', 'گلناز' );
+
+spk_equals( count( $sort_names ), count( $sort_page_expected ), 'صفحه‌بندی: تعداد ردیف‌ها با تعداد اشخاص ساخته‌شده یکی است' );
+
+spk_equals(
+	wp_json_encode( $sort_page_expected ),
+	wp_json_encode( $sort_page_names ),
+	'صفحه‌بندی با orderby=name ترتیب را می‌شکند نه ردیف‌ها را (۳ صفحه)',
+	wp_json_encode( $sort_page_names )
+);
+
+// تمیزکاری.
+foreach ( $sort_ids as $sort_id ) {
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}sparkknife_ledger_persons WHERE id = %d", $sort_id ) );
+}
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
