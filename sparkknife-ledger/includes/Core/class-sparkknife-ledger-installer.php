@@ -203,6 +203,7 @@ class Sparkknife_Ledger_Installer {
 			 */
 			self::create_tables();
 			Sparkknife_Ledger_DB::flush_table_cache();
+			self::backfill_sort_keys();
 			Sparkknife_Ledger_Settings::install_defaults();
 			Sparkknife_Ledger_Capabilities::add_capabilities();
 
@@ -216,6 +217,7 @@ class Sparkknife_Ledger_Installer {
 			Sparkknife_Ledger_Capabilities::add_capabilities();
 		} else {
 			self::create_tables();
+			Sparkknife_Ledger_DB::flush_table_cache();
 			self::run_migrations( $installed );
 		}
 
@@ -229,7 +231,7 @@ class Sparkknife_Ledger_Installer {
 	 */
 	private static function structure_is_intact() {
 		$required = array(
-			Sparkknife_Ledger_DB::persons_table()      => array( 'id', 'name', 'phone', 'status', 'deleted_at', 'created_at', 'updated_at' ),
+			Sparkknife_Ledger_DB::persons_table()      => array( 'id', 'name', 'phone', 'status', 'sort_key', 'deleted_at', 'created_at', 'updated_at' ),
 			Sparkknife_Ledger_DB::transactions_table() => array( 'id', 'reference', 'person_id', 'type', 'amount', 'txn_date', 'status', 'created_at' ),
 			Sparkknife_Ledger_DB::audit_table()        => array( 'id', 'object_type', 'object_id', 'action', 'changes', 'created_at' ),
 		);
@@ -263,6 +265,12 @@ class Sparkknife_Ledger_Installer {
 		/*
 		 * جدول اشخاص
 		 * - status: active | inactive
+		 * - sort_key: کلید مرتب‌سازی الفبای فارسی (`Sanitizer::persian_sort_key`).
+		 *   `ORDER BY name` ترتیب بایتی UTF-8 می‌دهد و `پ چ ک گ ی` را به انتهای
+		 *   فهرست می‌پراند (باگ ۵۹). کلید عمداً `text` است و نه `varchar(190)`:
+		 *   هر حرف فارسی ۶ نویسه کلید می‌گیرد و نام ۱۹۰ نویسه‌ای ۱۱۴۰ نویسه
+		 *   کلید می‌دهد؛ ستون کوتاه کلید را می‌بُرید و ترتیب نام‌های بلند را
+		 *   دوباره خراب می‌کرد.
 		 * - deleted_at: حذف نرم؛ ردیف‌های حذف‌شده در محاسبات نمی‌آیند اما اطلاعات حفظ می‌شود.
 		 */
 		$sql_persons = "CREATE TABLE {$persons} (
@@ -272,6 +280,7 @@ class Sparkknife_Ledger_Installer {
 			description text NULL,
 			status varchar(20) NOT NULL DEFAULT 'active',
 			created_by bigint(20) unsigned NOT NULL DEFAULT 0,
+			sort_key text NULL,
 			created_at datetime DEFAULT NULL,
 			updated_at datetime DEFAULT NULL,
 			deleted_at datetime DEFAULT NULL,
@@ -367,12 +376,66 @@ class Sparkknife_Ledger_Installer {
 	 * @return void
 	 */
 	private static function run_migrations( $from_version ) {
+		/*
+		 * ستون `sort_key` در نسخهٔ ۱.۱.۰ اضافه شد. `dbDelta` ستون را با
+		 * پیش‌فرض '' می‌سازد و ردیف‌های موجود مقدار درست ندارند؛ بدون
+		 * پر کردن، همهٔ اشخاص کهنه با کلید خالی در ابتدای فهرست جمع
+		 * می‌شدند و ترتیب نام باز هم غلط می‌ماند.
+		 */
+		self::backfill_sort_keys();
+
 		/**
 		 * امکان افزودن مهاجرت توسط توسعه‌دهندگان.
 		 *
 		 * @param string $from_version نسخه قبلی.
 		 */
 		do_action( 'sparkknife_ledger_migrate', $from_version );
+	}
+
+	/**
+	 * پر کردن ستون `sort_key` برای ردیف‌هایی که خالی‌اند.
+	 *
+	 * فقط ردیف‌های خالی به‌روزرسانی می‌شوند: فهرست اشخاص یک دفتر
+	 * خانگی است و بازنویسی کل جدول در هر ارتقا لازم نیست. اگر روزی
+	 * الگوریتم کلید عوض شود، نسخهٔ اسکیما باید بالا برود و همین‌جا
+	 * شرط بازنویسی گسترده‌تر شود.
+	 *
+	 * @return int تعداد ردیف‌های به‌روزرسانی‌شده.
+	 */
+	public static function backfill_sort_keys() {
+		global $wpdb;
+
+		$table = Sparkknife_Ledger_DB::persons_table();
+
+		$suppress = $wpdb->suppress_errors( true );
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results( "SELECT id, name FROM {$table} WHERE sort_key IS NULL OR sort_key = ''" );
+
+		$wpdb->suppress_errors( $suppress );
+
+		if ( empty( $rows ) ) {
+			return 0;
+		}
+
+		$updated = 0;
+
+		foreach ( $rows as $row ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result = $wpdb->update(
+				$table,
+				array( 'sort_key' => Sparkknife_Ledger_Sanitizer::persian_sort_key( (string) $row->name ) ),
+				array( 'id' => (int) $row->id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+
+			if ( false !== $result ) {
+				$updated++;
+			}
+		}
+
+		return $updated;
 	}
 
 	/**

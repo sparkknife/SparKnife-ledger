@@ -144,6 +144,14 @@ class Sparkknife_Ledger_Person_Repository {
 		$orderby = in_array( $args['orderby'], self::sortable_columns(), true ) ? $args['orderby'] : 'created_at';
 		$order   = 'ASC' === strtoupper( (string) $args['order'] ) ? 'ASC' : 'DESC';
 
+		/*
+		 * مرتب‌سازی بر اساس «نام» روی ستون `sort_key` انجام می‌شود، نه
+		 * `name`: ترتیب بایتی UTF-8 ترتیب الفبای فارسی نمی‌دهد و پنج
+		 * حرف (`پ چ ک گ ی`) را به انتهای فهرست می‌پراند (باگ ۵۹).
+		 * سایر ستون‌ها ترتیب بایتی درستی دارند.
+		 */
+		$sort_column = 'name' === $orderby ? 'sort_key' : $orderby;
+
 		$where_sql = implode( ' AND ', $where );
 
 		$count_sql = "SELECT COUNT(*) FROM {$table} WHERE {$where_sql}";
@@ -161,7 +169,7 @@ class Sparkknife_Ledger_Person_Repository {
 		$offset   = ( $page - 1 ) * $per_page;
 
 		// نام ستون از whitelist بالا آمده و جهت مرتب‌سازی ثابت است.
-		$items_sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY {$orderby} {$order}, id DESC LIMIT %d OFFSET %d";
+		$items_sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY {$sort_column} {$order}, id DESC LIMIT %d OFFSET %d";
 
 		$items_params   = $params;
 		$items_params[] = $per_page;
@@ -196,7 +204,7 @@ class Sparkknife_Ledger_Person_Repository {
 		}
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$rows = $wpdb->get_results( "SELECT id, name, phone, status FROM {$table} WHERE {$where} ORDER BY name ASC" );
+		$rows = $wpdb->get_results( "SELECT id, name, phone, status FROM {$table} WHERE {$where} ORDER BY sort_key ASC" );
 
 		return is_array( $rows ) ? $rows : array();
 	}
@@ -225,7 +233,7 @@ class Sparkknife_Ledger_Person_Repository {
 			FROM {$persons} p
 			WHERE p.deleted_at IS NULL
 			   OR EXISTS ( SELECT 1 FROM {$transactions} t WHERE t.person_id = p.id )
-			ORDER BY p.name ASC";
+			ORDER BY p.sort_key ASC";
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$rows = $wpdb->get_results( $sql );
@@ -250,12 +258,13 @@ class Sparkknife_Ledger_Person_Repository {
 			'description' => $data['description'],
 			'status'      => $data['status'],
 			'created_by'  => get_current_user_id(),
+			'sort_key'    => Sparkknife_Ledger_Sanitizer::persian_sort_key( (string) $data['name'] ),
 			'created_at'  => $now,
 			'updated_at'  => $now,
 			'deleted_at'  => null,
 		);
 
-		$formats = array( '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s' );
+		$formats = array( '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$inserted = $wpdb->insert( Sparkknife_Ledger_DB::persons_table(), $row, $formats );
@@ -285,6 +294,11 @@ class Sparkknife_Ledger_Person_Repository {
 			'phone'       => $data['phone'],
 			'description' => $data['description'],
 			'status'      => $data['status'],
+			/*
+			 * تغییر نام باید کلید مرتب‌سازی را هم به‌روز کند، وگرنه
+			 * شخص پس از ویرایش نامش در جای قدیمی فهرست می‌ماند.
+			 */
+			'sort_key'    => Sparkknife_Ledger_Sanitizer::persian_sort_key( (string) $data['name'] ),
 			'updated_at'  => Sparkknife_Ledger_Date::now(),
 		);
 
@@ -293,7 +307,7 @@ class Sparkknife_Ledger_Person_Repository {
 			Sparkknife_Ledger_DB::persons_table(),
 			$row,
 			array( 'id' => (int) $id ),
-			array( '%s', '%s', '%s', '%s', '%s' ),
+			array( '%s', '%s', '%s', '%s', '%s', '%s' ),
 			array( '%d' )
 		);
 
