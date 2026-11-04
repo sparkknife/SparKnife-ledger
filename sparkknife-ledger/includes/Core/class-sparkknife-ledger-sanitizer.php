@@ -13,6 +13,14 @@ defined( 'ABSPATH' ) || exit;
 class Sparkknife_Ledger_Sanitizer {
 
 	/**
+	 * حداکثر نسخهٔ املایی برای یک عبارت جستجو.
+	 *
+	 * سقف در حین ساخت هم اعمال می‌شود، نه فقط در پایان: بدون آن،
+	 * ساختن نسخه‌ها با رشته‌های بلند **نمایی** می‌شد.
+	 */
+	const MAX_SEARCH_VARIANTS = 48;
+
+	/**
 	 * یکسان‌سازی نویسه‌های فارسی برای جستجو.
 	 *
 	 * کاربران ایرانی گاهی با کیبورد عربی یا از روی متن کپی‌شده تایپ
@@ -196,23 +204,125 @@ class Sparkknife_Ledger_Sanitizer {
 			return array();
 		}
 
-		/*
-		 * عبارت جستجو ابتدا یکسان‌سازی می‌شود (ی/ک عربی، ارقام فارسی،
-		 * نیم‌فاصله). سپس نسخه‌های جایگزین نویسه‌ای از آن ساخته می‌شوند.
-		 */
-		$search   = self::normalize_persian( $search );
-		$variants = array( $search );
+		$raw = trim( $search );
 
 		/*
-		 * هر گروه، نویسه‌هایی است که کاربر ممکن است به‌جای هم تایپ کند.
-		 * هر دو جهت پوشش داده می‌شود تا جستجو برای داده‌های قدیمی که با
-		 * نویسه عربی ذخیره شده‌اند هم کار کند.
+		 * عبارت جستجو یکسان‌سازی می‌شود (ی/ک عربی، ارقام فارسی،
+		 * نیم‌فاصله) و **مقدار خام** هم نگه داشته می‌شود.
+		 *
+		 * چرا خام؟ یکسان‌سازی ارقام فارسی را به لاتین تبدیل می‌کند،
+		 * ولی نام‌ها همان‌طور که کاربر تایپ کرده ذخیره می‌شوند
+		 * (`text()` ارقام را لاتین نمی‌کند). بدون نسخهٔ خام، رکوردی با
+		 * نام «علي كاوه ۰۹۱۲» با جستجوی دقیقاً همان متن هم پیدا نمی‌شد.
 		 */
-		$groups = array(
-			array( 'ی', 'ي', 'ى' ), // ی فارسی، ي عربی، ى
-			array( 'ک', 'ك' ),      // ک فارسی، ك عربی
-			array( 'ه', 'ة', 'ۀ' ), // ه، ة، ۀ
+		$normalized = self::normalize_persian( $search );
+
+		/*
+		 * همهٔ ترکیب‌های املا، از **هر دو** پایه (خام و یکسان‌شده).
+		 *
+		 * جستجوی «علی کاوه 0912» باید رکورد «علي كاوه ۰۹۱۲» را پیدا
+		 * کند: هم املا و هم نوع ارقام متفاوت است. پس نسخه‌ها باید
+		 * ضرب‌درسی از هر دو باشند، نه یکی از آن‌ها.
+		 */
+		$spellings = array_values(
+			array_unique(
+				array_merge(
+					self::spelling_variants( $normalized ),
+					self::spelling_variants( $raw )
+				)
+			)
 		);
+
+		/*
+		 * نسخه‌های ارقام: هر نسخهٔ املایی به هر سه شکل رقم.
+		 *
+		 * `to_persian_digits()` و `to_arabic_digits()` فقط لاتین →
+		 * فارسی/عربی می‌کنند و رشته‌ای که از قبل ارقام فارسی دارد را
+		 * دست‌نخورده می‌گذارند؛ پس اول همه به لاتین برمی‌گردند.
+		 */
+		$digit_variants = array();
+
+		foreach ( $spellings as $spelling ) {
+			if ( ! preg_match( '/[0-9\x{06F0}-\x{06F9}\x{0660}-\x{0669}]/u', $spelling ) ) {
+				continue;
+			}
+
+			$latin = Sparkknife_Ledger_Money::to_latin_digits( $spelling );
+
+			$digit_variants[] = $latin;
+			$digit_variants[] = Sparkknife_Ledger_Money::to_persian_digits( $latin );
+			$digit_variants[] = Sparkknife_Ledger_Money::to_arabic_digits( $latin );
+		}
+
+		/*
+		 * ترتیب اولویت.
+		 *
+		 *  ۱. خام و یکسان‌شده — بیشترین احتمال تطبیق.
+		 *  ۲. نسخه‌های املایی با ارقام لاتین — حالت عادی.
+		 *  ۳. نسخه‌های املایی با ارقام فارسی/عربی — رکوردهای قدیمی.
+		 *  ۴. بقیهٔ نسخه‌های املایی.
+		 *
+		 * پیش‌تر یک `array_slice( …, 0, 12 )` کور روی ترتیب ساخت
+		 * آرایه اعمال می‌شد: برای «علی کاوه 0912» هر ۱۲ جای اول را
+		 * ترکیب املای «ه» می‌گرفت و **همهٔ** نسخه‌های «ي عربی» و
+		 * «ارقام فارسی» حذف می‌شدند — یعنی سقف دقیقاً همان نسخه‌هایی
+		 * را می‌انداخت که برایشان ساخته شده بود.
+		 */
+		$priority = array_merge(
+			array( $raw, $normalized ),
+			array_map( array( 'Sparkknife_Ledger_Money', 'to_latin_digits' ), $spellings ),
+			$digit_variants,
+			$spellings
+		);
+
+		$variants = array();
+
+		foreach ( $priority as $variant ) {
+			$variant = (string) $variant;
+
+			/*
+			 * یکسان‌سازی می‌تواند **همهٔ** عبارت را حذف کند (ورودی
+			 * فقط نیم‌فاصله). `LIKE '%%'` همهٔ رکوردها را برمی‌گرداند،
+			 * پس نسخه‌های خالی کنار گذاشته می‌شوند.
+			 */
+			if ( '' === trim( $variant ) ) {
+				continue;
+			}
+
+			$variants[ $variant ] = true;
+		}
+
+		/*
+		 * سقف ایمنی تا کوئری بیش از حد بزرگ نشود.
+		 *
+		 * ۴۸ کافی است تا ضرب‌درسی کامل املا × ارقام جا شود: نام
+		 * واقعی حداکثر سه حرف مشکل‌دار دارد (ی/ک/ه)، یعنی ۳×۲×۳ = ۱۸
+		 * املا و ۱۸×۳ = ۵۴ نسخهٔ ارقامی. با اولویت بالا، برش هیچ
+		 * خانواده‌ای را کامل حذف نمی‌کند.
+		 */
+		return array_slice( array_keys( $variants ), 0, self::MAX_SEARCH_VARIANTS );
+	}
+
+	/**
+	 * همهٔ ترکیب‌های املایی ممکن برای یک عبارت.
+	 *
+	 * کاربران ایرانی گاهی با کیبورد عربی تایپ می‌کنند یا متن را از
+	 * جایی کپی می‌کنند؛ «ي» (U+064A) و «ك» (U+0643) عربی به‌جای
+	 * «ی» (U+06CC) و «ک» (U+06A9) فارسی وارد می‌شود. «ة» و «ۀ» هم
+	 * به‌جای «ه» می‌آیند. چون این‌ها نویسه‌های متفاوتی در دیتابیس
+	 * هستند، جستجو باید هر ترکیبی را امتحان کند.
+	 *
+	 * @param string $value عبارت.
+	 * @return array<int, string> نسخه‌ها؛ همیشه شامل خودِ عبارت.
+	 */
+	private static function spelling_variants( $value ) {
+		$groups = array(
+			array( 'ی', 'ي', 'ى' ),
+			array( 'ک', 'ك' ),
+			array( 'ه', 'ة', 'ۀ' ),
+		);
+
+		$variants = array( (string) $value );
 
 		foreach ( $groups as $group ) {
 			$expanded = array();
@@ -220,58 +330,51 @@ class Sparkknife_Ledger_Sanitizer {
 			foreach ( $variants as $variant ) {
 				$expanded[] = $variant;
 
+				/*
+				 * فقط **یک** جایگاه از هر گروه در هر نسخه عوض می‌شود.
+				 *
+				 * اگر هر نسخه با هر حرف گروه به همهٔ حرف‌های دیگر بازنویسی
+				 * شود، تعداد نسخه‌ها **نمایی** می‌شود: ۳ به توان تعداد
+				 * «ی» در رشته. توضیحات یک تراکنش تا ۲۰۰۰ نویسه است و
+				 * رشته‌ای با ۴۰۰ «ی» چیزی حدود ۱۰^۱۹۰ نسخه می‌خواست —
+				 * یعنی حافظهٔ سرور تمام می‌شد و صفحه سفید می‌ماند.
+				 */
 				foreach ( $group as $from ) {
-					if ( false === strpos( $variant, $from ) ) {
+					/*
+					 * هر حرف گروه از ابتدای رشته جستجو می‌شود.
+					 *
+					 * پیش‌تر یک `$position` مشترک بین حروف گروه بود و پس از
+					 * یافتن «ی» جلو می‌رفت؛ بعد جستجوی «ى» از همان جای
+					 * جلوتر شروع می‌شد و نسخه‌های عقب‌افتاده را از دست
+					 * می‌داد. با رشتهٔ «علي كاوه ۰۹۱۲» این باعث می‌شد ۶
+					 * ترکیب از ۱۶ ترکیب ماتریس پیدا نشوند.
+					 */
+					$offset = strpos( $variant, $from );
+
+					if ( false === $offset ) {
 						continue;
 					}
 
 					foreach ( $group as $to ) {
 						if ( $to !== $from ) {
-							$expanded[] = str_replace( $from, $to, $variant );
+							$expanded[] = substr_replace( $variant, $to, $offset, strlen( $from ) );
 						}
 					}
 				}
 			}
 
 			$variants = array_values( array_unique( $expanded ) );
+
+			/*
+			 * سقف در همین‌جا و نه فقط در پایان: بدون آن، گروه بعدی روی
+			 * آرایهٔ رشدکرده کار می‌کند و انفجار ادامه می‌یابد.
+			 */
+			if ( count( $variants ) > self::MAX_SEARCH_VARIANTS ) {
+				$variants = array_slice( $variants, 0, self::MAX_SEARCH_VARIANTS );
+			}
 		}
 
-		/*
-		 * نسخه با ارقام فارسی هم تولید می‌شود تا رکوردهای قدیمی که شماره
-		 * را با ارقام فارسی ذخیره کرده‌اند پیدا شوند. جستجو با ارقام
-		 * لاتین و فارسی هر دو باید یک نتیجه بدهد.
-		 */
-		$with_persian_digits = array();
-
-		foreach ( $variants as $variant ) {
-			$with_persian_digits[] = Sparkknife_Ledger_Money::to_persian_digits( $variant );
-			$with_persian_digits[] = Sparkknife_Ledger_Money::to_arabic_digits( $variant );
-		}
-
-		$variants = array_values( array_unique( array_merge( $variants, $with_persian_digits ) ) );
-
-		/*
-		 * یکسان‌سازی می‌تواند **همهٔ** عبارت را حذف کند.
-		 *
-		 * نیم‌فاصله (`U+200C`) و دیگر نویسه‌های کنترلی قالب‌بندی توسط
-		 * `normalize_persian()` حذف می‌شوند. اگر کاربر فقط نیم‌فاصله
-		 * بفرستد، نتیجه رشتهٔ خالی است و `LIKE '%%'` **همهٔ** رکوردها را
-		 * برمی‌گرداند — یعنی جستجوی «هیچ» جواب «همه چیز» می‌داد.
-		 *
-		 * نسخه‌های خالی کنار گذاشته می‌شوند؛ اگر چیزی نماند، آرایهٔ خالی
-		 * می‌ماند و لایهٔ بالاتر هیچ شرط جستجویی نمی‌سازد.
-		 */
-		$variants = array_values(
-			array_filter(
-				$variants,
-				static function ( $variant ) {
-					return '' !== trim( (string) $variant );
-				}
-			)
-		);
-
-		// سقف ایمنی تا کوئری بیش از حد بزرگ نشود.
-		return array_slice( $variants, 0, 12 );
+		return $variants;
 	}
 
 	/**

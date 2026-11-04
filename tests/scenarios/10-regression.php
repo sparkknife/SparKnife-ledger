@@ -2836,6 +2836,161 @@ foreach ( $sort_ids as $sort_id ) {
 	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}sparkknife_ledger_persons WHERE id = %d", $sort_id ) );
 }
 
+// ── ۳۱: جستجو باید همهٔ ترکیب‌های املا و ارقام را پوشش دهد ───────────
+//
+// دو نقص مستقل که هر دو یک نتیجه داشتند: «رکورد پیدا نمی‌شود».
+//
+// (۱) نام با همان ارقامی که کاربر تایپ کرده ذخیره می‌شود
+//     (`Sanitizer::text()` ارقام فارسی را لاتین نمی‌کند)، ولی
+//     `normalize_persian()` روی **عبارت جستجو** همیشه ارقام را لاتین
+//     می‌کند. پس رکوردی با نام «علي كاوه ۰۹۱۲» با جستجوی دقیقاً همان
+//     متن هم پیدا نمی‌شد — نسخه‌ای برابر مقدار ذخیره‌شده وجود نداشت.
+//
+// (۲) نسخه‌های ارقام فارسی/عربی ساخته می‌شدند ولی `array_slice(…, 12)`
+//     آن‌ها را می‌برید: برای «علی کاوه 0912» هر ۱۲ جای اول را ترکیب
+//     املای «ه» می‌گرفت و همهٔ نسخه‌های «ي عربی» و «ارقام فارسی» حذف
+//     می‌شدند. سقف دقیقاً همان نسخه‌هایی را می‌انداخت که برایشان ساخته
+//     شده بود.
+
+// (۱) هیچ نسخه‌ای نباید خالی باشد (وگرنه LIKE '%%' همه چیز را می‌آورد).
+$var_empty = array();
+
+foreach ( Sparkknife_Ledger_Sanitizer::search_variants( 'علی' ) as $var ) {
+	if ( '' === trim( (string) $var ) ) {
+		$var_empty[] = $var;
+	}
+}
+
+spk_equals( 0, count( $var_empty ), 'نسخه‌های جستجو هیچ‌گاه خالی نیستند' );
+
+spk_equals(
+	array(),
+	Sparkknife_Ledger_Sanitizer::search_variants( ' ' ),
+	'جستجوی فقط-فاصله هیچ نسخه‌ای نمی‌سازد'
+);
+
+// (۲) سقف نسخه‌ها نباید از حد بگذرد (کوئری بی‌جهت بزرگ نشود).
+foreach ( array( 'علی', 'علی کاوه 0912', 'فاطمه محمدی ۰۹۱۲۳۴۵۶۷۸۹' ) as $var_query ) {
+	$var_count = count( Sparkknife_Ledger_Sanitizer::search_variants( $var_query ) );
+	spk_assert(
+		$var_count <= 48,
+		'نسخه‌های جستجو از سقف ۴۸ نمی‌گذرند (' . $var_count . ')'
+	);
+}
+
+/*
+ * (۳) آزمون واقعی: ماتریس ذخیره × جستجو.
+ *
+ * هر رکورد با یک ترکیب املا و ارقام ذخیره می‌شود و با هر ترکیب دیگر
+ * جستجو می‌شود. همه باید پیدا شوند — نه فقط هم‌شکل خودشان.
+ */
+$var_marker = 'VAR' . wp_generate_password( 6, false, false );
+
+$var_forms = array(
+	"علي كاوه \u{06F0}\u{06F9}\u{06F1}\u{06F2}", // عربی + ارقام فارسی
+	'علي كاوه 0912',                              // عربی + ارقام لاتین
+	"علی کاوه \u{06F0}\u{06F9}\u{06F1}\u{06F2}", // فارسی + ارقام فارسی
+	'علی کاوه 0912',                              // فارسی + ارقام لاتین
+);
+
+$var_ids = array();
+
+foreach ( $var_forms as $var_form ) {
+	$var_id = Sparkknife_Ledger_Person_Repository::instance()->insert(
+		array( 'name' => $var_form . ' ' . $var_marker, 'phone' => '', 'description' => '', 'status' => 'active' )
+	);
+
+	spk_assert( $var_id > 0, 'شخص آزمایشی جستجو ساخته شد' );
+
+	if ( $var_id > 0 ) {
+		$var_ids[ $var_form ] = (int) $var_id;
+	}
+}
+
+$var_misses = array();
+
+foreach ( $var_ids as $var_stored => $var_stored_id ) {
+	foreach ( $var_forms as $var_query ) {
+		$var_result = Sparkknife_Ledger_Person_Repository::instance()->query(
+			array( 'search' => $var_query . ' ' . $var_marker, 'per_page' => 200 )
+		);
+
+		$var_found = false;
+
+		foreach ( $var_result['items'] as $var_item ) {
+			if ( (int) $var_item->id === $var_stored_id ) {
+				$var_found = true;
+				break;
+			}
+		}
+
+		if ( ! $var_found ) {
+			$var_misses[] = $var_stored . ' ← ' . $var_query;
+		}
+	}
+}
+
+spk_equals(
+	array(),
+	$var_misses,
+	'جستجو هر ترکیب املا × ارقام را پیدا می‌کند (' . ( count( $var_ids ) * count( $var_forms ) ) . ' ترکیب)',
+	wp_json_encode( $var_misses, JSON_UNESCAPED_UNICODE )
+);
+
+/*
+ * (۴) جهت مخالف: جستجوی مقدار **دقیقاً ذخیره‌شده** هم باید کار کند.
+ *
+ * این همان حالتی بود که کاملاً بدیهی به نظر می‌رسد و کار نمی‌کرد.
+ */
+if ( ! empty( $var_ids ) ) {
+	foreach ( $var_ids as $var_stored => $var_stored_id ) {
+		$var_exact = Sparkknife_Ledger_Person_Repository::instance()->query(
+			array( 'search' => $var_stored . ' ' . $var_marker, 'per_page' => 200 )
+		);
+
+		$var_self = false;
+
+		foreach ( $var_exact['items'] as $var_item ) {
+			if ( (int) $var_item->id === $var_stored_id ) {
+				$var_self = true;
+				break;
+			}
+		}
+
+		spk_assert( $var_self, 'جستجوی متن دقیقاً ذخیره‌شده خودش را پیدا می‌کند: ' . $var_stored );
+	}
+}
+
+// (۵) جستجوی بدون رقم باید سادهٔ کوچک بسازد، نه ۴۸ نسخه.
+spk_assert(
+	count( Sparkknife_Ledger_Sanitizer::search_variants( 'علی' ) ) <= 6,
+	'جستجوی کوتاه بی‌رقم نسخه‌های کمی می‌سازد'
+);
+
+// (۶) حرف‌های فارسی و عربی هر دو در نسخه‌ها هستند.
+$var_all = Sparkknife_Ledger_Sanitizer::search_variants( 'علی کاوه' );
+
+$var_has_arabic_yeh = false;
+$var_has_farsi_yeh  = false;
+
+foreach ( $var_all as $var ) {
+	if ( false !== strpos( $var, 'ي' ) ) {
+		$var_has_arabic_yeh = true;
+	}
+	if ( false !== strpos( $var, 'ی' ) ) {
+		$var_has_farsi_yeh = true;
+	}
+}
+
+spk_assert( $var_has_arabic_yeh && $var_has_farsi_yeh, 'نسخه‌های جستجو هم «ی» فارسی دارند هم «ي» عربی' );
+
+// تمیزکاری.
+global $wpdb;
+
+foreach ( $var_ids as $var_cleanup_id ) {
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}sparkknife_ledger_persons WHERE id = %d", $var_cleanup_id ) );
+}
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
