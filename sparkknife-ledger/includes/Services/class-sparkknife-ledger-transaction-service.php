@@ -309,6 +309,16 @@ class Sparkknife_Ledger_Transaction_Service {
 			return $result;
 		}
 
+		/*
+		 * فقط تغییرهای واقعی ثبت می‌شوند.
+		 *
+		 * پیش‌تر `amount` هم در این آرایه بود، با همان مقدار در هر دو
+		 * طرف: `from` و `to` هر دو مبلغ تراکنش. صفحهٔ تاریخچه آن را
+		 * «مبلغ: ۱۲۵٬۰۰۰ → ۱۲۵٬۰۰۰» نشان می‌داد — ردیفی که هیچ تغییری
+		 * توصیف نمی‌کند. ابطال تراکنش مبلغ را دست نمی‌زند؛ تراکنش فقط
+		 * از وضعیت `posted` به `void` می‌رود و مبلغش برای حسابرسی
+		 * دست‌نخورده می‌ماند. مبلغ همان‌جا در خلاصهٔ ردیف دیده می‌شود.
+		 */
 		Sparkknife_Ledger_Audit_Service::instance()->log(
 			'transaction',
 			$id,
@@ -316,7 +326,6 @@ class Sparkknife_Ledger_Transaction_Service {
 			array(
 				'status'      => array( 'from' => 'posted', 'to' => 'void' ),
 				'void_reason' => array( 'from' => null, 'to' => $reason ),
-				'amount'      => array( 'from' => Sparkknife_Ledger_Money::to_human( $transaction->amount ), 'to' => Sparkknife_Ledger_Money::to_human( $transaction->amount ) ),
 			),
 			sprintf(
 				/* translators: 1: reference, 2: reason */

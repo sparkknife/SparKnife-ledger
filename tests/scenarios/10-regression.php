@@ -3404,6 +3404,100 @@ spk_equals(
 // بازگرداندن محیط.
 $_SERVER = $ip_backup;
 
+// ── ۳۷: تاریخچهٔ ابطال نباید تغییر بی‌تغییر ثبت کند ───────────────────
+/*
+ * باگ ۶۷: `void()` در آرایهٔ `changes` فیلد `amount` را با همان مقدار در
+ * هر دو طرف ثبت می‌کرد (`from` و `to` هر دو مبلغ تراکنش). صفحهٔ تاریخچه
+ * آن را «مبلغ: X → X» نشان می‌داد — ردیفی که هیچ تغییری توصیف نمی‌کند.
+ *
+ * `Audit_Service::log()` مقادیر را فیلتر نمی‌کند (فقط `diff()` این کار
+ * را می‌کند)، پس این نویز واقعاً در JSON ذخیره می‌شد.
+ */
+$av_marker = 'MARKER_AV_' . wp_generate_password( 6, false, false );
+
+global $wpdb;
+$av_table = Sparkknife_Ledger_DB::persons_table();
+
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+$wpdb->insert(
+	$av_table,
+	array(
+		'name'        => $av_marker,
+		'phone'       => '',
+		'status'      => 'active',
+		'description' => '',
+		'sort_key'    => Sparkknife_Ledger_Sanitizer::persian_sort_key( $av_marker ),
+		'created_at'  => current_time( 'mysql' ),
+		'updated_at'  => current_time( 'mysql' ),
+	)
+);
+
+$av_person_id = (int) $wpdb->insert_id;
+
+spk_assert( $av_person_id > 0, 'شخص آزمون تاریخچهٔ ابطال ساخته شد' );
+
+$av_txn_id = Sparkknife_Ledger_Transaction_Service::instance()->create(
+	array(
+		'person_id'   => $av_person_id,
+		'type'        => 'income',
+		'amount'      => '125000',
+		'txn_date'    => current_time( 'Y-m-d' ),
+		'description' => $av_marker,
+	)
+);
+
+spk_assert( ! is_wp_error( $av_txn_id ), 'تراکنش آزمون ابطال ساخته شد' );
+
+$av_void = Sparkknife_Ledger_Transaction_Service::instance()->void( $av_txn_id, 'دلیل آزمون' );
+
+spk_assert( true === $av_void, 'تراکنش با موفقیت باطل شد' );
+
+// رکورد ممیزی را بخوان و مطمئن شو amount با from===to ثبت نشده.
+$av_audit = Sparkknife_Ledger_Audit_Service::instance()->get_history( 'transaction', $av_txn_id, 10 );
+$av_found = false;
+
+foreach ( (array) $av_audit as $av_entry ) {
+	if ( 'void' !== $av_entry->action ) {
+		continue;
+	}
+
+	$av_changes = Sparkknife_Ledger_Audit_Service::instance()->decode_changes( $av_entry );
+
+	$av_found = true;
+
+	spk_assert( ! isset( $av_changes['amount'] ), 'تاریخچهٔ ابطال فیلد amount بی‌تغییر ندارد' );
+	spk_assert( isset( $av_changes['status'] ), 'تاریخچهٔ ابطال تغییر وضعیت را دارد' );
+	spk_equals( 'posted', isset( $av_changes['status']['from'] ) ? $av_changes['status']['from'] : null, 'وضعیت پیش از ابطال posted است' );
+	spk_equals( 'void', isset( $av_changes['status']['to'] ) ? $av_changes['status']['to'] : null, 'وضعیت پس از ابطال void است' );
+	spk_assert( isset( $av_changes['void_reason'] ), 'تاریخچهٔ ابطال دلیل را ثبت می‌کند' );
+
+	break;
+}
+
+spk_assert( $av_found, 'رکورد ممیزی ابطال در تاریخچه پیدا شد' );
+
+// هیچ فیلدی در هیچ رکوردی نباید from === to داشته باشد.
+$av_dup_ok = true;
+
+foreach ( (array) $av_audit as $av_entry ) {
+	foreach ( Sparkknife_Ledger_Audit_Service::instance()->decode_changes( $av_entry ) as $av_field => $av_pair ) {
+		if ( ! is_array( $av_pair ) || ! array_key_exists( 'from', $av_pair ) || ! array_key_exists( 'to', $av_pair ) ) {
+			continue;
+		}
+
+		if ( null !== $av_pair['from'] && (string) $av_pair['from'] === (string) $av_pair['to'] ) {
+			$av_dup_ok = false;
+		}
+	}
+}
+
+spk_assert( $av_dup_ok, 'در تاریخچهٔ تراکنش هیچ فیلدی با from === to ثبت نشده است' );
+
+// تمیزکاری.
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}sparkknife_ledger_audit WHERE object_type = 'transaction' AND object_id = %d", $av_txn_id ) );
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}sparkknife_ledger_transactions WHERE id = %d", $av_txn_id ) );
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$av_table} WHERE id = %d", $av_person_id ) );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
