@@ -320,11 +320,31 @@ class Sparkknife_Ledger_Amount {
 			return $value;
 		}
 
-		$sign = '';
-		if ( '-' === $value[0] ) {
-			$sign  = '-' === $sign ? '' : '-';
+		/*
+		 * علامت نتیجه از **هر دو** عامل می‌آید، نه فقط از `$value`.
+		 *
+		 * پیش‌تر `$sign` فقط از علامت `$value` ساخته می‌شد و ضرب در
+		 * `abs( $multiplier )` انجام می‌گرفت؛ یعنی علامت مضروب دور
+		 * ریخته می‌شد. نتیجه:
+		 *
+		 *     mul_int( '1000', -3 )  →  '3000'   (باید '-3000')
+		 *     mul_int( '-1000', -3 ) →  '-3000'  (باید '3000')
+		 *
+		 * در حالت `bcmath` نتیجه درست بود چون `bcmul` علامت را خودش
+		 * می‌دید. یعنی خروجی تابع به نصب‌بودن افزونهٔ اختیاری bcmath
+		 * وابسته بود — همان دسته باگی که نباید وجود داشته باشد.
+		 */
+		$negative = '-' === $value[0];
+
+		if ( $negative ) {
 			$value = substr( $value, 1 );
 		}
+
+		if ( $multiplier < 0 ) {
+			$negative = ! $negative;
+		}
+
+		$sign = $negative ? '-' : '';
 
 		if ( self::has_bcmath() ) {
 			return self::canonical( $sign . bcmul( $value, (string) abs( $multiplier ), 0 ) );
@@ -435,7 +455,7 @@ class Sparkknife_Ledger_Amount {
 	}
 
 	/**
-	 * جمع دو رشته нормалиزه‌شده.
+	 * جمع دو رشته نرمال‌شده.
 	 *
 	 * @param string $a اول.
 	 * @param string $b دوم.
