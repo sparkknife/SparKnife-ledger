@@ -3200,6 +3200,125 @@ foreach ( array( 1, 2, 1000, PHP_INT_MAX ) as $pg_p ) {
 
 spk_assert( $pg_offset_is_int, 'آفست صفحه‌بندی در هیچ حالتی به float سرریز نمی‌کند' );
 
+// ── ۳۵: پر شدن sort_key وقتی گزینهٔ نسخه پاک شده باشد ─────────────────
+/*
+ * باگ ۶۵: شاخهٔ «افزونه بدون فعال‌سازی اجرا شده» در `maybe_upgrade()`
+ * `backfill_sort_keys()` را صدا نمی‌زد.
+ *
+ * سناریوی واقعی: جداول و اشخاص از یک نصب قدیمی‌تر باقی مانده‌اند ولی
+ * گزینهٔ نسخهٔ پایگاه‌داده پاک شده است (پاک‌سازی دستی wp_options،
+ * مهاجرت سایت بدون انتقال آپشن‌ها، یا جایگزینی پوشه با FTP).
+ *
+ * در آن حالت ردیف‌ها `sort_key` نداشتند و `ORDER BY sort_key ASC`
+ * آن‌ها را با ترتیب درج برمی‌گرداند — یعنی فهرست اشخاص بی‌ترتیب.
+ */
+$sk_table = Sparkknife_Ledger_DB::persons_table();
+$sk_marker = 'MARKER_SK_' . wp_generate_password( 8, false, false );
+$sk_ids    = array();
+
+global $wpdb;
+
+/*
+ * سه شخص با نام‌هایی که ترتیب الفبایی‌شان با ترتیب درج **مخالف** است:
+ * «یوسف» اول درج می‌شود و باید آخر بیاید.
+ */
+foreach ( array( 'یوسف', 'آرش', 'مهدی' ) as $sk_name ) {
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+	$wpdb->insert(
+		$sk_table,
+		array(
+			'name'       => $sk_name . ' ' . $sk_marker,
+			'phone'      => '',
+			'status'     => 'active',
+			'description' => '',
+			'sort_key'   => null,
+			'created_at' => current_time( 'mysql' ),
+			'updated_at' => current_time( 'mysql' ),
+		)
+	);
+	$sk_ids[] = (int) $wpdb->insert_id;
+}
+
+spk_assert( 3 === count( array_filter( $sk_ids ) ), 'سه شخص برای آزمون sort_key ساخته شد' );
+
+// پیش از backfill: کلیدها خالی‌اند.
+$sk_null_before = (int) $wpdb->get_var(
+	$wpdb->prepare(
+		"SELECT COUNT(*) FROM {$sk_table} WHERE id IN (%d,%d,%d) AND ( sort_key IS NULL OR sort_key = '' )",
+		$sk_ids[0],
+		$sk_ids[1],
+		$sk_ids[2]
+	)
+);
+
+spk_equals( 3, $sk_null_before, 'پیش از backfill هر سه ردیف sort_key خالی دارند' );
+
+// اجرای همان متدی که مسیر ارتقا صدا می‌زند.
+$sk_filled = Sparkknife_Ledger_Installer::backfill_sort_keys();
+
+spk_assert( $sk_filled > 0, 'backfill_sort_keys ردیف‌های خالی را پر می‌کند' );
+
+$sk_null_after = (int) $wpdb->get_var(
+	$wpdb->prepare(
+		"SELECT COUNT(*) FROM {$sk_table} WHERE id IN (%d,%d,%d) AND ( sort_key IS NULL OR sort_key = '' )",
+		$sk_ids[0],
+		$sk_ids[1],
+		$sk_ids[2]
+	)
+);
+
+spk_equals( 0, $sk_null_after, 'پس از backfill هیچ ردیفی sort_key خالی ندارد' );
+
+// ترتیب الفبایی حالا درست است: آرش، مهدی، یوسف.
+// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+$sk_ordered = $wpdb->get_results(
+	$wpdb->prepare(
+		"SELECT name FROM {$sk_table} WHERE id IN (%d,%d,%d) ORDER BY sort_key ASC",
+		$sk_ids[0],
+		$sk_ids[1],
+		$sk_ids[2]
+	)
+);
+
+$sk_names = array();
+
+foreach ( (array) $sk_ordered as $sk_row ) {
+	$sk_names[] = str_replace( ' ' . $sk_marker, '', $sk_row->name );
+}
+
+spk_equals(
+	array( 'آرش', 'مهدی', 'یوسف' ),
+	$sk_names,
+	'پس از backfill ترتیب الفبای فارسی درست است، نه ترتیب درج'
+);
+
+// اجرای دوباره نباید چیزی را خراب کند (ایدمپوتنت).
+Sparkknife_Ledger_Installer::backfill_sort_keys();
+
+// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+$sk_again = $wpdb->get_results(
+	$wpdb->prepare(
+		"SELECT name FROM {$sk_table} WHERE id IN (%d,%d,%d) ORDER BY sort_key ASC",
+		$sk_ids[0],
+		$sk_ids[1],
+		$sk_ids[2]
+	)
+);
+
+$sk_names_again = array();
+
+foreach ( (array) $sk_again as $sk_row ) {
+	$sk_names_again[] = str_replace( ' ' . $sk_marker, '', $sk_row->name );
+}
+
+spk_equals( array( 'آرش', 'مهدی', 'یوسف' ), $sk_names_again, 'اجرای دوبارهٔ backfill ترتیب را تغییر نمی‌دهد' );
+
+// تمیزکاری.
+foreach ( $sk_ids as $sk_cleanup_id ) {
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$sk_table} WHERE id = %d", $sk_cleanup_id ) );
+}
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
