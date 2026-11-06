@@ -3102,6 +3102,104 @@ spk_equals(
 	'آپاستروف پیش از نویسهٔ بی‌عرض می‌نشیند و محتوا حفظ می‌شود'
 );
 
+// ── ۳۴: سرریز آفست صفحه‌بندی ─────────────────────────────────────────
+/*
+ * باگ ۶۴: `( $page - 1 ) * $per_page` بدون سقف حساب می‌شد.
+ *
+ * با `page` بزرگ‌تر از حدود ۴٫۶×۱۰^۱۶ حاصل‌ضرب از بازهٔ `int` بیرون
+ * می‌زد و PHP بی‌صدا آن را به `float` تبدیل می‌کرد. بعد:
+ *
+ *   - در SQL، `%d` در `$wpdb->prepare()` آن float را به `0` می‌کاست و
+ *     **صفحهٔ اول** برمی‌گشت.
+ *   - در PHP، `array_slice()` با آفست غیری صحیح **کل ردیف‌ها** را
+ *     برمی‌گرداند.
+ *
+ * هر دو بی‌صدا و بدون خطا رخ می‌دادند. حالا صفحه پیش از ضرب به تعداد
+ * صفحات موجود محدود می‌شود.
+ */
+$pg_page   = 20;
+$pg_total  = 45;
+
+// صفحهٔ عادی نباید دست بخورد.
+$pg_ok_page = Sparkknife_Ledger_Transaction_Repository::instance()->query(
+	array(
+		'per_page' => $pg_page,
+		'page'     => 2,
+		'search'   => 'MARKER_PG_NEVER_MATCHES',
+	)
+);
+
+spk_equals( 2, (int) $pg_ok_page['page'], 'صفحهٔ عادی ۲ دست‌نخورده می‌ماند' );
+spk_equals( 0, count( $pg_ok_page['items'] ), 'صفحهٔ عادی با جستجوی بی‌نتیجه ردیفی ندارد' );
+
+// صفحهٔ سرریزشده باید به آخرین صفحهٔ معقول بیفتد، نه صفحهٔ اول.
+$pg_huge = Sparkknife_Ledger_Transaction_Repository::instance()->query(
+	array(
+		'per_page' => $pg_page,
+		'page'     => PHP_INT_MAX,
+		'search'   => 'MARKER_PG_NEVER_MATCHES',
+	)
+);
+
+spk_assert(
+	is_int( $pg_huge['page'] ) || ctype_digit( (string) $pg_huge['page'] ),
+	'شماره صفحه پس از سرریز همچنان عدد صحیح است'
+);
+spk_assert(
+	(int) $pg_huge['page'] < 1000000,
+	'شماره صفحه پس از سرریز به سقف منطقی محدود می‌شود'
+);
+
+// افراد هم باید همین رفتار را داشته باشند.
+$pg_person = Sparkknife_Ledger_Person_Repository::instance()->query(
+	array(
+		'per_page' => 50,
+		'page'     => PHP_INT_MAX,
+		'search'   => 'MARKER_PG_NEVER_MATCHES',
+	)
+);
+
+spk_assert(
+	(int) $pg_person['page'] < 1000000,
+	'صفحه سرریزشده در فهرست اشخاص هم محدود می‌شود'
+);
+spk_equals( 0, count( $pg_person['items'] ), 'صفحه سرریزشده اشخاص ردیف ناخواسته برنمی‌گرداند' );
+
+// تاریخچه تغییرات.
+$pg_audit = Sparkknife_Ledger_Audit_Repository::instance()->query(
+	array(
+		'per_page' => 50,
+		'page'     => PHP_INT_MAX,
+	)
+);
+
+spk_assert(
+	(int) $pg_audit['page'] < 1000000,
+	'صفحه سرریزشده در تاریخچه تغییرات هم محدود می‌شود'
+);
+
+// آفست همیشه عدد صحیح می‌ماند — نه float.
+$pg_offset_is_int = true;
+
+foreach ( array( 1, 2, 1000, PHP_INT_MAX ) as $pg_p ) {
+	$pg_probe = Sparkknife_Ledger_Transaction_Repository::instance()->query(
+		array(
+			'per_page' => 20,
+			'page'     => $pg_p,
+			'search'   => 'MARKER_PG_NEVER_MATCHES',
+		)
+	);
+
+	$pg_calc = ( (int) $pg_probe['page'] - 1 ) * (int) $pg_probe['per_page'];
+
+	if ( ! is_int( $pg_calc ) ) {
+		$pg_offset_is_int = false;
+		break;
+	}
+}
+
+spk_assert( $pg_offset_is_int, 'آفست صفحه‌بندی در هیچ حالتی به float سرریز نمی‌کند' );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();

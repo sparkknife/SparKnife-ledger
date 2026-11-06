@@ -192,9 +192,26 @@ class Sparkknife_Ledger_Audit_Repository {
 			$total = (int) $wpdb->get_var( $count_sql );
 		}
 
-		$per_page = max( 1, min( 200, (int) $args['per_page'] ) );
+		$per_page = max( 1, min( 500, (int) $args['per_page'] ) );
 		$page     = max( 1, (int) $args['page'] );
-		$offset   = ( $page - 1 ) * $per_page;
+
+		/*
+		 * سقف صفحه پیش از ضرب.
+		 *
+		 * پیش‌تر `( $page - 1 ) * $per_page` بدون سقف حساب می‌شد. با
+		 * `page` بزرگ‌تر از حدود ۴٫۶×۱۰^۱۶ حاصل‌ضرب از بازهٔ `int`
+		 * بیرون می‌زد و PHP بی‌صدا آن را به `float` تبدیل می‌کرد. بعد
+		 * `%d` در `$wpdb->prepare()` آن float را به `0` کاست می‌داد و
+		 * **صفحهٔ اول** به‌جای صفحهٔ درخواستی برمی‌گشت — بدون هیچ خطا.
+		 */
+		$max_page = (int) ceil( $total / $per_page );
+		$max_page = max( 1, min( $max_page, 1000000 ) );
+
+		if ( $page > $max_page ) {
+			$page = $max_page;
+		}
+
+		$offset = ( $page - 1 ) * $per_page;
 
 		$items_sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d";
 

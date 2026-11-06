@@ -327,6 +327,23 @@ class Sparkknife_Ledger_Report_Service {
 		$page     = isset( $args['page'] ) ? max( 1, absint( $args['page'] ) ) : 1;
 		$total    = count( $rows );
 
+		/*
+		 * سقف صفحه پیش از ضرب.
+		 *
+		 * پیش‌تر `( $page - 1 ) * $per_page` بدون سقف حساب می‌شد. با
+		 * `page` بزرگ‌تر از حدود ۴٫۶×۱۰^۱۶ حاصل‌ضرب از بازهٔ `int`
+		 * بیرون می‌زد، PHP بی‌صدا آن را به `float` تبدیل می‌کرد و
+		 * `array_slice()` با آفست غیرصحیح، **کل ردیف‌ها** را از ابتدا
+		 * برمی‌گرداند. یعنی صفحهٔ ۹۲۲۳۳۷۲۰۳۶۸۵۴۷۷۵۸۰۷ همان صفحهٔ اول
+		 * می‌شد، بدون هیچ خطا.
+		 */
+		$max_page = (int) ceil( $total / $per_page );
+		$max_page = max( 1, min( $max_page, 1000000 ) );
+
+		if ( $page > $max_page ) {
+			$page = $max_page;
+		}
+
 		$paged_rows = array_slice( $rows, ( $page - 1 ) * $per_page, $per_page );
 
 		/*
