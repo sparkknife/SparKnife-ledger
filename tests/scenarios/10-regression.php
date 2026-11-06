@@ -3319,6 +3319,91 @@ foreach ( $sk_ids as $sk_cleanup_id ) {
 	$wpdb->query( $wpdb->prepare( "DELETE FROM {$sk_table} WHERE id = %d", $sk_cleanup_id ) );
 }
 
+// ── ۳۶: جعل IP در لاگ ممیزی با X-Forwarded-For ───────────────────────
+/*
+ * باگ ۶۶: توضیح تابع `get_ip()` وعده می‌داد که هدر `X-Forwarded-For`
+ * فقط «اگر `REMOTE_ADDR` یکی از پروکسی‌های مجاز باشد» پذیرفته می‌شود و
+ * فیلتر `sparkknife_ledger_trusted_proxies` را معرفی می‌کرد — اما آن
+ * بررسی در کد **وجود نداشت** و فیلتر هرگز `apply_filters` نمی‌شد.
+ *
+ * نتیجه: با فعال‌کردن `TRUST_PROXY`، هر کلاینتی که مستقیم به سایت وصل
+ * می‌شد می‌توانست IP دلخواهی در لاگ بنشاند.
+ *
+ * در این بلوک خودِ متد خصوصی با Reflection صدا زده می‌شود، چون رفتار
+ * آن به `$_SERVER` وابسته است و از مسیر عمومی قابل کنترل نیست.
+ */
+$ip_ref = new ReflectionMethod( 'Sparkknife_Ledger_Audit_Service', 'get_ip' );
+
+if ( method_exists( $ip_ref, 'setAccessible' ) ) {
+	$ip_ref->setAccessible( true );
+}
+
+$ip_service = Sparkknife_Ledger_Audit_Service::instance();
+$ip_backup  = $_SERVER;
+
+// (۱) بدون trust: هدر باید نادیده گرفته شود.
+$_SERVER['REMOTE_ADDR']          = '203.0.113.5';
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '1.2.3.4';
+
+add_filter( 'sparkknife_ledger_trust_proxy', '__return_false' );
+$ip_no_trust = $ip_ref->invoke( $ip_service );
+remove_filter( 'sparkknife_ledger_trust_proxy', '__return_false' );
+
+spk_equals( '203.0.113.5', $ip_no_trust, 'بدون trust، هدر X-Forwarded-For نادیده گرفته می‌شود' );
+
+// (۲) با trust و فهرست پروکسی‌های مجاز: REMOTE_ADDR غیرمجاز → هدر رد می‌شود.
+$ip_trusted_cb = static function () {
+	return array( '10.0.0.1' );
+};
+
+add_filter( 'sparkknife_ledger_trust_proxy', '__return_true' );
+add_filter( 'sparkknife_ledger_trusted_proxies', $ip_trusted_cb );
+
+$ip_spoofed = $ip_ref->invoke( $ip_service );
+
+remove_filter( 'sparkknife_ledger_trusted_proxies', $ip_trusted_cb );
+remove_filter( 'sparkknife_ledger_trust_proxy', '__return_true' );
+
+spk_equals(
+	'203.0.113.5',
+	$ip_spoofed,
+	'اگر REMOTE_ADDR پروکسی مجاز نباشد، هدر جعلی پذیرفته نمی‌شود'
+);
+
+// (۳) با trust و REMOTE_ADDR مجاز: راست‌ترین آدرس معتبر برنده است.
+$_SERVER['REMOTE_ADDR']          = '10.0.0.1';
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '8.8.8.8, 198.51.100.7';
+
+add_filter( 'sparkknife_ledger_trust_proxy', '__return_true' );
+add_filter( 'sparkknife_ledger_trusted_proxies', $ip_trusted_cb );
+
+$ip_real = $ip_ref->invoke( $ip_service );
+
+remove_filter( 'sparkknife_ledger_trusted_proxies', $ip_trusted_cb );
+remove_filter( 'sparkknife_ledger_trust_proxy', '__return_true' );
+
+spk_equals( '198.51.100.7', $ip_real, 'پشت پروکسی مجاز، راست‌ترین آدرس معتبر برنده است' );
+
+// (۴) آدرس آشغال در انتهای زنجیره نباید آدرس جعلی سمت چپ را برنده کند.
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '8.8.8.8, 198.51.100.7, garbage';
+
+add_filter( 'sparkknife_ledger_trust_proxy', '__return_true' );
+add_filter( 'sparkknife_ledger_trusted_proxies', $ip_trusted_cb );
+
+$ip_garbage = $ip_ref->invoke( $ip_service );
+
+remove_filter( 'sparkknife_ledger_trusted_proxies', $ip_trusted_cb );
+remove_filter( 'sparkknife_ledger_trust_proxy', '__return_true' );
+
+spk_equals(
+	'198.51.100.7',
+	$ip_garbage,
+	'آشغال در انتهای زنجیره، آدرس جعلی سمت چپ را برنده نمی‌کند'
+);
+
+// بازگرداندن محیط.
+$_SERVER = $ip_backup;
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();

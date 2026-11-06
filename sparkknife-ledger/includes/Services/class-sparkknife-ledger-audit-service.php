@@ -301,18 +301,41 @@ class Sparkknife_Ledger_Audit_Service {
 			return $ip;
 		}
 
+		/*
+		 * هدر فقط وقتی پذیرفته می‌شود که درخواست واقعاً از یک پروکسی
+		 * مجاز آمده باشد.
+		 *
+		 * این بررسی پیش‌تر **وجود نداشت**، در حالی که توضیح بالای همین
+		 * تابع آن را وعده می‌داد و فیلتر `sparkknife_ledger_trusted_proxies`
+		 * را هم معرفی می‌کرد. نتیجه: با فعال‌کردن `TRUST_PROXY`، هر
+		 * کلاینتی که مستقیماً به سایت وصل می‌شد می‌توانست با فرستادن
+		 * `X-Forwarded-For` هر IP دلخواهی را در لاگ ممیزی بنشاند —
+		 * همان جعل هویتی که کل این منطق برای جلوگیری از آن نوشته شده.
+		 *
+		 * اگر فهرست پروکسی‌های مجاز خالی باشد، هدر پذیرفته می‌شود تا
+		 * نصب‌های پشت CDN که فهرست ثابت ندارند نشکنند.
+		 */
+		$trusted_proxies = apply_filters( 'sparkknife_ledger_trusted_proxies', array() );
+		$trusted_proxies = is_array( $trusted_proxies ) ? array_filter( array_map( 'trim', $trusted_proxies ) ) : array();
+
+		if ( ! empty( $trusted_proxies ) && ! in_array( $ip, $trusted_proxies, true ) ) {
+			return $ip;
+		}
+
 		$forwarded = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) );
 
 		/*
 		 * فقط آخرین (راست‌ترین) آدرس در زنجیره قابل اتکاست، چون بقیه را
-		 * خود کلاینت نوشته است. اگر `REMOTE_ADDR` یکی از پروکسی‌های مجاز
-		 * نباشد، هدر نادیده گرفته می‌شود.
+		 * خود کلاینت نوشته است. پس از راست به چپ می‌گردیم و نخستین
+		 * آدرس معتبر را برمی‌داریم؛ پیش‌تر حلقه از چپ به راست می‌رفت و
+		 * «آخرین معتبر» را می‌گرفت که در زنجیرهٔ «جعل، واقعی، آشغال»
+		 * همان آدرس جعلی می‌شد.
 		 */
-		$parts = array_map( 'trim', explode( ',', $forwarded ) );
+		$parts = array_reverse( array_map( 'trim', explode( ',', $forwarded ) ) );
 
 		foreach ( $parts as $candidate ) {
 			if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) {
-				$ip = $candidate;
+				return $candidate;
 			}
 		}
 
