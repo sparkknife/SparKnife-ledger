@@ -170,12 +170,6 @@ class Sparkknife_Ledger_Money {
 	}
 
 	/**
-	 * تبدیل ارقام لاتین به فارسی برای نمایش.
-	 *
-	 * @param string $value ورودی.
-	 * @return string
-	 */
-	/**
 	 * ارقام عددی برای نمایش در رابط کاربری، با احترام به تنظیم.
 	 *
 	 * `to_persian_digits()` همیشه تبدیل می‌کند و برای جایی است که ارقام فارسی
@@ -196,7 +190,18 @@ class Sparkknife_Ledger_Money {
 		return self::uses_persian_digits() ? self::to_persian_digits( $value ) : $value;
 	}
 
-		public static function to_persian_digits( $value ) {
+	/**
+	 * تبدیل ارقام لاتین به فارسی برای نمایش.
+	 *
+	 * این تابع **همیشه** تبدیل می‌کند و تنظیم `use_persian_digits` را
+	 * نمی‌بیند؛ برای جایی است که ارقام فارسی بخشی از قالب است. برای
+	 * شمارنده‌ها و هر عدد دیگری که باید تنظیم را رعایت کند از `digits()`
+	 * استفاده کنید.
+	 *
+	 * @param string $value ورودی.
+	 * @return string
+	 */
+	public static function to_persian_digits( $value ) {
 		$persian = array( '۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹' );
 		$latin   = array( '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' );
 
