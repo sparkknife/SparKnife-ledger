@@ -3129,8 +3129,52 @@ $pg_ok_page = Sparkknife_Ledger_Transaction_Repository::instance()->query(
 	)
 );
 
-spk_equals( 2, (int) $pg_ok_page['page'], 'صفحهٔ عادی ۲ دست‌نخورده می‌ماند' );
+/*
+ * با نتیجهٔ صفر، تعداد صفحات ۱ است و صفحهٔ ۲ به ۱ محدود می‌شود — همان
+ * رفتار مطلوب. برای سنجش «صفحهٔ عادی دست نمی‌خورد» باید صفحه‌ای در
+ * محدودهٔ معتبر انتخاب شود.
+ */
+spk_equals( 1, (int) $pg_ok_page['page'], 'با نتیجهٔ صفر، صفحه ۱ می‌ماند' );
 spk_equals( 0, count( $pg_ok_page['items'] ), 'صفحهٔ عادی با جستجوی بی‌نتیجه ردیفی ندارد' );
+
+// با داده واقعی: صفحهٔ ۲ از ۳ صفحه باید دست‌نخورده بماند.
+$pg_seed = 'MARKER_PG_' . wp_generate_password( 6, false, false );
+$pg_person_table = Sparkknife_Ledger_DB::persons_table();
+$pg_seed_ids = array();
+
+global $wpdb;
+
+for ( $pg_i = 0; $pg_i < 3; $pg_i++ ) {
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+	$wpdb->insert(
+		$pg_person_table,
+		array(
+			'name'        => $pg_seed . ' ' . $pg_i,
+			'phone'       => '',
+			'status'      => 'active',
+			'description' => '',
+			'sort_key'    => Sparkknife_Ledger_Sanitizer::persian_sort_key( $pg_seed . ' ' . $pg_i ),
+			'created_at'  => current_time( 'mysql' ),
+			'updated_at'  => current_time( 'mysql' ),
+		)
+	);
+	$pg_seed_ids[] = (int) $wpdb->insert_id;
+}
+
+$pg_real = Sparkknife_Ledger_Person_Repository::instance()->query(
+	array(
+		'per_page' => 1,
+		'page'     => 2,
+		'search'   => $pg_seed,
+	)
+);
+
+spk_equals( 2, (int) $pg_real['page'], 'صفحهٔ ۲ در محدودهٔ معتبر دست‌نخورده می‌ماند' );
+spk_equals( 3, (int) $pg_real['total'], 'سه ردیف آزمون صفحه‌بندی شمرده می‌شوند' );
+
+foreach ( $pg_seed_ids as $pg_cleanup_id ) {
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$pg_person_table} WHERE id = %d", $pg_cleanup_id ) );
+}
 
 // صفحهٔ سرریزشده باید به آخرین صفحهٔ معقول بیفتد، نه صفحهٔ اول.
 $pg_huge = Sparkknife_Ledger_Transaction_Repository::instance()->query(
@@ -3494,8 +3538,11 @@ foreach ( (array) $av_audit as $av_entry ) {
 spk_assert( $av_dup_ok, 'در تاریخچهٔ تراکنش هیچ فیلدی با from === to ثبت نشده است' );
 
 // تمیزکاری.
-$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}sparkknife_ledger_audit WHERE object_type = 'transaction' AND object_id = %d", $av_txn_id ) );
-$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}sparkknife_ledger_transactions WHERE id = %d", $av_txn_id ) );
+$av_audit_table = Sparkknife_Ledger_DB::audit_table();
+$av_txn_table   = Sparkknife_Ledger_DB::transactions_table();
+
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$av_audit_table} WHERE object_type = 'transaction' AND object_id = %d", $av_txn_id ) );
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$av_txn_table} WHERE id = %d", $av_txn_id ) );
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$av_table} WHERE id = %d", $av_person_id ) );
 
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
