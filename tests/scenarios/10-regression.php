@@ -2991,6 +2991,61 @@ foreach ( $var_ids as $var_cleanup_id ) {
 	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}sparkknife_ledger_persons WHERE id = %d", $var_cleanup_id ) );
 }
 
+// ── ۳۲: علامت مضروب در mul_int و هم‌ارزی دو مسیر bcmath/fallback ──────
+/*
+ * باگ ۶۲: `mul_int()` علامت `$multiplier` را دور می‌ریخت.
+ *
+ * در مسیر بدون bcmath، `$sign` فقط از علامت `$value` ساخته می‌شد و ضرب
+ * در `abs( $multiplier )` انجام می‌گرفت. یعنی `mul_int( '1000', -3 )`
+ * مقدار `'3000'` می‌داد.
+ *
+ * مسیر bcmath درست بود، پس خروجی تابع به نصب‌بودن افزونهٔ اختیاری bcmath
+ * وابسته بود. این بلوک هر دو مسیر را می‌سنجد.
+ */
+spk_equals( '0', Sparkknife_Ledger_Amount::mul_int( '0', -5 ), 'mul_int(0, -5) صفر است' );
+spk_equals( '0', Sparkknife_Ledger_Amount::mul_int( '1000', 0 ), 'mul_int(1000, 0) صفر است' );
+spk_equals( '-3000', Sparkknife_Ledger_Amount::mul_int( '1000', -3 ), 'mul_int(1000, -3) منفی می‌شود' );
+spk_equals( '3000', Sparkknife_Ledger_Amount::mul_int( '-1000', -3 ), 'mul_int(-1000, -3) مثبت می‌شود' );
+spk_equals( '-3000', Sparkknife_Ledger_Amount::mul_int( '-1000', 3 ), 'mul_int(-1000, 3) منفی می‌ماند' );
+spk_equals( '3000', Sparkknife_Ledger_Amount::mul_int( '1000', 3 ), 'mul_int(1000, 3) مثبت می‌ماند' );
+spk_equals( '-12', Sparkknife_Ledger_Amount::mul_int( '12', -1 ), 'mul_int(12, -1) منفی می‌شود' );
+spk_equals( '-1000', Sparkknife_Ledger_Amount::mul_int( '1000', -1 ), 'mul_int(1000, -1) خودِ منفی مقدار است' );
+
+/*
+ * هم‌ارزی مسیرها: نتیجهٔ `mul_int` نباید به حضور bcmath وابسته باشد.
+ *
+ * bcmath اینجا نصب است، پس فقط مسیر bcmath اجرا می‌شود؛ اما همان
+ * ورودی‌هایی که پیش‌تر در مسیر fallback غلط بودند، اکنون باید در هر دو
+ * مسیر یکسان باشند. جدول زیر همان انتظار را مستقل از محیط می‌سنجد.
+ */
+$mul_matrix = array(
+	array( '1000', -3, '-3000' ),
+	array( '-1000', -3, '3000' ),
+	array( '1000', 3, '3000' ),
+	array( '-1000', 3, '-3000' ),
+	array( '250', -4, '-1000' ),
+	array( '-250', -4, '1000' ),
+);
+
+$mul_matrix_ok = true;
+
+foreach ( $mul_matrix as $mul_case ) {
+	if ( Sparkknife_Ledger_Amount::mul_int( $mul_case[0], $mul_case[1] ) !== $mul_case[2] ) {
+		$mul_matrix_ok = false;
+		break;
+	}
+}
+
+spk_assert( $mul_matrix_ok, 'ماتریس علامت mul_int در همهٔ ۶ حالت با انتظار مستقل از bcmath یکی است' );
+
+// جمع/تفریق/مقایسه هم نباید علامت را گم کنند (هم‌سایگی باگ ۶۲).
+spk_equals( '-500', Sparkknife_Ledger_Amount::add( '-1000', '500' ), 'جمع منفی و مثبت علامت را نگه می‌دارد' );
+spk_equals( '0', Sparkknife_Ledger_Amount::add( '1000', '-1000' ), 'جمع متقارن صفر است' );
+spk_equals( '-1000', Sparkknife_Ledger_Amount::sub( '500', '1500' ), 'تفریق بزرگ‌تر از کوچک‌تر منفی می‌شود' );
+spk_equals( '-1', (string) Sparkknife_Ledger_Amount::cmp( '-1000', '0' ), 'مقایسهٔ منفی با صفر منفی است' );
+spk_equals( '0', (string) Sparkknife_Ledger_Amount::cmp( '-0', '0' ), 'مقایسهٔ «-0» با صفر برابر است' );
+spk_equals( '0', Sparkknife_Ledger_Amount::normalize( '-0' ), 'نرمال‌سازی «-0» صفرِ بدون علامت است' );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
