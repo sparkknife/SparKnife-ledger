@@ -211,10 +211,23 @@ class Sparkknife_Ledger_Installer {
 		}
 
 		if ( ! $installed ) {
-			// افزونه بدون فعال‌سازی (مثلاً آپلود دستی) اجرا شده است.
+			/*
+			 * افزونه بدون فعال‌سازی (مثلاً آپلود دستی) اجرا شده است.
+			 *
+			 * `backfill_sort_keys()` اینجا هم لازم است: ممکن است جداول از
+			 * یک نصب قدیمی‌تر باقی مانده باشند و گزینهٔ نسخه پاک شده باشد
+			 * (مثلاً با پاک‌سازی دستی wp_options، یا مهاجرت سایت بدون
+			 * انتقال آپشن‌ها). در آن حالت ردیف‌های موجود `sort_key` ندارند
+			 * و `ORDER BY sort_key ASC` آن‌ها را با ترتیب دلبخواه — عملاً
+			 * ترتیب درج — برمی‌گرداند. فهرست اشخاص بی‌ترتیب می‌شد و
+			 * کاربر آن را «الفبای خراب» می‌دید.
+			 *
+			 * این متد ایدمپوتنت است و فقط ردیف‌های خالی را پر می‌کند.
+			 */
 			self::create_tables();
 			Sparkknife_Ledger_Settings::install_defaults();
 			Sparkknife_Ledger_Capabilities::add_capabilities();
+			self::backfill_sort_keys();
 		} else {
 			self::create_tables();
 			Sparkknife_Ledger_DB::flush_table_cache();
