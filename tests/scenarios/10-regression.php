@@ -3046,6 +3046,62 @@ spk_equals( '-1', (string) Sparkknife_Ledger_Amount::cmp( '-1000', '0' ), 'مق�
 spk_equals( '0', (string) Sparkknife_Ledger_Amount::cmp( '-0', '0' ), 'مقایسهٔ «-0» با صفر برابر است' );
 spk_equals( '0', Sparkknife_Ledger_Amount::normalize( '-0' ), 'نرمال‌سازی «-0» صفرِ بدون علامت است' );
 
+// ── ۳۳: تزریق فرمول CSV با پیش‌وند پوشاننده ─────────────────────────
+/*
+ * باگ ۶۳: `sanitize_cell()` فقط بایت نخست سلول را می‌سنجید.
+ *
+ * Excel و LibreOffice فاصله و نویسه‌های بی‌عرض ابتدای سلول را نادیده
+ * می‌گیرند و رشتهٔ بعدی را به‌عنوان فرمول اجرا می‌کنند. پس نامی مثل
+ * «ZERO-WIDTH-SPACE =cmd|calc» از فیلتر رد می‌شد و در فایل CSV به
+ * فرمول تبدیل می‌شد.
+ *
+ * `Sanitizer::text()` این نویسه‌ها را حذف نمی‌کند (فقط می‌سنجد که
+ * رشتهٔ مرئی خالی نباشد)، بنابراین این مقدار تا مرحلهٔ CSV می‌رسد.
+ */
+$csv_unsafe = array(
+	'=cmd|calc'              => 'فرمول ساده',
+	'+1+1'                   => 'به‌علاوه',
+	'-1+1'                   => 'منفی',
+	'@SUM(A1)'               => 'ات‌فورمول',
+	"\tTAB"                  => 'tab ابتدایی',
+	"\rCR"                   => 'CR ابتدایی',
+	"\u{200B}=cmd|calc"      => 'فاصلهٔ بی‌عرض صفر',
+	"\u{200F}=1+1"           => 'علامت راست‌به‌چپ',
+	"\u{FEFF}=HYPERLINK(A1)" => 'BOM',
+	"\u{00A0}=1+1"           => 'فاصلهٔ نشکن',
+	"\u{200E}+1+1"           => 'علامت چپ‌به‌راست',
+	"  =1+1"                 => 'دو فاصله',
+	"\n=cmd|calc"            => 'خط جدید',
+);
+
+$csv_unsafe_ok = true;
+
+foreach ( $csv_unsafe as $csv_payload => $csv_label ) {
+	$csv_out = Sparkknife_Ledger_Export_Service::sanitize_cell( (string) $csv_payload );
+
+	// نخستین بایت باید آپاستروف باشد، وگرنه Excel فرمول را اجرا می‌کند.
+	if ( 0 !== strpos( $csv_out, "'" ) ) {
+		$csv_unsafe_ok = false;
+		break;
+	}
+}
+
+spk_assert( $csv_unsafe_ok, 'همهٔ ۱۳ پیش‌وند پوشانندهٔ تزریق فرمول CSV مسدود می‌شوند' );
+
+// مقدار سالم نباید دست‌کاری شود.
+spk_equals( 'سلام', Sparkknife_Ledger_Export_Service::sanitize_cell( 'سلام' ), 'متن سالم فارسی دست‌نخورده می‌ماند' );
+spk_equals( 'normal', Sparkknife_Ledger_Export_Service::sanitize_cell( 'normal' ), 'متن سالم لاتین دست‌نخورده می‌ماند' );
+spk_equals( '', Sparkknife_Ledger_Export_Service::sanitize_cell( '' ), 'سلول خالی خالی می‌ماند' );
+spk_equals( '12,500', Sparkknife_Ledger_Export_Service::sanitize_cell( '12,500' ), 'عدد با جداکننده دست‌نخورده می‌ماند' );
+spk_equals( "'-12500", Sparkknife_Ledger_Export_Service::sanitize_cell( '-12500' ), 'مبلغ منفی آپاستروف می‌گیرد — رفتار قبلی حفظ شده' );
+
+// خودِ ورودی هم باید بازگردانده شود، نه نسخهٔ بریده‌شده.
+spk_equals(
+	"'\u{200B}=cmd|calc",
+	Sparkknife_Ledger_Export_Service::sanitize_cell( "\u{200B}=cmd|calc" ),
+	'آپاستروف پیش از نویسهٔ بی‌عرض می‌نشیند و محتوا حفظ می‌شود'
+);
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
