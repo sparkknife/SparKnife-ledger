@@ -3937,6 +3937,340 @@ $txn_real_result = $txn_repo->query( array( 'search' => 'zzz-no-such-reference-z
 spk_equals( '', (string) $wpdb->last_error, 'جستجوی عادی تراکنش خطا نمی‌دهد' );
 spk_equals( 0, (int) $txn_real_result['total'], 'جستجوی بی‌نتیجه صفر ردیف می‌دهد' );
 
+// ── ۴۴: چرخه ابطال/بازیابی، تقویم و صحت گزارش‌ها ────────────────────
+//
+// پاس ۱۰ روی نواحی‌ای تمرکز کرد که تا آن زمان فقط با بازخوانی کد
+// تأیید شده بودند. سه ناحیه انتخاب شد: چرخه ابطال/بازیابی، گردش
+// تقویم شمسی و انطباق گزارش‌ها با SQL مستقیم. هیچ باگ تازه‌ای پیدا
+// نشد، ولی همین سه ناحیه حساس‌ترین بخش‌های یک افزونه حسابداری‌اند
+// و ارزش نگهبان دارند.
+
+add_filter( 'sparkknife_ledger_allow_void_restore', '__return_true' );
+
+$cyc_repo = Sparkknife_Ledger_Transaction_Repository::instance();
+$cyc_svc  = Sparkknife_Ledger_Transaction_Service::instance();
+$cyc_rep  = Sparkknife_Ledger_Report_Service::instance();
+$cyc_tag  = 'CYC' . wp_generate_password( 6, false, false );
+$cyc_pid  = (int) Sparkknife_Ledger_Person_Repository::instance()->insert(
+	array(
+		'name'        => 'چرخه ' . $cyc_tag,
+		'phone'       => '',
+		'description' => '',
+		'status'      => 'active',
+	)
+);
+
+$cyc_a = $cyc_svc->create(
+	array(
+		'person_id'   => $cyc_pid,
+		'type'        => 'income',
+		'amount'      => '1000000',
+		'txn_date'    => '1405/08/16',
+		'description' => 'چرخه الف',
+	)
+);
+$cyc_b = $cyc_svc->create(
+	array(
+		'person_id'   => $cyc_pid,
+		'type'        => 'income',
+		'amount'      => '2000000',
+		'txn_date'    => '1405/08/16',
+		'description' => 'چرخه ب',
+	)
+);
+
+spk_assert( ! is_wp_error( $cyc_a ) && ! is_wp_error( $cyc_b ), 'دو تراکنش چرخه ساخته شد' );
+
+$cyc_a = (int) $cyc_a;
+$cyc_b = (int) $cyc_b;
+
+$cyc_before = $cyc_rep->get_summary_report( array( 'person_id' => $cyc_pid, 'per_page' => 50 ) );
+$cyc_void   = $cyc_svc->void( $cyc_b, 'دلیل چرخه' );
+$cyc_mid    = $cyc_rep->get_summary_report( array( 'person_id' => $cyc_pid, 'per_page' => 50 ) );
+
+spk_assert( true === $cyc_void, 'ابطال موفق است' );
+spk_equals(
+	(int) $cyc_before['totals']['count'] - 1,
+	(int) $cyc_mid['totals']['count'],
+	'ابطال یک ردیف از شمار تراکنش‌های گزارش کم می‌کند'
+);
+
+// ابطال دوباره باید رد شود.
+$cyc_twice = $cyc_svc->void( $cyc_b, 'دوباره' );
+spk_assert( is_wp_error( $cyc_twice ), 'ابطال دوباره همان تراکنش رد می‌شود' );
+spk_equals(
+	'sparkknife_ledger_already_void',
+	is_wp_error( $cyc_twice ) ? $cyc_twice->get_error_code() : '',
+	'کد خطای ابطال دوباره درست است'
+);
+
+// بازیابی باید همه‌چیز را به حالت اول برگرداند.
+$cyc_restore = $cyc_svc->restore_void( $cyc_b );
+$cyc_after   = $cyc_rep->get_summary_report( array( 'person_id' => $cyc_pid, 'per_page' => 50 ) );
+
+spk_assert( true === $cyc_restore, 'بازیابی تراکنش باطل‌شده موفق است' );
+spk_equals(
+	(string) $cyc_before['totals']['income'],
+	(string) $cyc_after['totals']['income'],
+	'بازیابی درآمد گزارش را دقیقاً به حالت اول برمی‌گرداند'
+);
+spk_equals(
+	(int) $cyc_before['totals']['count'],
+	(int) $cyc_after['totals']['count'],
+	'بازیابی شمار تراکنش‌ها را دقیقاً برمی‌گرداند'
+);
+
+// فیلدهای ابطال باید پاک شوند، نه فقط وضعیت.
+$cyc_row = $cyc_repo->find( $cyc_b );
+
+spk_equals( 'posted', (string) $cyc_row->status, 'وضعیت پس از بازیابی posted است' );
+spk_assert( empty( $cyc_row->void_reason ), 'دلیل ابطال پس از بازیابی پاک می‌شود' );
+spk_equals( 0, (int) $cyc_row->voided_by, 'ابطال‌کننده پس از بازیابی صفر می‌شود' );
+spk_assert( empty( $cyc_row->voided_at ), 'زمان ابطال پس از بازیابی پاک می‌شود' );
+
+// بازیابی تراکنشی که باطل نیست باید رد شود.
+$cyc_not_void = $cyc_svc->restore_void( $cyc_a );
+
+spk_assert( is_wp_error( $cyc_not_void ), 'بازیابی تراکنش غیرباطل رد می‌شود' );
+spk_equals(
+	'sparkknife_ledger_not_void',
+	is_wp_error( $cyc_not_void ) ? $cyc_not_void->get_error_code() : '',
+	'کد خطای بازیابی غیرباطل درست است'
+);
+
+// تاریخچه باید سه رویداد create → void → restore داشته باشد.
+$cyc_actions = array();
+$cyc_logs    = Sparkknife_Ledger_Audit_Repository::instance()->query(
+	array( 'object_type' => 'transaction', 'object_id' => $cyc_b, 'per_page' => 50 )
+);
+
+foreach ( $cyc_logs['items'] as $cyc_log ) {
+	$cyc_actions[] = $cyc_log->action;
+}
+
+/*
+ * مخزن تاریخچه جدیدترین را اول می‌دهد (`ORDER BY created_at DESC`) —
+ * این ترتیب نمایش درست است چون کاربر دنبال آخرین اتفاق است. پس
+ * انتظار از جدید به قدیم نوشته می‌شود.
+ */
+spk_equals(
+	array( 'restore', 'void', 'create' ),
+	$cyc_actions,
+	'تاریخچه چرخه ابطال هر سه رویداد را دارد'
+);
+
+// ── ۴۴ب: گردش تقویم شمسی ────────────────────────────────────────────
+//
+// هر روز یک بازه چهارساله باید از میلادی به شمسی و برگشت **بی‌تغییر**
+// برگردد. یک خطای یک‌روزه در تبدیل، گزارش‌های مرزی و «۳۰ روز اخیر» را
+//بی‌صدا جابه‌جا می‌کند.
+
+$cal_fails  = 0;
+$cal_cursor = '2024-01-01';
+$cal_end    = '2026-12-31';
+
+while ( $cal_cursor <= $cal_end ) {
+	$cal_jalali = Sparkknife_Ledger_Date::format( $cal_cursor );
+	$cal_back   = Sparkknife_Ledger_Date::to_storage( $cal_jalali );
+
+	if ( is_wp_error( $cal_back ) || $cal_back !== $cal_cursor ) {
+		$cal_fails++;
+	}
+
+	$cal_cursor = gmdate( 'Y-m-d', strtotime( $cal_cursor . ' +1 day' ) );
+}
+
+spk_equals( 0, $cal_fails, 'گردش سه‌ساله تقویم شمسی هیچ اختلافی ندارد' );
+
+foreach ( array( 1399, 1403, 1408 ) as $cal_leap ) {
+	spk_assert( Sparkknife_Ledger_Date::is_jalali_leap( $cal_leap ), 'سال ' . $cal_leap . ' کبیسه است' );
+	spk_assert(
+		! is_wp_error( Sparkknife_Ledger_Date::to_storage( $cal_leap . '/12/30' ) ),
+		'۳۰ اسفند سال کبیسه ' . $cal_leap . ' پذیرفته می‌شود'
+	);
+}
+
+foreach ( array( 1400, 1405, 1406 ) as $cal_plain ) {
+	spk_assert( ! Sparkknife_Ledger_Date::is_jalali_leap( $cal_plain ), 'سال ' . $cal_plain . ' کبیسه نیست' );
+	spk_assert(
+		is_wp_error( Sparkknife_Ledger_Date::to_storage( $cal_plain . '/12/30' ) ),
+		'۳۰ اسفند سال غیرکبیسه ' . $cal_plain . ' رد می‌شود'
+	);
+}
+
+foreach ( array( '1405/13/01', '1405/01/00', '1405/00/15', '1405/07/31', 'abc', '' ) as $cal_bad ) {
+	spk_assert(
+		is_wp_error( Sparkknife_Ledger_Date::to_storage( $cal_bad ) ),
+		'تاریخ نامعتبر رد می‌شود: ' . $cal_bad
+	);
+}
+
+// ── ۴۴ج: انطباق گزارش با SQL مستقیم ─────────────────────────────────
+//
+// اگر گزارش با جمع مستقیم جدول نخواند، کاربر عددی می‌بیند که با
+// حسابداری واقعی فرق دارد — بدترین نوع باگ در نرم‌افزار مالی.
+
+$aud_txn_table = Sparkknife_Ledger_DB::transactions_table();
+
+$aud_sql = $wpdb->get_row(
+	"SELECT COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END),0) AS inc,
+	        COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END),0) AS exp,
+	        COUNT(*) AS cnt
+	 FROM {$aud_txn_table} WHERE status='posted'"
+);
+
+$aud_report = $cyc_rep->get_summary_report( array( 'per_page' => 500 ) );
+
+spk_equals(
+	(string) $aud_sql->inc,
+	(string) $aud_report['totals']['income'],
+	'درآمد گزارش تجمیعی با SQL مستقیم برابر است'
+);
+spk_equals(
+	(string) $aud_sql->exp,
+	(string) $aud_report['totals']['expense'],
+	'هزینه گزارش تجمیعی با SQL مستقیم برابر است'
+);
+spk_equals(
+	(int) $aud_sql->cnt,
+	(int) $aud_report['totals']['count'],
+	'شمار تراکنش‌های گزارش با SQL مستقیم برابر است'
+);
+spk_equals(
+	Sparkknife_Ledger_Amount::sub( $aud_report['totals']['income'], $aud_report['totals']['expense'] ),
+	(string) $aud_report['totals']['balance'],
+	'مانده گزارش دقیقاً درآمد منهای هزینه است'
+);
+
+// جمع ردیف‌ها باید با جمع کل یکی باشد.
+$aud_sum_inc = '0';
+$aud_sum_exp = '0';
+$aud_sum_cnt = 0;
+
+foreach ( $aud_report['rows'] as $aud_row ) {
+	$aud_sum_inc = Sparkknife_Ledger_Amount::add( $aud_sum_inc, $aud_row['income'] );
+	$aud_sum_exp = Sparkknife_Ledger_Amount::add( $aud_sum_exp, $aud_row['expense'] );
+	$aud_sum_cnt += (int) $aud_row['count'];
+}
+
+spk_equals( (string) $aud_report['totals']['income'], $aud_sum_inc, 'جمع درآمد ردیف‌ها با جمع کل برابر است' );
+spk_equals( (string) $aud_report['totals']['expense'], $aud_sum_exp, 'جمع هزینه ردیف‌ها با جمع کل برابر است' );
+spk_equals( (int) $aud_report['totals']['count'], $aud_sum_cnt, 'جمع شمار ردیف‌ها با جمع کل برابر است' );
+
+// ── ۴۴د: تولید مرجع یکتا و پیوسته ───────────────────────────────────
+
+$ref_list   = array();
+$ref_errors = 0;
+
+for ( $ref_i = 0; $ref_i < 12; $ref_i++ ) {
+	$ref_id = $cyc_svc->create(
+		array(
+			'person_id'   => $cyc_pid,
+			'type'        => 'income',
+			'amount'      => '1000',
+			'txn_date'    => '1405/08/16',
+			'description' => 'مرجع ' . $ref_i,
+		)
+	);
+
+	if ( is_wp_error( $ref_id ) ) {
+		$ref_errors++;
+		continue;
+	}
+
+	$ref_row = $cyc_repo->find( (int) $ref_id );
+
+	if ( $ref_row ) {
+		$ref_list[] = (string) $ref_row->reference;
+		Sparkknife_Ledger_Transaction_Repository::instance()->update(
+			(int) $ref_id,
+			array( 'status' => 'void', 'void_reason' => 'پاک‌سازی' )
+		);
+	}
+}
+
+spk_equals( 0, $ref_errors, '۱۲ درج مرجع بدون خطا انجام شد' );
+spk_equals( count( $ref_list ), count( array_unique( $ref_list ) ), 'همه مرجع‌های تولیدشده یکتا هستند' );
+
+$ref_bad_shape = 0;
+
+foreach ( $ref_list as $ref_one ) {
+	if ( ! preg_match( '/\d+$/', $ref_one ) ) {
+		$ref_bad_shape++;
+	}
+}
+
+spk_equals( 0, $ref_bad_shape, 'همه مرجع‌ها به عدد تمام می‌شوند' );
+
+// ── ۴۴ه: ویژگی‌های رشته‌ای نام‌ها در پایگاه داده ─────────────────────
+
+$str_repo  = Sparkknife_Ledger_Person_Repository::instance();
+$str_cases = array(
+	'comma'   => 'شخص، با ویرگول',
+	'quote'   => 'شخص "با" گیومه',
+	'newline' => "شخص\nبا خط جدید",
+	'tab'     => "شخص\tبا تب",
+	'pipe'    => 'شخص|با پایپ',
+	'zwnj'    => 'نیم‌فاصله‌دار',
+	'emoji'   => 'شخص 😀 ایموجی',
+);
+$str_ids   = array();
+
+foreach ( $str_cases as $str_key => $str_name ) {
+	$str_ids[ $str_key ] = (int) $str_repo->insert(
+		array(
+			'name'        => $str_name,
+			'phone'       => '',
+			'description' => '',
+			'status'      => 'active',
+		)
+	);
+
+	$str_row = $str_repo->find( $str_ids[ $str_key ] );
+
+	spk_equals(
+		$str_name,
+		$str_row ? $str_row->name : '',
+		'نام با نویسه خاص بایت‌به‌بایت حفظ می‌شود: ' . $str_key
+	);
+}
+
+// تزریق فرمول در خروجی CSV: همه این‌ها باید پیشوند بگیرند.
+foreach ( array( '=1+1', '+1+1', '-1+1', '@SUM(A1)', "\t=1+1", "\n=1+1", ' =1+1' ) as $inj ) {
+	$inj_safe = Sparkknife_Ledger_Export_Service::sanitize_cell( $inj );
+
+	spk_equals(
+		"'",
+		substr( $inj_safe, 0, 1 ),
+		'سلول مخرب پیشوند محافظ می‌گیرد: ' . bin2hex( $inj )
+	);
+}
+
+// اعداد خالص نباید پیشوند بگیرند (باگ ۷۰).
+foreach ( array( '-7438000', '125000', '-1.5', '-1,000' ) as $num_cell ) {
+	spk_equals(
+		$num_cell,
+		Sparkknife_Ledger_Export_Service::sanitize_cell( $num_cell ),
+		'عدد خالص در CSV دست‌نخورده می‌ماند: ' . $num_cell
+	);
+}
+
+// تمیزکاری.
+foreach ( $str_ids as $str_id ) {
+	Sparkknife_Ledger_Person_Service::instance()->delete( $str_id );
+}
+
+global $wpdb;
+$cyc_txn_table   = Sparkknife_Ledger_DB::transactions_table();
+$cyc_audit_table = Sparkknife_Ledger_DB::audit_table();
+
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$cyc_audit_table} WHERE object_type = 'transaction' AND object_id = %d", $cyc_a ) );
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$cyc_audit_table} WHERE object_type = 'transaction' AND object_id = %d", $cyc_b ) );
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$cyc_txn_table} WHERE person_id = %d", $cyc_pid ) );
+Sparkknife_Ledger_Person_Service::instance()->delete( $cyc_pid );
+
+remove_filter( 'sparkknife_ledger_allow_void_restore', '__return_true' );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
