@@ -359,6 +359,26 @@ add_filter( 'sparkknife_ledger_export_formats', function ( $formats ) {
 php tests/run-tests.php /path/to/wp-load.php
 ```
 
+### ابزارهای بررسی
+
+دو بررسی که بدون نیاز به وردپرس و PHP اجرا می‌شوند:
+
+```bash
+node tools/lint.mjs              # تجزیهٔ نحوی همهٔ فایل‌های PHP
+node tools/check-authorship.mjs  # یکپارچگی امضای نویسنده (۱۲ بررسی)
+```
+
+و دو ابزار برای انتشار:
+
+```bash
+./tools/sign-release.sh sparkknife-ledger.zip    # چکسام + امضای RSA
+./tools/verify-release.sh sparkknife-ledger.zip  # بررسی امضا
+```
+
+`lint.mjs` به `php-parser` نیاز دارد (`npm install php-parser`).
+`check-authorship.mjs` هیچ وابستگی ندارد. راهنمای کامل امضا:
+[`docs/RELEASE-SIGNING.md`](docs/RELEASE-SIGNING.md).
+
 پوشش: **۹۶۶ assertion در ۱۰ سناریو** — ۳۳۳ در سناریوهای ۰۱–۰۹ و
 ۶۳۳ در سناریوی رگرسیون.
 
