@@ -12,6 +12,65 @@ Sparkknife_Ledger_Test_Reporter::group( '۱۰) رگرسیون باگ‌های م
 
 global $wpdb;
 
+/*
+ * اجرای زیرفرایند فقط وقتی مجاز است که هم تابع وجود داشته باشد و هم
+ * در `disable_functions` نباشد.
+ *
+ * دو جای این سناریو با `shell_exec` یک اسکریپت PHP یا Node را اجرا
+ * می‌کنند (بلوک ۹ برای قالب چاپ و بلوک ۲۵ص برای پیش‌نمایش جاوااسکریپت).
+ * روی میزبان‌هایی که `shell_exec` در `disable_functions` است — یعنی
+ * پیش‌فرض بیشتر هاست‌های اشتراکی وردپرس — فراخوانی آن خطای مرگبار
+ * می‌دهد و **کل مجموعه تست متوقف می‌شود**؛ نه یک شکست، بلکه توقف.
+ * در محیط PHP-WASM هم `popen`/`proc_open` پشتیبانی نمی‌شوند و همین
+ * اتفاق می‌افتد.
+ *
+ * `function_exists()` این را نمی‌بیند: تابعِ غیرفعال‌شده هم «وجود
+ * دارد». باید فهرست `disable_functions` هم بررسی شود.
+ */
+if ( ! function_exists( 'sparkknife_ledger_can_spawn' ) ) {
+	/**
+	 * آیا می‌توان زیرفرایند اجرا کرد؟
+	 *
+	 * @return bool
+	 */
+	function sparkknife_ledger_can_spawn() {
+		static $can = null;
+
+		if ( null !== $can ) {
+			return $can;
+		}
+
+		$can = false;
+
+		if ( ! function_exists( 'shell_exec' ) ) {
+			return $can;
+		}
+
+		$disabled = (string) ini_get( 'disable_functions' );
+
+		if ( '' !== $disabled ) {
+			$list = array_map( 'trim', explode( ',', $disabled ) );
+
+			if ( in_array( 'shell_exec', $list, true ) || in_array( 'exec', $list, true ) ) {
+				return $can;
+			}
+		}
+
+		// در محیط WASM پشتیبانی زیرفرایند وجود ندارد.
+		if ( defined( 'PHP_WASM' ) || false !== getenv( 'PHP_WASM' ) ) {
+			return $can;
+		}
+
+		if ( 'cli' !== PHP_SAPI && false !== strpos( (string) PHP_SAPI, 'wasm' ) ) {
+			return $can;
+		}
+
+		$can = true;
+
+		return $can;
+	}
+}
+
 // ── ۱: ذخیره یک تب تنظیمات، تب‌های دیگر را خاموش نکند ──────────────
 $defaults = Sparkknife_Ledger_Settings::defaults();
 Sparkknife_Ledger_Settings::save( $defaults, false );
@@ -248,9 +307,11 @@ if ( '' !== $php_bin && is_executable( $php_bin ) ) {
 
 	file_put_contents( $doc_script, $doc_source );
 
-	$doc_output = (string) shell_exec(
-		escapeshellarg( $php_bin ) . ' -d memory_limit=512M ' . escapeshellarg( $doc_script ) . ' 2>/dev/null'
-	);
+	$doc_output = sparkknife_ledger_can_spawn()
+		? (string) shell_exec(
+			escapeshellarg( $php_bin ) . ' -d memory_limit=512M ' . escapeshellarg( $doc_script ) . ' 2>/dev/null'
+		)
+		: '';
 
 	wp_delete_file( $doc_script );
 }
@@ -502,10 +563,18 @@ spk_equals(
 	'مرتب‌سازی با مقادیر مساوی بین دو اجرا پایدار است'
 );
 
-// هیچ شخصی نباید در صفحه‌بندی تکرار یا حذف شود.
-$paged_ids = array();
-$page_size = 2;
-$page_max  = (int) ceil( $sort_a['total'] / $page_size ) + 1;
+/*
+ * هیچ شخصی نباید در صفحه‌بندی تکرار یا حذف شود.
+ *
+ * حلقه دقیقاً تا آخرین صفحهٔ موجود می‌رود، نه یکی بیشتر. باگ ۶۴ صفحه‌های
+ * خارج از بازه را به آخرین صفحه محدود می‌کند (رفتار استاندارد)، پس
+ * درخواست صفحهٔ اضافه ردیف‌ها را **تکرار** می‌کند و این بررسی را قرمز
+ * می‌کرد — نه به‌خاطر نقص کد، بلکه به‌خاطر بازهٔ نادرست آزمون.
+ */
+$paged_ids   = array();
+$page_size   = 2;
+$sort_total  = (int) $sort_a['pagination']['total'];
+$page_max    = max( 1, (int) ceil( $sort_total / $page_size ) );
 
 for ( $p = 1; $p <= $page_max; $p++ ) {
 	$page = $report_service->get_summary_report(
@@ -524,7 +593,7 @@ spk_equals(
 );
 
 spk_equals(
-	(int) $sort_a['total'],
+	$sort_total,
 	count( $paged_ids ),
 	'صفحه‌بندی گزارش همه اشخاص را پوشش می‌دهد'
 );
@@ -991,6 +1060,18 @@ spk_equals( $unfiltered_report['totals']['income'], $unfiltered_report['filtered
 // `section_keys()` برای نام ناشناخته آرایه خالی برمی‌گرداند و شرط
 // `! empty( $section_keys )` آن را رد می‌کرد، پس `$sanitized` دست‌نخورده
 // می‌ماند و همه چک‌باکس‌ها صفر می‌شدند — همان باگ پاس اول، از راه دیگر.
+
+/*
+ * «قبل» باید همین‌جا خوانده شود.
+ *
+ * پیش‌تر این بلوک به `$settings_before` تکیه می‌کرد که در بلوک ۲۵ذ
+ * (چند صد خط **پایین‌تر**) تعریف می‌شد. یعنی هنگام اجرای اینجا متغیر
+ * وجود نداشت و `(string) null['use_persian_digits']` مقدار تهی می‌داد؛
+ * سه بررسی همیشه شکست می‌خوردند، مستقل از درستی کد. تستی که همیشه
+ * قرمز است، تست نیست.
+ */
+Sparkknife_Ledger_Settings::flush_cache();
+$settings_before = Sparkknife_Ledger_Settings::all();
 
 $unknown_section = Sparkknife_Ledger_Settings::save( array( 'settings_section' => 'not_a_real_tab' ), false );
 
@@ -2138,7 +2219,8 @@ spk_assert(
 // هیچ اتفاقی نمی‌افتاد. تنظیم مرده بدتر از نبودن تنظیم است، چون کاربر فکر
 // می‌کند کنترل دارد.
 
-$settings_before = Sparkknife_Ledger_Settings::all();
+// (نام `$settings_before` در بلوک ۲۵ی استفاده شده؛ اینجا نام جدا.)
+$dead_settings_before = Sparkknife_Ledger_Settings::all();
 
 // (الف) show_welcome_panel — پنل خوش‌آمد باید با تنظیم خاموش شود.
 Sparkknife_Ledger_Settings::save( array( 'show_welcome_panel' => 0 ), false );
@@ -2203,7 +2285,7 @@ foreach ( $view_files as $view_file ) {
 
 spk_equals( array(), $raw_digits, 'هیچ ویویی to_persian_digits را مستقیم صدا نمی‌زند' );
 
-Sparkknife_Ledger_Settings::save( $settings_before, false );
+Sparkknife_Ledger_Settings::save( $dead_settings_before, false );
 Sparkknife_Ledger_Settings::flush_cache();
 
 // ── ۲۵ژ: پیش‌نمایش مبلغ در مرورگر با ذخیره‌شده یکی است ────────────────
@@ -2240,7 +2322,7 @@ Sparkknife_Ledger_Settings::save( array( 'currency_decimals' => 0 ), false );
 Sparkknife_Ledger_Settings::flush_cache();
 
 // تست جاوااسکریپت اگر Node در دسترس باشد.
-$node = trim( (string) shell_exec( 'command -v node 2>/dev/null' ) );
+$node = sparkknife_ledger_can_spawn() ? trim( (string) shell_exec( 'command -v node 2>/dev/null' ) ) : '';
 
 if ( '' !== $node ) {
 	$probe_file = tempnam( sys_get_temp_dir(), 'spkj' ) . '.js';
@@ -2799,13 +2881,18 @@ if ( ! empty( $sort_ids ) ) {
  * (۶) رگرسیون صفحه‌بندی: مرتب‌سازی باید **پیش از** برش صفحه انجام شود.
  *
  * اگر کسی دوباره وسوسه شود که `LIMIT` را قبل از مرتب‌سازی PHP بگذارد،
- * صفحهٔ دوم ردیف‌های اشتباه می‌دهد. با هفت ردیف و per_page=۳، سه صفحهٔ
+ * صفحهٔ دوم ردیف‌های اشتباه می‌دهد. با شش ردیف و per_page=۳، دو صفحهٔ
  * پشت‌سرهم باید همان مجموعهٔ مرتب‌شده را بدون تکرار و بدون جاافتادن
  * بسازند.
+ *
+ * توجه: درخواست صفحهٔ سوم رد نمی‌شود بلکه به آخرین صفحه (۲) محدود
+ * می‌شود — رفتار استاندارد پس از باگ ۶۴ — و آن‌گاه ردیف‌ها تکرار
+ * می‌شوند. پس حلقه فقط تا شمار واقعی صفحه‌ها می‌رود.
  */
 $sort_page_names = array();
+$sort_page_count = max( 1, (int) ceil( 6 / 3 ) );
 
-for ( $sort_page = 1; $sort_page <= 3; $sort_page++ ) {
+for ( $sort_page = 1; $sort_page <= $sort_page_count; $sort_page++ ) {
 	$sort_page_result = Sparkknife_Ledger_Person_Repository::instance()->query(
 		array( 'orderby' => 'name', 'order' => 'ASC', 'per_page' => 3, 'page' => $sort_page, 'search' => $sort_marker )
 	);
@@ -2869,13 +2956,21 @@ spk_equals(
 	'جستجوی فقط-فاصله هیچ نسخه‌ای نمی‌سازد'
 );
 
-// (۲) سقف نسخه‌ها نباید از حد بگذرد (کوئری بی‌جهت بزرگ نشود).
-foreach ( array( 'علی', 'علی کاوه 0912', 'فاطمه محمدی ۰۹۱۲۳۴۵۶۷۸۹' ) as $var_query ) {
+/*
+ * (۲) سقف نسخه‌ها نباید از حد بگذرد (کوئری بی‌جهت بزرگ نشود).
+ *
+ * سقف از ثابت خودِ کلاس خوانده می‌شود، نه عددی دستی: سقف ۴۸ قدیمی
+ * دقیقاً خانوادهٔ ارقام عربی‌هندی را می‌بُرید و آزمون (۳) قرمز
+ * می‌شد — همان باگ ۷۶. عددِ آزمون اگر از کد جدا باشد دوباره از آن
+ * جدا می‌افتد.
+ */
+foreach ( array( 'علی', 'علی کاوه 0912', 'فاطمه محمدی ۰۹۱۲۳۴۵۶۷۸۹', 'علی کاوه 0912 MK12' ) as $var_query ) {
 	$var_count = count( Sparkknife_Ledger_Sanitizer::search_variants( $var_query ) );
 	spk_assert(
-		$var_count <= 48,
-		'نسخه‌های جستجو از سقف ۴۸ نمی‌گذرند (' . $var_count . ')'
+		$var_count <= Sparkknife_Ledger_Sanitizer::MAX_SEARCH_VARIANTS,
+		'نسخه‌های جستجو از سقف ' . Sparkknife_Ledger_Sanitizer::MAX_SEARCH_VARIANTS . ' نمی‌گذرند (' . $var_count . ')'
 	);
+	spk_assert( $var_count > 0, 'هر عبارت معنادار دست‌کم یک نسخه دارد: ' . $var_query );
 }
 
 /*
@@ -3093,7 +3188,8 @@ spk_equals( 'سلام', Sparkknife_Ledger_Export_Service::sanitize_cell( 'سلا
 spk_equals( 'normal', Sparkknife_Ledger_Export_Service::sanitize_cell( 'normal' ), 'متن سالم لاتین دست‌نخورده می‌ماند' );
 spk_equals( '', Sparkknife_Ledger_Export_Service::sanitize_cell( '' ), 'سلول خالی خالی می‌ماند' );
 spk_equals( '12,500', Sparkknife_Ledger_Export_Service::sanitize_cell( '12,500' ), 'عدد با جداکننده دست‌نخورده می‌ماند' );
-spk_equals( "'-12500", Sparkknife_Ledger_Export_Service::sanitize_cell( '-12500' ), 'مبلغ منفی آپاستروف می‌گیرد — رفتار قبلی حفظ شده' );
+// بلوک ۳۸ نشان داد مبلغ منفی باید عدد بماند (باگ ۷۰)؛ این انتظار به‌روز شد.
+spk_equals( '-12500', Sparkknife_Ledger_Export_Service::sanitize_cell( '-12500' ), 'مبلغ منفی عدد می‌ماند، نه متن' );
 
 // خودِ ورودی هم باید بازگردانده شود، نه نسخهٔ بریده‌شده.
 spk_equals(
@@ -3680,6 +3776,119 @@ $sm_audit = Sparkknife_Ledger_DB::audit_table();
 
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$sm_audit} WHERE object_type = 'person' AND object_id = %d", $sm_id ) );
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$sm_table} WHERE id = %d", $sm_id ) );
+
+// ── ۴۱: عبارت جستجوی بی‌محتوا هیچ نسخه‌ای نمی‌سازد ─────────────────
+//
+// `normalize_persian()` نویسه‌های قالب‌بندی (نیم‌فاصله U+200C،
+// U+200B و فاصله) را حذف می‌کند، ولی `trim()` آن‌ها را نمی‌گیرد.
+// نتیجه این بود که عبارتی که فقط از نیم‌فاصله ساخته شده از نگهبان
+// «عبارت خالی» رد می‌شد و یک نسخهٔ یک‌نویسه‌ای (خودِ نیم‌فاصله)
+// تولید می‌کرد. قرارداد تابع این است که برای عبارت بی‌محتوا هیچ
+// نسخه‌ای برنگرداند.
+foreach ( array( '', ' ', "\t\n", "\u{200C}", "\u{200B}", " \u{200C} ", "\u{FEFF}" ) as $blank_q ) {
+	spk_equals(
+		array(),
+		Sparkknife_Ledger_Sanitizer::search_variants( $blank_q ),
+		'عبارت بی‌محتوا هیچ نسخه‌ای نمی‌سازد: ' . bin2hex( $blank_q )
+	);
+}
+
+// عبارت معنادار اما کوتاه باید همچنان نسخه بسازد.
+spk_assert(
+	count( Sparkknife_Ledger_Sanitizer::search_variants( 'علی' ) ) > 0,
+	'جستجوی یک‌واژه‌ای همچنان نسخه می‌سازد'
+);
+
+// ── ۴۲: جستجو باید ارقام عربی‌هندی و ترکیب‌های مختلط را هم پیدا کند ──
+//
+// ریشهٔ باگ: `to_persian_digits()` و `to_arabic_digits()` کل رشته را
+// یکدست تبدیل می‌کنند. رکورد واقعی می‌تواند مختلط باشد — شمارهٔ
+// تماس با ارقام عربی‌هندی و یک شناسهٔ لاتین در ادامه. هیچ‌کدام از
+// سه نسخهٔ یکدست چنین رکوردی را پیدا نمی‌کرد.
+//
+// بدتر: سقف ثابت نسخه‌ها همیشه آخرین خانواده (ارقام عربی و ترکیب‌های
+// مختلط) را می‌بُرید، پس حتی نسخهٔ درست هم به کوئری نمی‌رسید.
+$mix_repo  = Sparkknife_Ledger_Person_Repository::instance();
+$mix_tag   = 'MIX' . wp_generate_password( 6, false, false );
+$mix_forms = array(
+	'علي كاوه 0912',                 // ك عربی + ارقام لاتین
+	'علی کاوه ۰۹۱۲',                 // ک فارسی + ارقام فارسی
+	'علي كاوه ٠٩١٢',                 // ك عربی + ارقام عربی‌هندی
+	'علی کاوه 0912',                 // ک فارسی + ارقام لاتین
+);
+
+$mix_ids = array();
+
+foreach ( $mix_forms as $mix_form ) {
+	$mix_id = $mix_repo->insert(
+		array(
+			'name'        => $mix_form . ' ' . $mix_tag,
+			'phone'       => '',
+			'description' => '',
+			'status'      => 'active',
+		)
+	);
+
+	spk_assert( $mix_id > 0, 'شخص آزمایشی مختلط ساخته شد' );
+
+	if ( $mix_id > 0 ) {
+		$mix_ids[ $mix_form ] = (int) $mix_id;
+	}
+}
+
+// هر رکورد باید با هر ترکیب دیگر جستجو پیدا شود — هر دو جهت.
+foreach ( $mix_ids as $mix_stored => $mix_stored_id ) {
+	foreach ( $mix_forms as $mix_query ) {
+		$mix_result = $mix_repo->query(
+			array( 'search' => $mix_query . ' ' . $mix_tag, 'per_page' => 200 )
+		);
+
+		$mix_found = false;
+
+		foreach ( $mix_result['items'] as $mix_item ) {
+			if ( (int) $mix_item->id === $mix_stored_id ) {
+				$mix_found = true;
+				break;
+			}
+		}
+
+		spk_assert(
+			$mix_found,
+			'ذخیره «' . $mix_stored . '» با جستجوی «' . $mix_query . '» پیدا می‌شود'
+		);
+	}
+}
+
+// نسخهٔ مختلط واقعاً ساخته می‌شود (نه فقط سقف بزرگ شده باشد).
+$mix_variants = Sparkknife_Ledger_Sanitizer::search_variants( 'علی کاوه 0912 MK12' );
+$mix_mixed    = 0;
+
+foreach ( $mix_variants as $mix_variant ) {
+	if ( preg_match( '/[\x{0660}-\x{0669}]/u', $mix_variant ) && preg_match( '/[0-9]/', $mix_variant ) ) {
+		$mix_mixed++;
+	}
+}
+
+spk_assert(
+	$mix_mixed > 0,
+	'ترکیب ارقام عربی و لاتین در یک نسخه ساخته می‌شود (' . $mix_mixed . ' نسخه)'
+);
+
+// و سقف باید از تعداد واقعی نسخه‌ها بزرگ‌تر باشد، وگرنه بریدن،
+// خانوادهٔ آخر را می‌اندازد.
+foreach ( array( 'علی کاوه 0912', 'علی کاوه 0912 MK12', 'فاطمه محمدی ۰۹۱۲۳۴۵۶۷۸۹' ) as $cap_query ) {
+	$cap_count = count( Sparkknife_Ledger_Sanitizer::search_variants( $cap_query ) );
+
+	spk_assert(
+		$cap_count <= Sparkknife_Ledger_Sanitizer::MAX_SEARCH_VARIANTS,
+		'نسخه‌ها از سقف مطلق نمی‌گذرند (' . $cap_count . ')'
+	);
+}
+
+// تمیزکاری.
+foreach ( $mix_ids as $mix_id ) {
+	Sparkknife_Ledger_Person_Service::instance()->delete( $mix_id );
+}
 
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
