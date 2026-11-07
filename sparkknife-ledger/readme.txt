@@ -5,10 +5,14 @@ Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
 Stable tag: 1.1.0
-License: GPLv2 or later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
+License: GPLv2 or later, or commercial license
+License URI: https://github.com/sparkknife/SparKnife-ledger/blob/main/sparkknife-ledger/LICENSE
+Author: SparKnife
+Author URI: https://github.com/sparkknife
 
 سیستم حرفه‌ای دفتر حساب اشخاص: ثبت تراکنش‌های ورودی و خروجی، محاسبه خودکار مانده، گزارش فردی و تجمیعی، تاریخچه تغییرات و پشتیبانی کامل از تقویم شمسی و رابط راست‌به‌چپ.
+
+نوشتهٔ SparKnife. تحت لایسنس دوگانه عرضه می‌شود: GPL-2.0-or-later برای استفادهٔ آزاد، یا لایسنس تجاری SparKnife برای استفادهٔ تجاری بدون تعهد بازنشر.
 
 == Description ==
 

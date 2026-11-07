@@ -6,6 +6,8 @@
  * @var string $description توضیح کوتاه.
  * @var array  $actions     دکمه‌های سمت چپ (label, url, class).
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

@@ -2,6 +2,8 @@
 /**
  * Repository اشخاص.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

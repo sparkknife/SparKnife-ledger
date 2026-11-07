@@ -1,6 +1,8 @@
 /**
  * SparKnife Ledger – اسکریپت پنل مدیریت
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * قابلیت‌ها:
  *   ۱) تأیید عملیات حساس (فرم‌های data-confirm)
  *   ۲) پیش‌نمایش لحظه‌ای و قالب‌بندی مبلغ

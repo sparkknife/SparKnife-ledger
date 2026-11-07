@@ -5,6 +5,8 @@
  * هر تغییر مهم با اطلاعات کاربر، IP، User-Agent و اختلاف فیلدها ثبت
  * می‌شود و با زنجیره هش SHA-256 در برابر دستکاری محافظت می‌شود.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

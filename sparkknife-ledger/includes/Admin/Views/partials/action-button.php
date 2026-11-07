@@ -10,6 +10,8 @@
  * @var string $class   کلاس دکمه.
  * @var string $redirect مقصد بازگشت (پیش‌فرض: صفحه جاری).
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

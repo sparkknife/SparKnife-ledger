@@ -6,6 +6,8 @@
  * @var array $settings تنظیمات فعلی.
  * @var string $current اسلاگ صفحه.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

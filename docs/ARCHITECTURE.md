@@ -117,3 +117,9 @@ Viewها هیچ‌گاه SQL نمی‌نویسند و کلاس‌های Model د
 - **API**: افزودن `includes/Api/class-sparkknife-ledger-rest-controller.php` با زیرساخت Capability موجود
 - **چند کاربری پیشرفته**: جدول مالکیت شخص برای تفکیک داده بین کاربران
 - **مانده افتتاحیه**: افزودن ستون `opening_balance` با محاسبه در `Ledger_Service` (بدون تغییر جداول تراکنش)
+
+---
+
+© ۱۴۰۵ / ۲۰۲۶ **SparKnife**. همهٔ حقوق محفوظ است.
+
+[SparKnife Ledger](https://github.com/sparkknife/SparKnife-ledger) · نوشتهٔ SparKnife

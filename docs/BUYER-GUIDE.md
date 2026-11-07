@@ -258,3 +258,9 @@ wp option delete sparkknife_ledger_onboarding_done
 - [ ] پشتیبان اولیه گرفته شد
 - [ ] یک شخص آزمایشی ساخته شد
 - [ ] یک تراکنش آزمایشی ثبت و در گزارش دیده شد
+
+---
+
+© ۱۴۰۵ / ۲۰۲۶ **SparKnife**. همهٔ حقوق محفوظ است.
+
+[SparKnife Ledger](https://github.com/sparkknife/SparKnife-ledger) · نوشتهٔ SparKnife

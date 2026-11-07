@@ -2,6 +2,8 @@
 /**
  * تبدیل و قالب‌بندی تاریخ (میلادی برای ذخیره، شمسی برای نمایش).
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

@@ -271,6 +271,8 @@ sparkknife-ledger/
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | لایه‌ها، جریان داده، تصمیم‌های طراحی |
 | [`docs/BUYER-GUIDE.md`](docs/BUYER-GUIDE.md) | مسیر خریدار: نصب، فعال‌سازی لایسنس، انتقال، پشتیبان |
 | [`docs/PRODUCT-PAGE.md`](docs/PRODUCT-PAGE.md) | متن آمادهٔ صفحهٔ فروش و پرسش‌های متداول |
+| [`docs/AUTHORSHIP.md`](docs/AUTHORSHIP.md) | نویسنده، مالکیت، لایسنس دوگانه |
+| [`docs/RELEASE-SIGNING.md`](docs/RELEASE-SIGNING.md) | امضای دیجیتال بستهٔ انتشار با RSA |
 | [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار — ۸۵ باگ مستند |
 
 ### قواعد کد
@@ -391,4 +393,28 @@ zip -r sparkknife-ledger.zip sparkknife-ledger \
 
 ## مجوز
 
-GPL-2.0-or-later. فایل [`LICENSE`](https://www.gnu.org/licenses/gpl-2.0.html) را ببینید.
+**لایسنس دوگانه.** هر کدام را که برای کاربری‌تان مناسب‌تر است انتخاب کنید:
+
+| | لایسنس | برای چه کسی |
+| --- | --- | --- |
+| (الف) | **GPL-2.0-or-later** | استفادهٔ آزاد و متن‌باز؛ با تعهد بازنشر |
+| (ب) | **لایسنس تجاری SparKnife** | استفادهٔ تجاری بدون تعهد بازنشر GPL |
+
+متن کامل هر دو در [`sparkknife-ledger/LICENSE`](sparkknife-ledger/LICENSE) است.
+اگر نمی‌خواهید کد شما بازنشر شود، لایسنس تجاری را انتخاب کنید — GPL اجازه
+می‌دهد هر دریافت‌کنندهٔ نسخهٔ GPL آن را با همان شرایط بازتوزیع کند.
+
+---
+
+## نویسنده
+
+**SparKnife** — طراحی، پیاده‌سازی و نگهداری.
+
+- وب: <https://github.com/sparkknife/SparKnife-ledger>
+- ایمیل: <155084046+sparkknife@users.noreply.github.com>
+
+کد این افزونه توسط SparKnife نوشته و بازبینی شده است. هر تصمیم طراحی در
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) توضیح دارد و هر باگ رفع‌شده در
+[`docs/AUDIT.md`](docs/AUDIT.md) با ریشه و آزمون رگرسیون ثبت شده است.
+
+© ۱۴۰۵ / 2026 SparKnife. همهٔ حقوق محفوظ است.

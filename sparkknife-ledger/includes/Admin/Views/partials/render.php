@@ -5,6 +5,8 @@
  * Viewها PHP ساده هستند؛ این کلاس امکان بازنویسی آن‌ها توسط قالب یا
  * افزونه دیگر را از طریق مسیر قالب فراهم می‌کند.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

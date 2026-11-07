@@ -15,6 +15,8 @@
  * @var string $id          شناسه (پیش‌فرض name).
  * @var string $extra       ویژگی‌های اضافی امن.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

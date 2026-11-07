@@ -15,6 +15,8 @@
  * همه توابع این کلاس برای رشته عددی متعارف (بدون صفر ابتدایی، با علامت
  * منفی اختیاری) کار می‌کنند و نتیجه همیشه رشته متعارف است.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

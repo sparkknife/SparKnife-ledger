@@ -8,6 +8,8 @@
  * @var string $action_url  نشانی دکمه.
  * @var string $action_text متن دکمه.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

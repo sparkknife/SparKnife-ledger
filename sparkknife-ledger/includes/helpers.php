@@ -5,6 +5,8 @@
  * همه توابع این فایل با پیشوند sparkknife_ledger_ نام‌گذاری شده‌اند تا احتمال
  * تداخل با سایر افزونه‌ها به حداقل برسد. این توابع API عمومی افزونه هستند.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 
