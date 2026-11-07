@@ -147,18 +147,41 @@ class Sparkknife_Ledger_Person_Service {
 		$changes = Sparkknife_Ledger_Audit_Service::instance()->diff( $before, $validated, array( 'name', 'phone', 'description', 'status' ) );
 
 		if ( ! empty( $changes ) ) {
-			$action = isset( $changes['status'] ) && 1 === count( $changes ) ? 'status_change' : 'update';
+			$only_status = isset( $changes['status'] ) && 1 === count( $changes );
+			$action      = $only_status ? 'status_change' : 'update';
 
+			/*
+			 * خلاصه باید با action بخواند.
+			 *
+			 * پیش‌تر `$action` در حالت تغییرِ فقط-وضعیت `status_change`
+			 * می‌شد، ولی متن خلاصه همیشه «ویرایش اطلاعات شخص» می‌ماند.
+			 * نتیجه در تاریخچه:
+			 *
+			 *     [غیرفعال‌سازی]  ویرایش اطلاعات شخص «آرش محمدی»
+			 *
+			 * کاربر با دیدن این ردیف فکر می‌کند نام یا تلفن هم عوض شده
+			 * و برای یافتن تغییر به‌دنبال جزئیاتی می‌گردد که وجود ندارد.
+			 * حالا خلاصه می‌گوید «تغییر وضعیت شخص».
+			 */
 			Sparkknife_Ledger_Audit_Service::instance()->log(
 				'person',
 				$id,
 				$action,
 				$changes,
-				sprintf(
-					/* translators: %s: person name */
-					__( 'ویرایش اطلاعات شخص «%s»', 'sparkknife-ledger' ),
-					$validated['name']
-				)
+				$only_status
+					? sprintf(
+						/* translators: 1: person name, 2: new status label */
+						__( 'تغییر وضعیت شخص «%1$s» به %2$s', 'sparkknife-ledger' ),
+						$validated['name'],
+						'active' === $validated['status']
+							? __( 'فعال', 'sparkknife-ledger' )
+							: __( 'غیرفعال', 'sparkknife-ledger' )
+					)
+					: sprintf(
+						/* translators: %s: person name */
+						__( 'ویرایش اطلاعات شخص «%s»', 'sparkknife-ledger' ),
+						$validated['name']
+					)
 			);
 		}
 
