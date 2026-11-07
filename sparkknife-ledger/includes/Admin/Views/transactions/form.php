@@ -89,7 +89,27 @@ $form_url = $is_edit
 			<?php endif; ?>
 		</div>
 
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="spk-form" id="spk-transaction-form" novalidate>
+		<?php
+		/*
+		 * بدون `novalidate`.
+		 *
+		 * پیش‌تر این فرم `novalidate` داشت تا اعتبارسنجی سفارشی
+		 * جاوااسکریپت (پیام‌های فارسی) تنها مرجع باشد. ولی فیلدها
+		 * `required` هم داشتند و آن صفت هرگز اعمال نمی‌شد — یعنی
+		 * اگر JS بارگذاری نمی‌شد (کش، خطای شبکه، افزونهٔ مسدودکننده،
+		 * کاربر با JS خاموش)، فرم خالی ارسال می‌شد، صفحه دوباره
+		 * بارگذاری می‌شد و کاربر تازه خطا را می‌دید.
+		 *
+		 * سرور جلوی ذخیرهٔ دادهٔ نامعتبر را می‌گیرد (تأییدشده)، پس
+		 * این باگ امنیتی نبود — ولی «صفحه دوباره بارگذاری شد و هیچ
+		 * اتفاقی نیفتاد» تجربهٔ بدی است که اعتبارسنجی بومی مرورگر
+		 * جلویش را می‌گیرد، حتی بدون جاوااسکریپت.
+		 *
+		 * جاوااسکریپت همچنان پیام‌های فارسی خودش را نشان می‌دهد؛
+		 * فقط دیگر مانع اعتبارسنجی بومی نیست.
+		 */
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="spk-form" id="spk-transaction-form">
 			<input type="hidden" name="action" value="sparkknife_ledger_action" />
 			<input type="hidden" name="sparkknife_action" value="transaction_save" />
 			<input type="hidden" name="sparkknife_redirect" value="<?php echo esc_attr( $form_url ); ?>" />

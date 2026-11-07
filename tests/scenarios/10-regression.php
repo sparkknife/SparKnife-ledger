@@ -4372,3 +4372,50 @@ spk_assert(
 	false !== strpos( $full_text, 'void' ) || 0 === (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$transactions} WHERE status = 'void'" ),
 	'تراکنش‌های باطل در خروجی کامل می‌آیند'
 );
+
+// ── ۴۶: cache تنظیمات تغییر گزینه را می‌بیند ─────────────────────────
+//
+// `Settings::all()` از یک کش استاتیک برمی‌گشت که فقط با `flush_cache()`
+// صریح پاک می‌شد. اگر گزینه از راه دیگری عوض می‌شد — `uninstall.php`،
+// مهاجرت، WP-CLI، یا افزونهٔ دیگر — افزونه تا پایان درخواست مقدار
+// کهنه برمی‌گرداند. در آزمون تجربی دیتابیس `rial` داشت و نمایش «یورو»
+// می‌داد: واحد پول اشتباه روی همهٔ مبالغ.
+
+Sparkknife_Ledger_Settings::save( array( 'currency_type' => 'toman' ), false );
+Sparkknife_Ledger_Settings::flush_cache();
+
+spk_equals( 'toman', Sparkknife_Ledger_Settings::get( 'currency_type' ), 'cache تنظیمات: مقدار اولیه' );
+
+// تغییر مستقیم گزینه، بی‌خبر از Settings::save().
+$cache_probe = get_option( Sparkknife_Ledger_Settings::OPTION_KEY, array() );
+$cache_probe['currency_type'] = 'rial';
+update_option( Sparkknife_Ledger_Settings::OPTION_KEY, $cache_probe );
+
+spk_equals(
+	'rial',
+	Sparkknife_Ledger_Settings::get( 'currency_type' ),
+	'cache تنظیمات تغییر مستقیم گزینه را می‌بیند (بدون flush)'
+);
+
+spk_equals(
+	'rial',
+	Sparkknife_Ledger_Settings::get( 'currency_type' ),
+	'واحد پول نمایش‌داده‌شده با مقدار ذخیره‌شده هم‌خوان است'
+);
+
+// تغییر مقدار (نه افزودن کلید) هم باید دیده شود.
+$cache_probe = get_option( Sparkknife_Ledger_Settings::OPTION_KEY, array() );
+if ( isset( $cache_probe['currency_decimals'] ) ) {
+	$cache_probe['currency_decimals'] = 0 === (int) $cache_probe['currency_decimals'] ? 2 : 0;
+	update_option( Sparkknife_Ledger_Settings::OPTION_KEY, $cache_probe );
+
+	spk_equals(
+		(string) $cache_probe['currency_decimals'],
+		(string) Sparkknife_Ledger_Settings::get( 'currency_decimals' ),
+		'cache تنظیمات تغییر یک مقدار را هم می‌بیند'
+	);
+}
+
+// بازگرداندن به پیش‌فرض.
+Sparkknife_Ledger_Settings::save( $defaults, false );
+Sparkknife_Ledger_Settings::flush_cache();

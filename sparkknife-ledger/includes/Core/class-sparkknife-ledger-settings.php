@@ -25,6 +25,13 @@ class Sparkknife_Ledger_Settings {
 	private static $cache = null;
 
 	/**
+	 * اثر انگشت گزینه در لحظهٔ پر شدن کش.
+	 *
+	 * @var string|null
+	 */
+	private static $cache_signature = null;
+
+	/**
 	 * مقادیر پیش‌فرض.
 	 *
 	 * @return array<string, mixed>
@@ -134,7 +141,7 @@ class Sparkknife_Ledger_Settings {
 	 * @return array<string, mixed>
 	 */
 	public static function all() {
-		if ( null !== self::$cache ) {
+		if ( null !== self::$cache && self::$cache_signature === self::signature() ) {
 			return self::$cache;
 		}
 
@@ -144,9 +151,44 @@ class Sparkknife_Ledger_Settings {
 			$stored = array();
 		}
 
-		self::$cache = array_merge( self::defaults(), $stored );
+		self::$cache           = array_merge( self::defaults(), $stored );
+		self::$cache_signature = self::signature();
 
 		return self::$cache;
+	}
+
+	/**
+	 * اثر انگشت ارزان گزینهٔ تنظیمات.
+	 *
+	 * چرا لازم است: `self::$cache` قبلاً فقط با `flush_cache()` صریح پاک
+	 * می‌شد. اگر گزینه از راه دیگری عوض می‌شد، افزونه تا پایان همان
+	 * درخواست مقدار کهنه را برمی‌گرداند.
+	 *
+	 * این حالت فرضی نیست:
+	 *
+	 *   - `uninstall.php` مقدار را مستقیم عوض می‌کند؛
+	 *   - مهاجرت‌ها و WP-CLI ممکن است بین دو خواندن بنویسند؛
+	 *   - افزونهٔ دیگری که تنظیمات را مهاجرت می‌دهد.
+	 *
+	 * پیامد در یک نرم‌افزار مالی جدی است: کاربر واحد پول اشتباه روی همهٔ
+	 * مبالغ می‌بیند و تصمیم غلط می‌گیرد. آزمون تجربی: دیتابیس `rial`
+	 * ولی نمایش «یورو».
+	 *
+	 * `get_option()` خودش از آپشن‌کش وردپرس می‌آید و در درخواست‌های
+	 * عادی از حافظه می‌خواند، پس این بررسی هزینهٔ کوئری اضافه ندارد.
+	 * اثر انگشت شامل تعداد کلیدها و یک هش از سریال‌سازی است تا حتی
+	 * تغییر یک مقدار (نه فقط افزودن/حذف کلید) هم دیده شود.
+	 *
+	 * @return string
+	 */
+	private static function signature() {
+		$stored = get_option( self::OPTION_KEY, array() );
+
+		if ( ! is_array( $stored ) ) {
+			return 'none';
+		}
+
+		return count( $stored ) . ':' . md5( (string) wp_json_encode( $stored ) );
 	}
 
 	/**
@@ -331,6 +373,7 @@ class Sparkknife_Ledger_Settings {
 	 * @return void
 	 */
 	public static function flush_cache() {
-		self::$cache = null;
+		self::$cache           = null;
+		self::$cache_signature = null;
 	}
 }
