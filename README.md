@@ -273,6 +273,7 @@ sparkknife-ledger/
 | [`docs/PRODUCT-PAGE.md`](docs/PRODUCT-PAGE.md) | متن آمادهٔ صفحهٔ فروش و پرسش‌های متداول |
 | [`docs/AUTHORSHIP.md`](docs/AUTHORSHIP.md) | نویسنده، مالکیت، لایسنس دوگانه |
 | [`docs/RELEASE-SIGNING.md`](docs/RELEASE-SIGNING.md) | امضای دیجیتال بستهٔ انتشار با RSA |
+| [`docs/YOUR-STEPS.md`](docs/YOUR-STEPS.md) | کارهایی که پیش از فروش باید خودتان انجام دهید |
 | [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار — ۸۷ باگ مستند |
 
 ### قواعد کد
