@@ -543,7 +543,30 @@ class Sparkknife_Ledger_Admin_Controller {
 	 * @return void
 	 */
 	private function handle_capabilities_save( $redirect ) {
-		Sparkknife_Ledger_Capabilities::require_capability( 'manage_settings' );
+		/*
+		 * تغییر سطوح دسترسی با `manage_settings` **نه** با
+		 * `manage_options` محافظت می‌شود.
+		 *
+		 * پیش‌تر `manage_settings` بود و این یک ارتقای دسترسی واقعی
+		 * می‌ساخت: مدیر می‌توانست به حسابدار فقط `manage_settings`
+		 * بدهد (کار عادی — واحد پول و تنظیمات)، ولی همان حسابدار
+		 * صفحهٔ تنظیمات را باز می‌کرد، تب «دسترسی‌ها» را می‌دید و به
+		 * **نقش خودش** `void_transactions` یا `manage_persons`
+		 * می‌داد. یعنی از حسابدار محدود به مدیر کامل تبدیل می‌شد،
+		 * بدون اینکه کسی متوجه شود جز لاگ.
+		 *
+		 * `manage_options` فقط به مدیر کل تعلق دارد و بخشی از
+		 * capabilityهای خود افزونه نیست، پس این مسیر ارتقا بسته
+		 * می‌شود. تنظیمات عادی (واحد پول، تقویم) همچنان با
+		 * `manage_settings` در دسترس است.
+		 */
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die(
+				esc_html__( 'تغییر سطوح دسترسی فقط برای مدیر کل مجاز است.', 'sparkknife-ledger' ),
+				esc_html__( 'دسترسی غیرمجاز', 'sparkknife-ledger' ),
+				array( 'response' => 403 )
+			);
+		}
 
 		$matrix = array();
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce در handle_post_action بررسی شده است.
@@ -558,7 +581,18 @@ class Sparkknife_Ledger_Admin_Controller {
 			}
 		}
 
-		Sparkknife_Ledger_Capabilities::save_role_matrix( $matrix );
+		$saved = Sparkknife_Ledger_Capabilities::save_role_matrix( $matrix );
+
+		if ( is_wp_error( $saved ) ) {
+			Sparkknife_Ledger_Admin_Loader::add_notice(
+				'error',
+				$saved->get_error_message(),
+				array(),
+				$redirect
+			);
+
+			return;
+		}
 
 		Sparkknife_Ledger_Admin_Loader::add_notice(
 			'success',

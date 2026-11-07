@@ -191,11 +191,29 @@ class Sparkknife_Ledger_Capabilities {
 	 * @return void
 	 */
 	public static function save_role_matrix( array $matrix ) {
+		/*
+		 * دفاع در عمق: این متد مستقیماً نقش‌ها را عوض می‌کند، پس نباید
+		 * به بررسی سطح دسترسی در لایهٔ کنترلر تکیه کند.
+		 *
+		 * اگر روزی یک مسیر تازه (REST، WP-CLI، AJAX) همین متد را صدا
+		 * بزند و بررسی کنترلر را جا بیندازد، این خط جلوی ارتقای
+		 * دسترسی را می‌گیرد. آزمون رگرسیون این رفتار را قفل می‌کند.
+		 */
+		if ( function_exists( 'current_user_can' ) && ! current_user_can( 'manage_options' ) ) {
+			return new WP_Error(
+				'sparkknife_ledger_capabilities_forbidden',
+				__( 'تغییر سطوح دسترسی فقط برای مدیر کل مجاز است.', 'sparkknife-ledger' )
+			);
+		}
+
 		$all_caps = array_keys( self::all() );
 		$roles    = wp_roles();
 
 		if ( ! $roles ) {
-			return;
+			return new WP_Error(
+				'sparkknife_ledger_no_roles',
+				__( 'سیستم نقش‌ها در دسترس نیست.', 'sparkknife-ledger' )
+			);
 		}
 
 		$before = self::get_role_matrix();
@@ -242,6 +260,8 @@ class Sparkknife_Ledger_Capabilities {
 			),
 			__( 'تغییر سطوح دسترسی نقش‌ها', 'sparkknife-ledger' )
 		);
+
+		return true;
 	}
 
 	/**

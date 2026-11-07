@@ -4488,3 +4488,117 @@ spk_equals(
 // بازگرداندن وضعیت.
 update_option( Sparkknife_Ledger_Installer::VERSION_OPTION, $real_app_version );
 update_option( Sparkknife_Ledger_Installer::DB_VERSION_OPTION, $real_db_version );
+
+/*
+ * -----------------------------------------------------------------------------
+ * باگ ۸۶ — ارتقای دسترسی از مسیر تنظیمات دسترسی‌ها.
+ *
+ * `capabilities_save` با `manage_settings` محافظت می‌شد، در حالی که
+ * همان capability برای عوض کردن واحد پول هم کافی است و مدیر معمولاً
+ * آن را به حسابدار می‌دهد. نتیجه: حسابدار صفحهٔ تنظیمات را باز
+ * می‌کرد، تب «دسترسی‌ها» را می‌دید، و به **نقش خودش**
+ * `void_transactions` می‌داد.
+ *
+ * این آزمون همان سناریو را می‌سازد: کاربری با `manage_settings` ولی
+ * بدون `manage_options` تلاش می‌کند نقش‌ها را عوض کند.
+ * -----------------------------------------------------------------------------
+ */
+$cap_probe_role = 'spk_cap_probe_' . wp_rand( 1000, 9999 );
+$cap_probe_user = wp_create_user(
+	'spk_capprobe_' . wp_rand( 1000, 9999 ),
+	wp_generate_password( 16 ),
+	'capprobe-' . wp_rand() . '@example.com'
+);
+
+if ( ! is_wp_error( $cap_probe_user ) ) {
+	$probe = new WP_User( $cap_probe_user );
+	$probe->set_role( 'subscriber' );
+
+	// حسابدار: فقط manage_settings، بدون manage_options.
+	$probe->add_cap( Sparkknife_Ledger_Capabilities::PREFIX . 'manage_settings' );
+	$probe->add_cap( Sparkknife_Ledger_Capabilities::PREFIX . 'reports' );
+
+	wp_set_current_user( $cap_probe_user );
+
+	spk_assert(
+		current_user_can( Sparkknife_Ledger_Capabilities::PREFIX . 'manage_settings' ),
+		'باگ ۸۶: حسابدار manage_settings دارد (پیش‌نیاز سناریو)'
+	);
+
+	spk_assert(
+		! current_user_can( 'manage_options' ),
+		'باگ ۸۶: حسابدار manage_options ندارد (پیش‌نیاز سناریو)'
+	);
+
+	spk_assert(
+		! current_user_can( Sparkknife_Ledger_Capabilities::PREFIX . 'void_transactions' ),
+		'باگ ۸۶: حسابدار پیش از حمله اجازهٔ ابطال ندارد'
+	);
+
+	// تلاش برای ارتقای دسترسی: به نقش خودش void_transactions بدهد.
+	$attack_matrix = array(
+		'subscriber' => array( 'void_transactions', 'manage_persons', 'manage_settings' ),
+	);
+
+	$saved = Sparkknife_Ledger_Capabilities::save_role_matrix( $attack_matrix );
+
+	spk_assert(
+		is_wp_error( $saved ),
+		'باگ ۸۶: save_role_matrix برای کاربر بی‌manage_options خطا می‌دهد'
+	);
+
+	// و مهم‌تر: دسترسی واقعاً داده نشده باشد.
+	$probe_fresh = new WP_User( $cap_probe_user );
+
+	spk_assert(
+		! $probe_fresh->has_cap( Sparkknife_Ledger_Capabilities::PREFIX . 'void_transactions' ),
+		'باگ ۸۶: تلاش برای ارتقای دسترسی، void_transactions را نمی‌دهد'
+	);
+
+	spk_assert(
+		! $probe_fresh->has_cap( Sparkknife_Ledger_Capabilities::PREFIX . 'manage_persons' ),
+		'باگ ۸۶: تلاش برای ارتقای دسترسی، manage_persons را نمی‌دهد'
+	);
+
+	// پاک‌سازی.
+	$probe_clean = new WP_User( $cap_probe_user );
+	$probe_clean->remove_all_caps();
+	$probe_clean->set_role( 'subscriber' );
+	wp_delete_user( $cap_probe_user );
+}
+
+wp_set_current_user( 1 );
+
+// مدیر کل باید بتواند نقش‌ها را عوض کند.
+wp_set_current_user( 1 );
+
+$admin_matrix = array();
+foreach ( array_keys( Sparkknife_Ledger_Capabilities::all() ) as $cap ) {
+	$admin_matrix['administrator'][] = $cap;
+}
+
+$admin_save = Sparkknife_Ledger_Capabilities::save_role_matrix( $admin_matrix );
+
+spk_assert(
+	true === $admin_save,
+	'باگ ۸۶: مدیر کل می‌تواند سطوح دسترسی را ذخیره کند'
+);
+
+spk_assert(
+	current_user_can( Sparkknife_Ledger_Capabilities::PREFIX . 'manage_settings' ),
+	'باگ ۸۶: مدیر پس از ذخیره همچنان manage_settings دارد'
+);
+
+// مدیر همیشه همه دسترسی‌ها را دارد، حتی اگر ماتریس خالی باشد.
+$admin_save_empty = Sparkknife_Ledger_Capabilities::save_role_matrix( array() );
+
+spk_assert(
+	true === $admin_save_empty,
+	'باگ ۸۶: ذخیرهٔ ماتریس خالی توسط مدیر بی‌خطاست'
+);
+
+$admin_user = new WP_User( 1 );
+spk_assert(
+	$admin_user->has_cap( Sparkknife_Ledger_Capabilities::PREFIX . 'void_transactions' ),
+	'باگ ۸۶: مدیر حتی با ماتریس خالی همهٔ دسترسی‌ها را دارد'
+);
