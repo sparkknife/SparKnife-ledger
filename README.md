@@ -269,7 +269,9 @@ sparkknife-ledger/
 | [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | نصب، تنظیمات، استفاده روزمره، رفع اشکال |
 | [`docs/STAGING.md`](docs/STAGING.md) | نصب آزمایشی و پشتیبان‌گیری (پیش از نصب روی سایت واقعی) |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | لایه‌ها، جریان داده، تصمیم‌های طراحی |
-| [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار |
+| [`docs/BUYER-GUIDE.md`](docs/BUYER-GUIDE.md) | مسیر خریدار: نصب، فعال‌سازی لایسنس، انتقال، پشتیبان |
+| [`docs/PRODUCT-PAGE.md`](docs/PRODUCT-PAGE.md) | متن آمادهٔ صفحهٔ فروش و پرسش‌های متداول |
+| [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار — ۸۵ باگ مستند |
 
 ### قواعد کد
 
