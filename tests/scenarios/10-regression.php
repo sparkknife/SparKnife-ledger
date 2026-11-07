@@ -4419,3 +4419,72 @@ if ( isset( $cache_probe['currency_decimals'] ) ) {
 // بازگرداندن به پیش‌فرض.
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
+
+/*
+ * -----------------------------------------------------------------------------
+ * باگ ۸۵ — نسخهٔ افزونه پس از ارتقا به‌روز نمی‌شد.
+ *
+ * `maybe_upgrade()` تنها زمانی از مسیر کامل می‌گذشت که **نسخهٔ دیتابیس**
+ * با ثابت فعلی فرق داشت. ارتقای کوچکی که اسکیما را عوض نمی‌کند (حالت
+ * عادی بیشتر انتشارها) نسخهٔ افزونه را برای همیشه روی مقدار قبلی
+ * می‌گذاشت. این آزمون دقیقاً آن حالت را می‌سازد: نسخهٔ دیتابیس درست،
+ * فقط نسخهٔ افزونه قدیمی.
+ * -----------------------------------------------------------------------------
+ */
+$real_db_version  = get_option( Sparkknife_Ledger_Installer::DB_VERSION_OPTION, '' );
+$real_app_version = get_option( Sparkknife_Ledger_Installer::VERSION_OPTION, '' );
+
+spk_assert(
+	'' !== $real_app_version,
+	'نسخهٔ افزونه پس از نصب ثبت شده است'
+);
+
+// حالت ۱: نسخهٔ دیتابیس درست، نسخهٔ افزونه قدیمی → باید بالا برود.
+update_option( Sparkknife_Ledger_Installer::VERSION_OPTION, '0.0.1' );
+Sparkknife_Ledger_Installer::maybe_upgrade();
+
+spk_equals(
+	SPARKKNIFE_LEDGER_VERSION,
+	get_option( Sparkknife_Ledger_Installer::VERSION_OPTION, '' ),
+	'باگ ۸۵: ارتقای بدون تغییر اسکیما نسخهٔ افزونه را به‌روز می‌کند'
+);
+
+spk_equals(
+	$real_db_version,
+	get_option( Sparkknife_Ledger_Installer::DB_VERSION_OPTION, '' ),
+	'باگ ۸۵: ارتقای نسخهٔ افزونه نسخهٔ دیتابیس را دست نمی‌زند'
+);
+
+// داده‌ها نباید در این مسیر دست بخورند.
+spk_assert(
+	count( Sparkknife_Ledger_Person_Repository::instance()->query( array( 'per_page' => 1 ) ) ) >= 0,
+	'باگ ۸۵: ارتقای نسخهٔ افزونه به داده‌ها دست نمی‌زند'
+);
+
+// حالت ۲: هر دو درست → اجرای دوباره بی‌اثر است (idempotent).
+Sparkknife_Ledger_Installer::maybe_upgrade();
+spk_equals(
+	SPARKKNIFE_LEDGER_VERSION,
+	get_option( Sparkknife_Ledger_Installer::VERSION_OPTION, '' ),
+	'باگ ۸۵: maybe_upgrade دوباره‌اجرا شدنی است'
+);
+
+// حالت ۳: نسخهٔ دیتابیس پاک شده (نصب دستی/انتقال سایت) → هر دو ثبت شوند.
+update_option( Sparkknife_Ledger_Installer::DB_VERSION_OPTION, '' );
+Sparkknife_Ledger_Installer::maybe_upgrade();
+
+spk_equals(
+	SPARKKNIFE_LEDGER_VERSION,
+	get_option( Sparkknife_Ledger_Installer::VERSION_OPTION, '' ),
+	'باگ ۸۵: نصب بدون نسخهٔ دیتابیس نسخهٔ افزونه را ثبت می‌کند'
+);
+
+spk_equals(
+	SPARKKNIFE_LEDGER_DB_VERSION,
+	get_option( Sparkknife_Ledger_Installer::DB_VERSION_OPTION, '' ),
+	'باگ ۸۵: نصب بدون نسخهٔ دیتابیس نسخهٔ دیتابیس را ثبت می‌کند'
+);
+
+// بازگرداندن وضعیت.
+update_option( Sparkknife_Ledger_Installer::VERSION_OPTION, $real_app_version );
+update_option( Sparkknife_Ledger_Installer::DB_VERSION_OPTION, $real_db_version );

@@ -192,7 +192,40 @@ class Sparkknife_Ledger_Installer {
 		$tables_ok  = Sparkknife_Ledger_DB::tables_exist();
 		$structure_ok = $tables_ok && self::structure_is_intact();
 
-		if ( $installed === SPARKKNIFE_LEDGER_DB_VERSION && $structure_ok ) {
+		/*
+		 * نسخهٔ افزونه هم باید ثبت شود، نه فقط نسخهٔ دیتابیس.
+		 *
+		 * `store_versions()` هر دو گزینه را می‌نویسد ولی تنها در انتهای
+		 * همین متد، و متد پیش از آن با شرط زیر زود برمی‌گشت. نتیجه: وقتی
+		 * فقط نسخهٔ **افزونه** بالا می‌رفت (بدون تغییر اسکیما — که حالت
+		 * عادی بیشتر ارتقاهاست)، `sparkknife_ledger_version` برای همیشه
+		 * روی نسخهٔ قبلی می‌ماند.
+		 *
+		 * پیامد: هر گزارش خطا یا تیکت پشتیبانی نسخهٔ غلط نشان می‌داد، و
+		 * هر شرط آینده‌ای بر اساس همین گزینه تصمیم غلط می‌گرفت.
+		 */
+		$app_version = (string) get_option( self::VERSION_OPTION, '' );
+
+		if (
+			$installed === SPARKKNIFE_LEDGER_DB_VERSION
+			&& $structure_ok
+			&& $app_version === SPARKKNIFE_LEDGER_VERSION
+		) {
+			return;
+		}
+
+		if (
+			$installed === SPARKKNIFE_LEDGER_DB_VERSION
+			&& $structure_ok
+			&& $app_version !== SPARKKNIFE_LEDGER_VERSION
+		) {
+			/*
+			 * فقط ارتقای نسخهٔ افزونه: هیچ کار اسکیمایی لازم نیست و هیچ
+			 * مهاجرتی نباید اجرا شود (چون نسخهٔ دیتابیس عوض نشده).
+			 * به‌روزرسانی گزینه کافی است.
+			 */
+			self::store_option( self::VERSION_OPTION, SPARKKNIFE_LEDGER_VERSION );
+
 			return;
 		}
 
