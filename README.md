@@ -5,7 +5,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-5.8%2B-21759b)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-777bb4)](https://www.php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-blue)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Tests](https://img.shields.io/badge/tests-976%20assertions-brightgreen)](#تستها)
+[![Tests](https://img.shields.io/badge/tests-982%20assertions-brightgreen)](#تستها)
 
 ---
 
@@ -273,7 +273,7 @@ sparkknife-ledger/
 | [`docs/PRODUCT-PAGE.md`](docs/PRODUCT-PAGE.md) | متن آمادهٔ صفحهٔ فروش و پرسش‌های متداول |
 | [`docs/AUTHORSHIP.md`](docs/AUTHORSHIP.md) | نویسنده، مالکیت، لایسنس دوگانه |
 | [`docs/RELEASE-SIGNING.md`](docs/RELEASE-SIGNING.md) | امضای دیجیتال بستهٔ انتشار با RSA |
-| [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار — ۸۶ باگ مستند |
+| [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار — ۸۷ باگ مستند |
 
 ### قواعد کد
 
@@ -381,8 +381,8 @@ node tools/check-authorship.mjs    # یکپارچگی امضای نویسنده 
 `check-authorship.mjs` هیچ وابستگی ندارد. راهنمای کامل امضا:
 [`docs/RELEASE-SIGNING.md`](docs/RELEASE-SIGNING.md).
 
-پوشش: **۹۷۶ assertion در ۱۰ سناریو** — ۳۳۳ در سناریوهای ۰۱–۰۹ و
-۶۴۳ در سناریوی رگرسیون.
+پوشش: **۹۸۲ assertion در ۱۰ سناریو** — ۳۳۳ در سناریوهای ۰۱–۰۹ و
+۶۴۹ در سناریوی رگرسیون.
 
 | # | سناریو |
 | --- | --- |

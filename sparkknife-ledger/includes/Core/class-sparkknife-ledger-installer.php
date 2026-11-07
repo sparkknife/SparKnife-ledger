@@ -496,6 +496,25 @@ class Sparkknife_Ledger_Installer {
 	 * @return void
 	 */
 	public static function purge_all_data() {
+		/*
+		 * دفاع در عمق — همان درس باگ ۸۶.
+		 *
+		 * این متد جداول مالی را DROP می‌کند و برگشت‌پذیر نیست. بررسی
+		 * `manage_options` در کنترلر وجود دارد، ولی به آن تکیه نمی‌کنیم:
+		 * اگر روزی مسیر تازه‌ای (REST، WP-CLI، AJAX، یا کد افزونهٔ
+		 * دیگری) این متد را صدا بزند و آن بررسی را جا بیندازد، حذف
+		 * داده بدون هیچ مانعی اجرا می‌شود.
+		 *
+		 * `manage_options` بخشی از capabilityهای خود افزونه نیست و
+		 * فقط به مدیر کل تعلق دارد.
+		 */
+		if ( function_exists( 'current_user_can' ) && ! current_user_can( 'manage_options' ) ) {
+			return new WP_Error(
+				'sparkknife_ledger_purge_forbidden',
+				__( 'حذف داده‌ها فقط برای مدیر کل مجاز است.', 'sparkknife-ledger' )
+			);
+		}
+
 		global $wpdb;
 
 		$audit = Sparkknife_Ledger_DB::audit_table();
@@ -549,6 +568,8 @@ class Sparkknife_Ledger_Installer {
 		Sparkknife_Ledger_DB::flush_table_cache();
 
 		do_action( 'sparkknife_ledger_data_purged' );
+
+		return true;
 	}
 
 	/**

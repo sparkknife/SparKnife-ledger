@@ -641,7 +641,18 @@ class Sparkknife_Ledger_Admin_Controller {
 			return;
 		}
 
-		Sparkknife_Ledger_Installer::purge_all_data();
+		$purged = Sparkknife_Ledger_Installer::purge_all_data();
+
+		if ( is_wp_error( $purged ) ) {
+			Sparkknife_Ledger_Admin_Loader::add_notice(
+				'error',
+				$purged->get_error_message(),
+				array(),
+				$redirect
+			);
+
+			return;
+		}
 
 		Sparkknife_Ledger_Admin_Loader::add_notice(
 			'warning',

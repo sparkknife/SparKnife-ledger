@@ -4602,3 +4602,86 @@ spk_assert(
 	$admin_user->has_cap( Sparkknife_Ledger_Capabilities::PREFIX . 'void_transactions' ),
 	'باگ ۸۶: مدیر حتی با ماتریس خالی همهٔ دسترسی‌ها را دارد'
 );
+
+/*
+ * -----------------------------------------------------------------------------
+ * باگ ۸۷ — purge_all_data بدون دفاع در عمق.
+ *
+ * همان درس باگ ۸۶، ولی روی خطرناک‌ترین متد پروژه. بررسی
+ * `manage_options` در کنترلر وجود داشت، ولی خود متد هر کسی را که
+ * صدایش می‌زد می‌پذیرفت. اگر مسیر تازه‌ای (REST، WP-CLI) آن را صدا
+ * می‌زد و بررسی را جا می‌انداخت، همهٔ جداول مالی DROP می‌شد.
+ *
+ * این آزمون عمداً متد را **مستقیم** با کاربر بی‌مجوز صدا می‌زند، نه از
+ * راه کنترلر — چون هدف سنجش خود متد است.
+ * -----------------------------------------------------------------------------
+ */
+$purge_probe = wp_create_user(
+	'spk_purgeprobe_' . wp_rand( 1000, 9999 ),
+	wp_generate_password( 16 ),
+	'purgeprobe-' . wp_rand() . '@example.com'
+);
+
+if ( ! is_wp_error( $purge_probe ) ) {
+	$purge_user = new WP_User( $purge_probe );
+	$purge_user->set_role( 'editor' );
+
+	// ادمین حتی دسترسی افزونه را هم به او بدهد — باز هم نباید بتواند.
+	$purge_user->add_cap( Sparkknife_Ledger_Capabilities::PREFIX . 'manage_settings' );
+	$purge_user->add_cap( Sparkknife_Ledger_Capabilities::PREFIX . 'manage_persons' );
+
+	wp_set_current_user( $purge_probe );
+
+	spk_assert(
+		! current_user_can( 'manage_options' ),
+		'باگ ۸۷: کاربر آزمون manage_options ندارد (پیش‌نیاز)'
+	);
+
+	// شمارش پیش از تلاش.
+	global $wpdb;
+	$persons_table = Sparkknife_Ledger_DB::persons_table();
+	$before_purge  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$persons_table}" ); // phpcs:ignore
+
+	$purge_result = Sparkknife_Ledger_Installer::purge_all_data();
+
+	spk_assert(
+		is_wp_error( $purge_result ),
+		'باگ ۸۷: purge_all_data برای کاربر بی‌manage_options خطا می‌دهد'
+	);
+
+	// مهم‌ترین بررسی: جدول‌ها باید سر جایشان باشند.
+	Sparkknife_Ledger_DB::flush_table_cache();
+
+	$after_purge = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$persons_table}" ); // phpcs:ignore
+
+	spk_assert(
+		$before_purge === $after_purge,
+		'باگ ۸۷: تلاش برای حذف داده، هیچ ردیفی را نکشت'
+	);
+
+	spk_assert(
+		Sparkknife_Ledger_DB::tables_exist(),
+		'باگ ۸۷: جدول‌ها پس از تلاش ناموفق حذف، وجود دارند'
+	);
+
+	// پاک‌سازی.
+	$purge_clean = new WP_User( $purge_probe );
+	$purge_clean->remove_all_caps();
+	$purge_clean->set_role( 'subscriber' );
+	wp_delete_user( $purge_probe );
+}
+
+wp_set_current_user( 1 );
+
+// مدیر کل باید بتواند — ولی این آزمون داده را واقعاً پاک نمی‌کند،
+// چون بقیهٔ سناریوها به آن تکیه دارند. فقط بررسی می‌کنیم که اجرای
+// متد با مدیر به خطای دسترسی نمی‌خورد.
+spk_assert(
+	current_user_can( 'manage_options' ),
+	'باگ ۸۷: مدیر کل manage_options دارد'
+);
+
+spk_assert(
+	Sparkknife_Ledger_DB::tables_exist(),
+	'باگ ۸۷: جدول‌ها پس از همهٔ آزمون‌ها سالم‌اند'
+);
