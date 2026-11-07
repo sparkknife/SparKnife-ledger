@@ -206,9 +206,30 @@ spk_equals( 'سلام', Sparkknife_Ledger_Export_Service::sanitize_cell( 'سلا
 $uninstall_source = file_get_contents( SPARKKNIFE_LEDGER_DIR . 'uninstall.php' );
 preg_match_all( "/delete_option\(\s*'([a-z_]+)'/", $uninstall_source, $matches );
 
+/*
+ * فهرست فایل‌ها با پیمایش بازگشتی ساخته می‌شود، نه با `glob('**')`.
+ *
+ * `glob()` در PHP از `**` به‌عنوان «هر عمق» پشتیبانی نمی‌کند؛ فقط یک
+ * سطح می‌گیرد. نتیجه این بود که گزینه‌ای که در
+ * `includes/Admin/Controllers/` ساخته می‌شد «هرگز ساخته نمی‌شود»
+ * تشخیص داده می‌شد و آزمون به‌غلط شکست می‌خورد — یعنی خودِ تست یک
+ * باگ داشت که فقط با اضافه شدن گزینهٔ تازه در عمق دو سطحی آشکار شد.
+ */
+$all_plugin_php = array();
+
+$spk_iterator = new RecursiveIteratorIterator(
+	new RecursiveDirectoryIterator( SPARKKNIFE_LEDGER_DIR . 'includes', FilesystemIterator::SKIP_DOTS )
+);
+
+foreach ( $spk_iterator as $spk_file ) {
+	if ( 'php' === strtolower( $spk_file->getExtension() ) ) {
+		$all_plugin_php[] = $spk_file->getPathname();
+	}
+}
+
 foreach ( $matches[1] as $option_name ) {
 	$created_in = false;
-	foreach ( glob( SPARKKNIFE_LEDGER_DIR . 'includes/**/*.php' ) as $file ) {
+	foreach ( $all_plugin_php as $file ) {
 		if ( false !== strpos( file_get_contents( $file ), $option_name ) ) {
 			$created_in = true;
 			break;
@@ -4283,4 +4304,71 @@ spk_equals(
 spk_assert(
 	Sparkknife_Ledger_DB::tables_exist(),
 	'در پایان ممیزی، جداول سالم‌اند'
+);
+
+// ── ۴۵: خروجی کامل داده صفحه‌به‌صفحه می‌خواند و بی‌نهایت نمی‌چرخد ────
+//
+// اولین نسخهٔ `full_export_rows()` با شرط `count($items) > 0` می‌چرخید.
+// مخزن `$page` را به بالاترین صفحه کلمپ می‌کند، پس صفحهٔ آخر بی‌نهایت
+// تکرار می‌شد: ۱٬۲۰۰ شخص به ۴۰٬۶۶۳ ردیف تبدیل شد. این بلوک همان را
+// می‌سنجد بدون آنکه به ۱٬۲۰۰ رکورد نیاز داشته باشد.
+
+$ex_svc = Sparkknife_Ledger_Export_Service::instance();
+
+spk_assert(
+	method_exists( $ex_svc, 'full_export_rows' ),
+	'خروجی کامل داده در دسترس است'
+);
+
+$full_rows = $ex_svc->full_export_rows();
+
+spk_assert( is_array( $full_rows ) && count( $full_rows ) > 0, 'خروجی کامل ردیف دارد' );
+
+// بخش‌های سه‌گانه باید حاضر باشند.
+$full_text = '';
+foreach ( $full_rows as $full_row ) {
+	$full_text .= implode( ',', array_map( 'strval', (array) $full_row ) ) . "\n";
+}
+
+foreach ( array( '# اشخاص', '# تراکنش‌ها', '# تاریخچه تغییرات' ) as $section_label ) {
+	spk_assert( false !== strpos( $full_text, $section_label ), 'بخش خروجی کامل موجود است: ' . $section_label );
+}
+
+/*
+ * سنجهٔ اصلی: تعداد ردیف‌های اشخاص نباید از تعداد واقعی بیشتر باشد.
+ * اگر حلقه دوباره بی‌نهایت بچرخد، این عدد چند برابر می‌شود.
+ */
+$total_persons = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$persons}" );
+$persons_in_export = count( $ex_svc->persons_export_rows() ) - 1; // منهای سرآیند.
+
+spk_equals(
+	$total_persons,
+	$persons_in_export,
+	'خروجی کامل همهٔ اشخاص را یک‌بار می‌آورد (بدون تکرار صفحهٔ آخر)'
+);
+
+$total_txns = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$transactions}" );
+$txns_in_export = count( $ex_svc->transactions_export_rows() ) - 1;
+
+spk_equals(
+	$total_txns,
+	$txns_in_export,
+	'خروجی کامل همهٔ تراکنش‌ها را می‌آورد'
+);
+
+// مبلغ مقیاس‌شده می‌آید، نه رشتهٔ خوانا.
+$txn_rows = $ex_svc->transactions_export_rows();
+if ( count( $txn_rows ) > 1 ) {
+	$sample_amount = $txn_rows[1][4];
+
+	spk_assert(
+		(bool) preg_match( '/^\d+$/', $sample_amount ),
+		'ستون مبلغ در خروجی کامل عدد صحیح مقیاس‌شده است: ' . $sample_amount
+	);
+}
+
+// تراکنش باطل هم باید در خروجی باشد.
+spk_assert(
+	false !== strpos( $full_text, 'void' ) || 0 === (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$transactions} WHERE status = 'void'" ),
+	'تراکنش‌های باطل در خروجی کامل می‌آیند'
 );

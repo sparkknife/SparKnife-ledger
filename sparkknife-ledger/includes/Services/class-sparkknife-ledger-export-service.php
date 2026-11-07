@@ -448,6 +448,12 @@ class Sparkknife_Ledger_Export_Service {
 	 * @return void
 	 */
 	public function log_export( $type, $object = 0 ) {
+		$labels = array(
+			'person'  => __( 'خروجی گرفته‌شده از گزارش فردی', 'sparkknife-ledger' ),
+			'summary' => __( 'خروجی گرفته‌شده از گزارش تجمیعی', 'sparkknife-ledger' ),
+			'full'    => __( 'خروجی کامل داده برای آرشیو', 'sparkknife-ledger' ),
+		);
+
 		Sparkknife_Ledger_Audit_Service::instance()->log(
 			'person' === $type ? 'person' : 'settings',
 			absint( $object ),
@@ -456,9 +462,247 @@ class Sparkknife_Ledger_Export_Service {
 				'report' => $type,
 				'format' => 'csv',
 			),
-			'person' === $type
-				? __( 'خروجی گرفته‌شده از گزارش فردی', 'sparkknife-ledger' )
-				: __( 'خروجی گرفته‌شده از گزارش تجمیعی', 'sparkknife-ledger' )
+			isset( $labels[ $type ] ) ? $labels[ $type ] : $labels['summary']
 		);
+	}
+	/**
+	 * خروجی کامل اشخاص، برای آرشیو یا انتقال به سیستم دیگر.
+	 *
+	 * چرا این جدا از گزارش‌هاست: گزارش‌ها برای **خواندن** ساخته شده‌اند
+	 * و ستون‌هایشان برای انسان معنا دارد (مانده، وضعیت حساب). این خروجی
+	 * برای **انتقال** است، پس هر ستون خام جدول با نام اصلی‌اش می‌آید —
+	 * چیزی که برای وارد کردن به سیستم دیگر لازم است.
+	 *
+	 * ستون‌های مشتق‌شده (`balance`) عمداً نیامده‌اند: با وارد کردن این
+	 * فایل به سیستم دیگر، مانده باید از تراکنش‌ها بازمحاسبه شود، نه از
+	 * عددی که ممکن است در فاصلهٔ بین دو خروجی کهنه شده باشد.
+	 *
+	 * @return array<int, array<int, string>>
+	 */
+	public function persons_export_rows() {
+		$repo = Sparkknife_Ledger_Person_Repository::instance();
+
+		/*
+		 * سقف `per_page` در مخزن ۵۰۰ است و آرگومان `for_export` وجود
+		 * ندارد؛ اولین نسخهٔ این متد `per_page => 0` فرستاد و مخزن آن
+		 * را به ۵۰۰ برد، ولی با ۵٬۰۰۰ رکورد بی‌صدا فقط ۵۰۰ ردیف
+		 * می‌داد. برای خروجی کامل باید صفحه‌به‌صفحه خواند.
+		 */
+		$all_items = array();
+		$page      = 1;
+		$guard     = 0;
+
+		/*
+		 * شرط توقف بر اساس `total` است، نه بر اساس «آیا این صفحه
+		 * ردیف داشت».
+		 *
+		 * مخزن `$page` را به `$max_page` کلمپ می‌کند: وقتی از آخر
+		 * رد شویم، همان آخرین صفحه را برمی‌گرداند. حلقه‌ای که با
+		 * `count( $items ) > 0` می‌چرخد هرگز تمام نمی‌شود و همان
+		 * ردیف‌ها را تا سقف تکرار می‌کند. اولین نسخهٔ این متد دقیقاً
+		 * همین کار را کرد: ۱٬۲۰۰ شخص به ۴۰٬۶۶۳ ردیف تبدیل شد.
+		 */
+		do {
+			$result = $repo->query(
+				array(
+					'per_page'        => 500,
+					'page'            => $page,
+					'include_deleted' => true,
+					'orderby'         => 'id',
+					'order'           => 'asc',
+				)
+			);
+
+			$items = (array) ( $result['items'] ?? array() );
+			$total = (int) ( $result['total'] ?? 0 );
+
+			foreach ( $items as $item ) {
+				$all_items[] = $item;
+			}
+
+			++$page;
+			++$guard;
+		} while ( count( $all_items ) < $total && count( $items ) > 0 && $guard < 200 );
+
+		$rows = array(
+			array(
+				'id',
+				'name',
+				'phone',
+				'description',
+				'status',
+				'created_at',
+				'updated_at',
+				'deleted_at',
+			),
+		);
+
+		foreach ( $all_items as $person ) {
+			$rows[] = array(
+				(string) $person->id,
+				(string) $person->name,
+				(string) $person->phone,
+				(string) $person->description,
+				(string) $person->status,
+				(string) $person->created_at,
+				(string) ( $person->updated_at ?? '' ),
+				(string) ( $person->deleted_at ?? '' ),
+			);
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * خروجی کامل تراکنش‌ها.
+	 *
+	 * تراکنش‌های باطل هم می‌آیند. جای تعجب دارد ولی درست است: کسی که
+	 * می‌خواهد داده‌اش را کامل ببرد، به رکورد باطل هم نیاز دارد، وگرنه
+	 * در سیستم مقصد تاریخچه ناقص می‌شود و نمی‌شود فهمید تراکنشی حذف
+	 * شده یا هرگز نبوده.
+	 *
+	 * `amount` به‌صورت **عدد صحیح مقیاس‌شده** نوشته می‌شود (مبلغ × ۱۰⁴)،
+	 * همان‌طور که در دیتابیس است. دلایلش:
+	 *
+	 *   ۱) اگر مبلغ را به شکل خوانا بنویسیم، سیستم مقصد نمی‌داند آیا
+	 *      «۱٬۲۳۴٫۵» اعشار دارد یا جداکنندهٔ هزارگان است.
+	 *   ۲) بازگرداندن عدد صحیح به همان دیتابیس بیت‌به‌بیت بی‌خطاست.
+	 *
+	 * ردیف سرآیند توضیح می‌دهد که مبلغ مقیاس‌شده است، تا کسی که فایل
+	 * را در Excel باز می‌کند گمراه نشود.
+	 *
+	 * @return array<int, array<int, string>>
+	 */
+	public function transactions_export_rows() {
+		global $wpdb;
+
+		$table = Sparkknife_Ledger_DB::transactions_table();
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- نام جدول داخلی.
+		$rows = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY id ASC" );
+
+		$out = array(
+			array(
+				'id',
+				'reference',
+				'person_id',
+				'type',
+				'amount_scaled_x10000',
+				'txn_date',
+				'description',
+				'status',
+				'void_reason',
+				'voided_by',
+				'voided_at',
+				'created_by',
+				'created_at',
+				'updated_at',
+			),
+		);
+
+		foreach ( (array) $rows as $row ) {
+			$out[] = array(
+				(string) $row->id,
+				(string) $row->reference,
+				(string) $row->person_id,
+				(string) $row->type,
+				(string) $row->amount,
+				(string) $row->txn_date,
+				(string) $row->description,
+				(string) $row->status,
+				(string) ( $row->void_reason ?? '' ),
+				(string) ( $row->voided_by ?? '' ),
+				(string) ( $row->voided_at ?? '' ),
+				(string) ( $row->created_by ?? '' ),
+				(string) $row->created_at,
+				(string) ( $row->updated_at ?? '' ),
+			);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * خروجی کامل داده در یک فایل CSV.
+	 *
+	 * سه بخش با یک خط خالی و یک برچسب از هم جدا می‌شوند:
+	 *
+	 *   # اشخاص
+	 *   ...
+	 *   # تراکنش‌ها
+	 *   ...
+	 *   # تاریخچه تغییرات
+	 *   ...
+	 *
+	 * چرا یک فایل و نه سه تا: مشتری که آرشیو می‌گیرد باید یک فایل را
+	 * نگه دارد، نه سه فایلی که یکی‌شان گم می‌شود. بخش‌ها با `#` شروع
+	 * می‌شوند که در Excel به‌عنوان داده دیده می‌شود و نادیده گرفته
+	 * نمی‌شود — یعنی فایل هم برای آدم قابل خواندن است هم برای ابزار.
+	 *
+	 * @return array<int, array<int, string>>
+	 */
+	public function full_export_rows() {
+		$rows = array();
+
+		$rows[] = array( '# SparKnife Ledger — خروجی کامل داده' );
+		$rows[] = array( '# تاریخ', Sparkknife_Ledger_Date::now() );
+		$rows[] = array( '# نسخهٔ افزونه', SPARKKNIFE_LEDGER_VERSION );
+		$rows[] = array( '# توجه: ستون amount_scaled_x10000 مقدار × ۱۰٬۰۰۰ است.' );
+		$rows[] = array();
+
+		$rows[] = array( '# اشخاص' );
+		foreach ( $this->persons_export_rows() as $row ) {
+			$rows[] = $row;
+		}
+
+		$rows[] = array();
+		$rows[] = array( '# تراکنش‌ها' );
+		foreach ( $this->transactions_export_rows() as $row ) {
+			$rows[] = $row;
+		}
+
+		$rows[] = array();
+		$rows[] = array( '# تاریخچه تغییرات' );
+
+		$audit_repo  = Sparkknife_Ledger_Audit_Repository::instance();
+		$audit_all   = array();
+		$audit_page  = 1;
+		$audit_guard = 0;
+
+		// همان دلیل توقف بر اساس `total` که در بخش اشخاص توضیح داده شد.
+		do {
+			$audit = $audit_repo->query(
+				array(
+					'per_page' => 500,
+					'page'     => $audit_page,
+				)
+			);
+
+			$audit_items = (array) ( $audit['items'] ?? array() );
+			$audit_total = (int) ( $audit['total'] ?? 0 );
+
+			foreach ( $audit_items as $audit_item ) {
+				$audit_all[] = $audit_item;
+			}
+
+			++$audit_page;
+			++$audit_guard;
+		} while ( count( $audit_all ) < $audit_total && count( $audit_items ) > 0 && $audit_guard < 200 );
+
+		$rows[] = array( 'id', 'object_type', 'object_id', 'action', 'user_id', 'description', 'created_at' );
+
+		foreach ( $audit_all as $entry ) {
+			$rows[] = array(
+				(string) $entry->id,
+				(string) $entry->object_type,
+				(string) $entry->object_id,
+				(string) $entry->action,
+				(string) $entry->user_id,
+				(string) $entry->description,
+				(string) $entry->created_at,
+			);
+		}
+
+		return $rows;
 	}
 }

@@ -59,21 +59,66 @@ function sparkknife_ledger_uninstall_site() {
 
 		Sparkknife_Ledger_DB::flush_table_cache();
 
-		// گزینه‌های تنظیمات و پیکربندی.
+		/*
+		 * گزینه‌های تنظیمات و پیکربندی.
+		 *
+		 * فهرست باید کامل باشد. پیش‌تر فقط تنظیمات پاک می‌شد و سه
+		 * گزینهٔ تازه‌تر جا می‌ماندند:
+		 *
+		 *   - `sparkknife_ledger_license` — کلید لایسنس خریدار. ماندنش
+		 *     هم نشت اطلاعات است هم اگر سایت با دامنهٔ دیگری بازسازی
+		 *     شود، می‌تواند بی‌دلیل معتبر به نظر برسد.
+		 *   - `sparkknife_ledger_security_log` — رویدادها با IP و
+		 *     شناسهٔ کاربر. این دادهٔ شخصی است و مدیر صریحاً حذف کامل
+		 *     خواسته است.
+		 *   - `sparkknife_ledger_onboarding_done` — بی‌خطر ولی نصب
+		 *     مجدد را بی‌دلیل از ویزارد محروم می‌کند.
+		 *
+		 * قاعده: هر گزینه‌ای که افزونه می‌سازد باید این‌جا یا در
+		 * پاک‌سازی الگویی پایین‌تر پوشش داده شود.
+		 */
 		delete_option( Sparkknife_Ledger_Settings::OPTION_KEY );
 		delete_option( 'sparkknife_ledger_delete_data_on_uninstall' );
+		delete_option( 'sparkknife_ledger_license' );
+		delete_option( 'sparkknife_ledger_license_state' );
+		delete_option( 'sparkknife_ledger_security_log' );
+		delete_option( 'sparkknife_ledger_onboarding_done' );
 
 		// دسترسی‌های سفارشی از همه نقش‌ها حذف می‌شود.
 		if ( class_exists( 'Sparkknife_Ledger_Capabilities' ) ) {
 			Sparkknife_Ledger_Capabilities::remove_capabilities();
 		}
 
-		// ترنزینت‌های گزارش/کش.
+		// ترنزینت‌های گزارش/کش و محدودیت تلاش.
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
 				$wpdb->esc_like( '_transient_sparkknife_ledger_' ) . '%',
 				$wpdb->esc_like( '_transient_timeout_sparkknife_ledger_' ) . '%'
+			)
+		);
+
+		/*
+		 * تور نهایی: هر گزینهٔ افزونه که در فهرست بالا جا مانده باشد.
+		 *
+		 * فهرست دستی همیشه از کد عقب می‌ماند — همین باگ ۸۰ از همین
+		 * جا آمد. این پرس‌وجو تضمین می‌کند که گزینهٔ فراموش‌شده‌ای
+		 * باقی نماند، حتی اگر توسعه‌دهندهٔ بعدی فهرست را به‌روز نکند.
+		 *
+		 * `sparkknife_ledger_notice_*` هم عمداً پاک می‌شود: پیام‌های
+		 * فلش کاربران دیگر بی‌فایده‌اند و حاوی متن خطا هستند.
+		 */
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s",
+				$wpdb->esc_like( 'sparkknife_ledger_' ) . '%',
+				$wpdb->esc_like( '_transient_sparkknife_ledger' ) . '%',
+				$wpdb->esc_like( '_transient_timeout_sparkknife_ledger' ) . '%',
+				// ترنزینت‌های محدودیت تلاش. پیشوند کوتاه است و با تور
+				// `sparkknife_ledger_` گرفته نمی‌شد، پس چهار ردیف با IP
+				// و شمارش تلاش باقی می‌ماندند.
+				$wpdb->esc_like( '_transient_spk_rl_' ) . '%',
+				$wpdb->esc_like( '_transient_timeout_spk_rl_' ) . '%'
 			)
 		);
 

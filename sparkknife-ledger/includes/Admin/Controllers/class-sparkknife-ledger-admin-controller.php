@@ -881,6 +881,18 @@ class Sparkknife_Ledger_Admin_Controller {
 
 		$export = Sparkknife_Ledger_Export_Service::instance();
 
+		/*
+		 * خروجی کامل داده — همهٔ اشخاص، تراکنش‌ها و تاریخچه.
+		 *
+		 * برای آرشیو یا انتقال به سیستم دیگر. جدا از گزارش‌هاست چون
+		 * گزارش برای خواندن ساخته شده و ستون‌هایش مشتق‌شده‌اند؛ این
+		 * خروجی ستون‌های خام جدول را می‌دهد تا قابل وارد کردن باشد.
+		 */
+		if ( 'full' === $type ) {
+			$export->log_export( 'full' );
+			$export->send_csv( $export->full_export_rows(), 'sparkknife-ledger-full' );
+		}
+
 		if ( 'summary' === $type ) {
 			$report = Sparkknife_Ledger_Report_Service::instance()->get_summary_report( $args );
 			$export->log_export( 'summary' );

@@ -426,6 +426,28 @@ $currency_presets  = Sparkknife_Ledger_Money::currency_presets();
 		</p>
 	</section>
 
+	<section class="spk-card" id="spk-data-export">
+		<h2 class="spk-card__title"><?php esc_html_e( 'خروجی کامل داده', 'sparkknife-ledger' ); ?></h2>
+		<p>
+			<?php esc_html_e( 'همهٔ اشخاص، تراکنش‌ها و تاریخچهٔ تغییرات را در یک فایل CSV بگیرید. این فایل برای آرشیو یا انتقال به سیستم دیگر ساخته شده است.', 'sparkknife-ledger' ); ?>
+		</p>
+		<p class="spk-muted">
+			<?php esc_html_e( 'تراکنش‌های باطل هم در فایل می‌آیند تا تاریخچه کامل بماند. ستون مبلغ به‌صورت عدد صحیح ضرب‌در-۱۰٬۰۰۰ نوشته می‌شود؛ همین باعث می‌شود بازگرداندنش به سیستم بی‌خطا باشد.', 'sparkknife-ledger' ); ?>
+		</p>
+		<p class="spk-muted">
+			<strong><?php esc_html_e( 'این خروجی جای پشتیبان دیتابیس را نمی‌گیرد.', 'sparkknife-ledger' ); ?></strong>
+			<?php esc_html_e( 'تنظیمات، دسترسی‌ها و حساب‌های کاربری در آن نیست. پیش از حذف کامل داده‌ها، از هاست خود پشتیبان دیتابیس بگیرید.', 'sparkknife-ledger' ); ?>
+		</p>
+
+		<a
+			class="spk-btn spk-btn--primary"
+			href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=sparkknife_ledger_export&report=full' ), 'sparkknife_ledger_export' ) ); ?>"
+		>
+			<span class="dashicons dashicons-download" aria-hidden="true"></span>
+			<?php esc_html_e( 'گرفتن خروجی کامل', 'sparkknife-ledger' ); ?>
+		</a>
+	</section>
+
 	<section class="spk-card">
 		<h2 class="spk-card__title"><?php esc_html_e( 'سیاست نگهداری داده‌ها', 'sparkknife-ledger' ); ?></h2>
 		<p>
