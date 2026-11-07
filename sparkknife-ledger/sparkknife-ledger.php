@@ -3,7 +3,7 @@
  * Plugin Name:       SparKnife Ledger
  * Plugin URI:        https://github.com/sparkknife/SparKnife-ledger
  * Description:       سیستم حرفه‌ای مدیریت حساب اشخاص، ثبت تراکنش‌های ورودی و خروجی، محاسبه خودکار مانده و گزارش‌گیری فردی و تجمیعی.
- * Version:           1.0.0
+ * Version:           1.1.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            SparKnife
@@ -24,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
 |--------------------------------------------------------------------------
 */
 
-define( 'SPARKKNIFE_LEDGER_VERSION', '1.0.0' );
+define( 'SPARKKNIFE_LEDGER_VERSION', '1.1.0' );
 define( 'SPARKKNIFE_LEDGER_FILE', __FILE__ );
 define( 'SPARKKNIFE_LEDGER_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SPARKKNIFE_LEDGER_URL', plugin_dir_url( __FILE__ ) );
