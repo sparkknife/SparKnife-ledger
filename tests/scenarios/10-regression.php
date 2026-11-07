@@ -4685,3 +4685,79 @@ spk_assert(
 	Sparkknife_Ledger_DB::tables_exist(),
 	'باگ ۸۷: جدول‌ها پس از همهٔ آزمون‌ها سالم‌اند'
 );
+
+/*
+ * -----------------------------------------------------------------------------
+ * باگ ۸۸ — ستون توضیح تاریخچه در خروجی CSV همیشه خالی بود.
+ *
+ * جدول `summary` نام دارد، کد `description` می‌خواند. `$wpdb` برای
+ * ستون ناموجود عضو stdClass نمی‌سازد، پس:
+ *   - Warning در لاگ
+ *   - ستون توضیح در CSV همیشه خالی
+ *
+ * آزمون قبلی خروجی، سرصفحه و تعداد ردیف را می‌سنجید، نه محتوای ستون.
+ * یک ستون تماماً خالی از آن رد می‌شد.
+ * -----------------------------------------------------------------------------
+ */
+$export_svc = Sparkknife_Ledger_Export_Service::instance();
+$export_rows = $export_svc->full_export_rows();
+
+spk_assert(
+	is_array( $export_rows ) && count( $export_rows ) > 0,
+	'باگ ۸۸: خروجی کامل ردیف دارد'
+);
+
+/*
+ * سرصفحهٔ بخش تاریخچه باید ستون `summary` داشته باشد، نه `description`.
+ * اگر کد به `description` برگردد، این آزمون می‌شکند.
+ */
+$audit_header = null;
+foreach ( $export_rows as $export_row ) {
+	if ( is_array( $export_row ) && in_array( 'object_type', $export_row, true ) ) {
+		$audit_header = $export_row;
+		break;
+	}
+}
+
+spk_assert(
+	is_array( $audit_header ),
+	'باگ ۸۸: سرصفحهٔ تاریخچه در خروجی پیدا شد'
+);
+
+if ( is_array( $audit_header ) ) {
+	spk_assert(
+		in_array( 'summary', $audit_header, true ),
+		'باگ ۸۸: سرصفحهٔ تاریخچه ستون summary دارد'
+	);
+
+	spk_assert(
+		! in_array( 'description', $audit_header, true ),
+		'باگ ۸۸: سرصفحهٔ تاریخچه ستون description ندارد'
+	);
+}
+
+/*
+ * مهم‌ترین بررسی: اگر ردیف تاریخچه با summary غیرخالی در دیتابیس هست،
+ * خروجی هم باید همان را داشته باشد. ستون خالی دیگر از آزمون رد نمی‌شود.
+ */
+global $wpdb;
+$audit_table = Sparkknife_Ledger_DB::audit_table();
+
+// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+$audit_with_summary = $wpdb->get_var( "SELECT summary FROM {$audit_table} WHERE summary IS NOT NULL AND summary <> '' LIMIT 1" );
+
+if ( null !== $audit_with_summary && '' !== $audit_with_summary ) {
+	$found_summary = false;
+
+	foreach ( $export_rows as $export_row ) {
+		if ( is_array( $export_row ) && in_array( (string) $audit_with_summary, array_map( 'strval', $export_row ), true ) ) {
+			$found_summary = true;
+			break;
+		}
+	}
+
+	spk_assert(
+		$found_summary,
+		'باگ ۸۸: متن summary جدول تاریخچه در خروجی دیده می‌شود'
+	);
+}

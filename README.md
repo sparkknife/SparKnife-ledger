@@ -5,7 +5,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-5.8%2B-21759b)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-777bb4)](https://www.php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-blue)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Tests](https://img.shields.io/badge/tests-982%20assertions-brightgreen)](#تستها)
+[![Tests](https://img.shields.io/badge/tests-988%20assertions-brightgreen)](#تستها)
 
 ---
 
@@ -274,7 +274,7 @@ sparkknife-ledger/
 | [`docs/AUTHORSHIP.md`](docs/AUTHORSHIP.md) | نویسنده، مالکیت، لایسنس دوگانه |
 | [`docs/RELEASE-SIGNING.md`](docs/RELEASE-SIGNING.md) | امضای دیجیتال بستهٔ انتشار با RSA |
 | [`docs/YOUR-STEPS.md`](docs/YOUR-STEPS.md) | کارهایی که پیش از فروش باید خودتان انجام دهید |
-| [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار — ۸۷ باگ مستند |
+| [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار — ۸۸ باگ مستند |
 
 ### قواعد کد
 
@@ -397,8 +397,30 @@ lint                   77 فایل | 0 خطا
 `check-authorship.mjs` هیچ وابستگی ندارد. راهنمای کامل امضا:
 [`docs/RELEASE-SIGNING.md`](docs/RELEASE-SIGNING.md).
 
-پوشش: **۹۸۲ assertion در ۱۰ سناریو** — ۳۳۳ در سناریوهای ۰۱–۰۹ و
-۶۴۹ در سناریوی رگرسیون.
+### آزمون واقعی بدون نصب PHP
+
+اگر PHP روی ماشین ندارید، PHP-WASM کافی است:
+
+```bash
+npm install @php-wasm/node @php-wasm/universal
+
+# ساخت سایت وردپرس آزمایشی (SQLite) — یک دستور
+node tools/setup-test-site.mjs /tmp/wpsite
+
+# اجرای هر اسکریپت PHP روی آن
+node tools/php-wasm.mjs /tmp/myscript.php
+```
+
+`setup-test-site.mjs` وردپرس را از مخزن رسمی می‌گیرد، درایور SQLite را
+کنارش می‌گذارد، و افزونه را نصب و فعال می‌کند. کاربر: `admin` /
+`password123`.
+
+> نکتهٔ فنی که وقت زیادی گرفت: `loadNodeRuntime()` یک **شمارهٔ runtime**
+> برمی‌گرداند، نه شیء PHP. باید با `new PHP(id)` از
+> `@php-wasm/universal` بسته‌بندی شود.
+
+پوشش: **۹۸۸ assertion در ۱۰ سناریو** — ۳۳۳ در سناریوهای ۰۱–۰۹ و
+۶۵۵ در سناریوی رگرسیون.
 
 | # | سناریو |
 | --- | --- |

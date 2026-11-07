@@ -691,7 +691,16 @@ class Sparkknife_Ledger_Export_Service {
 			++$audit_guard;
 		} while ( count( $audit_all ) < $audit_total && count( $audit_items ) > 0 && $audit_guard < 200 );
 
-		$rows[] = array( 'id', 'object_type', 'object_id', 'action', 'user_id', 'description', 'created_at' );
+		/*
+		 * ستون توضیح در جدول `summary` نام دارد، نه `description`.
+		 *
+		 * پیش‌تر کد `$entry->description` می‌خواند که هیچ‌وقت وجود
+		 * نداشت. نتیجه: در هر خروجی کامل تاریخچه، یک Warning
+		 * «Undefined property: stdClass::$description» در لاگ و ستون
+		 * توضیح **همیشه خالی** در CSV. کسی که خروجی می‌گرفت فکر
+		 * می‌کرد توضیحی ثبت نشده، در حالی که در دیتابیس بود.
+		 */
+		$rows[] = array( 'id', 'object_type', 'object_id', 'action', 'user_id', 'summary', 'created_at' );
 
 		foreach ( $audit_all as $entry ) {
 			$rows[] = array(
@@ -700,7 +709,7 @@ class Sparkknife_Ledger_Export_Service {
 				(string) $entry->object_id,
 				(string) $entry->action,
 				(string) $entry->user_id,
-				(string) $entry->description,
+				isset( $entry->summary ) ? (string) $entry->summary : '',
 				(string) $entry->created_at,
 			);
 		}
