@@ -361,13 +361,28 @@ php tests/run-tests.php /path/to/wp-load.php
 
 ### ابزارهای بررسی
 
-چهار بررسی که بدون نیاز به وردپرس و PHP اجرا می‌شوند:
+پنج بررسی که بدون نیاز به وردپرس و PHP اجرا می‌شوند:
+
+```bash
+./tools/check-all.sh
+```
+
+یا هر کدام جدا:
 
 ```bash
 node tools/lint.mjs                # تجزیهٔ نحوی همهٔ فایل‌های PHP
 node tools/static-audit.mjs        # انسجام کلاس‌ها و ارجاع‌های شکسته
 node tools/static-audit-rules.mjs  # قواعد امنیتی (nonce، escape، ABSPATH)
+node tools/php-compat.mjs          # سازگاری با PHP 7.4
 node tools/check-authorship.mjs    # یکپارچگی امضای نویسنده (۱۲ بررسی)
+```
+
+```text
+lint                   77 فایل | 0 خطا
+انسجام کلاس‌ها         هیچ ارجاع شکسته‌ای پیدا نشد ✓
+قواعد امنیتی           هیچ نقض قاعده‌ای پیدا نشد ✓
+سازگاری PHP            سازگار با PHP 7.4 ✓
+امضای نویسنده          همهٔ بررسی‌های نویسندگی موفق ✓
 ```
 
 و دو ابزار برای انتشار:
