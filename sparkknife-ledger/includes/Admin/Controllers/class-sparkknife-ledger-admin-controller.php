@@ -62,6 +62,27 @@ class Sparkknife_Ledger_Admin_Controller {
 		// بررسی Nonce اختصاصی هر action.
 		check_admin_referer( 'sparkknife_ledger_' . $action );
 
+		/*
+		 * محدودیت تلاش روی اکشن‌های حساس.
+		 *
+		 * nonce ثابت می‌کند که درخواست از فرم خودمان آمده، ولی نمی‌گوید
+		 * چند بار. اگر نشست یا nonce دزدیده شود، بدون این نگهبان
+		 * مهاجم می‌تواند بی‌نهایت `data_purge` یا
+		 * `capabilities_save` بفرستد.
+		 */
+		$allowed = Sparkknife_Ledger_Security::check_rate( $action );
+
+		if ( is_wp_error( $allowed ) ) {
+			Sparkknife_Ledger_Admin_Loader::add_notice(
+				'error',
+				$allowed->get_error_message(),
+				array(),
+				$this->resolve_redirect()
+			);
+
+			return;
+		}
+
 		$redirect = $this->resolve_redirect();
 
 		switch ( $action ) {
@@ -99,6 +120,30 @@ class Sparkknife_Ledger_Admin_Controller {
 
 			case 'data_purge':
 				$this->handle_data_purge( $redirect );
+				break;
+
+			case 'license_save':
+				$this->handle_license_save( $redirect );
+				break;
+
+			case 'license_remove':
+				$this->handle_license_remove( $redirect );
+				break;
+
+			case 'security_log_clear':
+				$this->handle_security_log_clear( $redirect );
+				break;
+
+			case 'onboarding_currency':
+				$this->handle_onboarding_currency( $redirect );
+				break;
+
+			case 'onboarding_person':
+				$this->handle_onboarding_person( $redirect );
+				break;
+
+			case 'onboarding_finish':
+				$this->handle_onboarding_finish( $redirect );
 				break;
 
 			default:
@@ -228,6 +273,15 @@ class Sparkknife_Ledger_Admin_Controller {
 		if ( is_wp_error( $result ) ) {
 			$this->flash_error( $result );
 			Sparkknife_Ledger_Admin_Loader::add_notice( 'error', $result->get_error_message(), array(), $redirect );
+
+			/*
+			 * `add_notice()` با redirect غیرخالی خودش exit می‌کند، ولی
+			 * این return عمدی است: بدون آن، اگر روزی رفتار add_notice
+			 * عوض شود یا redirect خالی باشد، پیام «موفقیت» هم بعد از
+			 * پیام خطا نوشته می‌شد و کاربر با یک شکست، پیام موفقیت
+			 * می‌دید.
+			 */
+			return;
 		}
 
 		Sparkknife_Ledger_Admin_Loader::add_notice(
@@ -252,6 +306,9 @@ class Sparkknife_Ledger_Admin_Controller {
 
 		if ( is_wp_error( $result ) ) {
 			Sparkknife_Ledger_Admin_Loader::add_notice( 'error', $result->get_error_message(), array(), $redirect );
+
+			// همان دلیل: پیام موفقیت نباید پس از شکست نوشته شود.
+			return;
 		}
 
 		Sparkknife_Ledger_Admin_Loader::add_notice( 'success', __( 'شخص با موفقیت بازگردانی شد.', 'sparkknife-ledger' ), array(), $redirect );
@@ -273,6 +330,9 @@ class Sparkknife_Ledger_Admin_Controller {
 
 		if ( is_wp_error( $result ) ) {
 			Sparkknife_Ledger_Admin_Loader::add_notice( 'error', $result->get_error_message(), array(), $redirect );
+
+			// همان دلیل: پیام موفقیت نباید پس از شکست نوشته شود.
+			return;
 		}
 
 		Sparkknife_Ledger_Admin_Loader::add_notice(
@@ -407,6 +467,9 @@ class Sparkknife_Ledger_Admin_Controller {
 
 		if ( is_wp_error( $result ) ) {
 			Sparkknife_Ledger_Admin_Loader::add_notice( 'error', $result->get_error_message(), array(), $return_url );
+
+			// همان دلیل: پیام موفقیت نباید پس از شکست نوشته شود.
+			return;
 		}
 
 		Sparkknife_Ledger_Admin_Loader::add_notice(
@@ -454,6 +517,13 @@ class Sparkknife_Ledger_Admin_Controller {
 				array(),
 				add_query_arg( array( 'page' => 'sparkknife-ledger-settings', 'tab' => $tab ), admin_url( 'admin.php' ) )
 			);
+
+			/*
+			 * همان دلیل: پیام «تنظیمات با موفقیت ذخیره شد» نباید پس از
+			 * یک خطای واقعی نوشته شود. پیش‌تر فقط exit داخل add_notice
+			 * جلوی آن را می‌گرفت.
+			 */
+			return;
 		}
 
 		Sparkknife_Ledger_Admin_Loader::add_notice(
@@ -542,6 +612,225 @@ class Sparkknife_Ledger_Admin_Controller {
 			__( 'تمام داده‌های مالی حذف شدند. برای ایجاد مجدد جداول، افزونه را غیرفعال و فعال کنید.', 'sparkknife-ledger' ),
 			array(),
 			admin_url( 'admin.php?page=sparkknife-ledger-settings' )
+		);
+	}
+
+	/*
+	|--------------------------------------------------------------------------
+	| ویزارد راه‌اندازی
+	|--------------------------------------------------------------------------
+	*/
+
+	/**
+	 * ذخیرهٔ واحد پول و تقویم از ویزارد.
+	 *
+	 * @param string $redirect مقصد.
+	 * @return void
+	 */
+	private function handle_onboarding_currency( $redirect ) {
+		Sparkknife_Ledger_Capabilities::require_capability( 'manage_settings' );
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce در handle_post_action بررسی شده است.
+		$currency = isset( $_POST['currency_type'] ) ? sanitize_key( wp_unslash( $_POST['currency_type'] ) ) : 'toman';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$calendar = isset( $_POST['calendar'] ) ? sanitize_key( wp_unslash( $_POST['calendar'] ) ) : 'jalali';
+
+		/*
+		 * یک فراخوانی، نه دو تا.
+		 *
+		 * `Settings::save()` همهٔ فیلدها را یک‌جا می‌نویسد؛ اگر دو بار
+		 * صدایش بزنیم، فراخوانی دوم فیلدهایی را که در ورودی‌اش نیست از
+		 * مقدار فعلی پر می‌کند — که همان مقدار تازه‌نوشته‌شده است، پس
+		 * نتیجه درست می‌شود ولی بیهوده دو نوشتن و دو رکورد تاریخچه
+		 * تولید می‌کند.
+		 */
+		$result = Sparkknife_Ledger_Settings::save(
+			array(
+				'currency_type' => $currency,
+				'calendar'      => $calendar,
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			Sparkknife_Ledger_Admin_Loader::add_notice( 'error', $result->get_error_message(), array(), $redirect );
+
+			return;
+		}
+
+		Sparkknife_Ledger_Admin_Loader::add_notice(
+			'success',
+			__( 'تنظیمات پایه ذخیره شد.', 'sparkknife-ledger' ),
+			array(),
+			$redirect
+		);
+	}
+
+	/**
+	 * افزودن اولین شخص از ویزارد.
+	 *
+	 * @param string $redirect مقصد.
+	 * @return void
+	 */
+	private function handle_onboarding_person( $redirect ) {
+		Sparkknife_Ledger_Capabilities::require_capability( 'manage_persons' );
+
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- nonce در handle_post_action بررسی شده است.
+		$name  = isset( $_POST['name'] ) ? wp_unslash( $_POST['name'] ) : '';
+		$phone = isset( $_POST['phone'] ) ? wp_unslash( $_POST['phone'] ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+		$result = Sparkknife_Ledger_Person_Service::instance()->create(
+			array(
+				'name'        => $name,
+				'phone'       => $phone,
+				'description' => '',
+				'status'      => 'active',
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			Sparkknife_Ledger_Admin_Loader::add_notice( 'error', $result->get_error_message(), array(), $redirect );
+
+			return;
+		}
+
+		Sparkknife_Ledger_Admin_Loader::add_notice(
+			'success',
+			__( 'شخص افزوده شد.', 'sparkknife-ledger' ),
+			array(),
+			$redirect
+		);
+	}
+
+	/**
+	 * پایان ویزارد.
+	 *
+	 * @param string $redirect مقصد.
+	 * @return void
+	 */
+	private function handle_onboarding_finish( $redirect ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			Sparkknife_Ledger_Admin_Loader::add_notice(
+				'error',
+				__( 'دسترسی کافی ندارید.', 'sparkknife-ledger' ),
+				array(),
+				$redirect
+			);
+
+			return;
+		}
+
+		update_option( Sparkknife_Ledger_Onboarding_Controller::OPTION_DONE, 'yes', false );
+
+		Sparkknife_Ledger_Admin_Loader::add_notice(
+			'success',
+			__( 'راه‌اندازی کامل شد.', 'sparkknife-ledger' ),
+			array(),
+			$redirect
+		);
+	}
+
+	/*
+	|--------------------------------------------------------------------------
+	| لایسنس و امنیت
+	|--------------------------------------------------------------------------
+	*/
+
+	/**
+	 * ذخیرهٔ کلید لایسنس.
+	 *
+	 * @param string $redirect مقصد.
+	 * @return void
+	 */
+	private function handle_license_save( $redirect ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			Sparkknife_Ledger_Admin_Loader::add_notice(
+				'error',
+				__( 'فقط مدیر کل سایت می‌تواند لایسنس را تغییر دهد.', 'sparkknife-ledger' ),
+				array(),
+				$redirect
+			);
+
+			return;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce در handle_post_action بررسی شده است.
+		$key = isset( $_POST['license_key'] ) ? sanitize_textarea_field( wp_unslash( $_POST['license_key'] ) ) : '';
+
+		$result = Sparkknife_Ledger_License::save_key( $key );
+
+		if ( is_wp_error( $result ) ) {
+			Sparkknife_Ledger_Security::log( 'license_rejected', 'warning', array( 'reason' => $result->get_error_code() ) );
+
+			Sparkknife_Ledger_Admin_Loader::add_notice( 'error', $result->get_error_message(), array(), $redirect );
+
+			return;
+		}
+
+		Sparkknife_Ledger_Security::log( 'license_activated', 'info', array( 'edition' => Sparkknife_Ledger_License::edition() ) );
+
+		Sparkknife_Ledger_Admin_Loader::add_notice(
+			'success',
+			__( 'لایسنس فعال شد.', 'sparkknife-ledger' ),
+			array(),
+			$redirect
+		);
+	}
+
+	/**
+	 * حذف لایسنس.
+	 *
+	 * @param string $redirect مقصد.
+	 * @return void
+	 */
+	private function handle_license_remove( $redirect ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			Sparkknife_Ledger_Admin_Loader::add_notice(
+				'error',
+				__( 'فقط مدیر کل سایت می‌تواند لایسنس را تغییر دهد.', 'sparkknife-ledger' ),
+				array(),
+				$redirect
+			);
+
+			return;
+		}
+
+		Sparkknife_Ledger_License::remove_key();
+		Sparkknife_Ledger_Security::log( 'license_removed', 'info' );
+
+		Sparkknife_Ledger_Admin_Loader::add_notice(
+			'success',
+			__( 'لایسنس از این سایت حذف شد.', 'sparkknife-ledger' ),
+			array(),
+			$redirect
+		);
+	}
+
+	/**
+	 * پاک کردن گزارش امنیتی.
+	 *
+	 * @param string $redirect مقصد.
+	 * @return void
+	 */
+	private function handle_security_log_clear( $redirect ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			Sparkknife_Ledger_Admin_Loader::add_notice(
+				'error',
+				__( 'دسترسی کافی ندارید.', 'sparkknife-ledger' ),
+				array(),
+				$redirect
+			);
+
+			return;
+		}
+
+		Sparkknife_Ledger_Security::clear_log();
+
+		Sparkknife_Ledger_Admin_Loader::add_notice(
+			'success',
+			__( 'گزارش امنیتی پاک شد.', 'sparkknife-ledger' ),
+			array(),
+			$redirect
 		);
 	}
 

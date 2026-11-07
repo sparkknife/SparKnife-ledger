@@ -132,6 +132,39 @@ class Sparkknife_Ledger_Admin_Loader {
 			'sparkknife-ledger-settings',
 			array( 'Sparkknife_Ledger_Settings_Controller', 'render' )
 		);
+
+		/*
+		 * صفحهٔ ویزارد راه‌اندازی — از منو مخفی است.
+		 *
+		 * `null` به‌عنوان تابع منو یعنی صفحه ثبت می‌شود ولی در نوار
+		 * کناری دیده نمی‌شود؛ کاربر فقط با هدایت خودکار یا نشانی
+		 * مستقیم به آن می‌رسد.
+		 */
+		add_submenu_page(
+			null,
+			__( 'راه‌اندازی', 'sparkknife-ledger' ),
+			__( 'راه‌اندازی', 'sparkknife-ledger' ),
+			'manage_options',
+			Sparkknife_Ledger_Onboarding_Controller::PAGE,
+			array( 'Sparkknife_Ledger_Onboarding_Controller', 'render' )
+		);
+
+		/*
+		 * صفحهٔ سلامت و امنیت.
+		 *
+		 * دسترسی `manage_options` است، نه `manage_settings` محلی، چون
+		 * این صفحه نتیجهٔ بررسی‌های سطح سایت (HTTPS، نسخه PHP،
+		 * دسترسی فایل) و وضعیت لایسنس را نشان می‌دهد — چیزی که فقط
+		 * مدیر کل باید ببیند.
+		 */
+		add_submenu_page(
+			self::MAIN_PAGE,
+			__( 'سلامت و امنیت', 'sparkknife-ledger' ),
+			__( 'سلامت و امنیت', 'sparkknife-ledger' ),
+			'manage_options',
+			'sparkknife-ledger-health',
+			array( 'Sparkknife_Ledger_Health_Controller', 'render' )
+		);
 	}
 
 	/**
@@ -283,6 +316,15 @@ class Sparkknife_Ledger_Admin_Loader {
 
 		if ( ! Sparkknife_Ledger_Capabilities::current_user_can( 'view_reports' ) ) {
 			return;
+		}
+
+		/*
+		 * اگر کاربر تازه‌کار است و هیچ داده‌ای ندارد، به ویزارد ببر؛
+		 * وگرنه به داشبورد. کاربری که داده دارد نباید ویزارد ببیند.
+		 */
+		if ( Sparkknife_Ledger_Onboarding_Controller::needs_setup() ) {
+			wp_safe_redirect( admin_url( 'admin.php?page=' . Sparkknife_Ledger_Onboarding_Controller::PAGE ) );
+			exit;
 		}
 
 		wp_safe_redirect( admin_url( 'admin.php?page=sparkknife-ledger' ) );

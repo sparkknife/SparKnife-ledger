@@ -1398,6 +1398,67 @@ textarea.spk-input { min-height: 84px; resize: vertical; }
 	.spk-form__actions--sticky { position: static; }
 }
 
+/* ── صفحهٔ سلامت و امنیت ──────────────────────────────────────────── */
+
+.spk-health-summary {
+	display: flex;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin: 4px 0 14px;
+}
+
+.spk-health-pill {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-width: 92px;
+	padding: 12px 18px;
+	border-radius: 10px;
+	border: 1px solid #dcdcde;
+	background: #fff;
+}
+
+.spk-health-pill__num {
+	font-size: 24px;
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.spk-health-pill__label {
+	font-size: 12px;
+	color: #646970;
+	margin-top: 2px;
+}
+
+.spk-health-pill.is-ok   { border-color: #00a32a; background: #f0fbf2; }
+.spk-health-pill.is-ok   .spk-health-pill__num { color: #00792a; }
+.spk-health-pill.is-warn { border-color: #dba617; background: #fefbe6; }
+.spk-health-pill.is-warn .spk-health-pill__num { color: #94660c; }
+.spk-health-pill.is-fail { border-color: #d63638; background: #fdf0f0; }
+.spk-health-pill.is-fail .spk-health-pill__num { color: #b32d2e; }
+
+.spk-health-note {
+	margin: 10px 0 0;
+	padding: 10px 14px;
+	border-radius: 8px;
+	border-inline-start: 4px solid #dcdcde;
+	background: #f6f7f7;
+}
+
+.spk-health-note.is-ok   { border-inline-start-color: #00a32a; background: #f0fbf2; }
+.spk-health-note.is-warn { border-inline-start-color: #dba617; background: #fefbe6; }
+
+.spk-health-table th[scope="row"] {
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.spk-badge.is-ok   { background: #f0fbf2; color: #00792a; border-color: #00a32a; }
+.spk-badge.is-warn { background: #fefbe6; color: #94660c; border-color: #dba617; }
+.spk-badge.is-fail { background: #fdf0f0; color: #b32d2e; border-color: #d63638; }
+.spk-badge.is-info { background: #f0f6fc; color: #0a4b78; border-color: #72aee6; }
+
 @media (prefers-reduced-motion: reduce) {
 	.spk-wrap * { transition: none !important; animation: none !important; }
 }

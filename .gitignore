@@ -18,3 +18,8 @@ vendor/
 dist/
 build/
 coverage/
+
+# ── کلید خصوصی لایسنس — هرگز نباید در مخزن باشد ────────────────────
+tools/licensing/private_key.pem
+*.pem.private
+license-keys/
