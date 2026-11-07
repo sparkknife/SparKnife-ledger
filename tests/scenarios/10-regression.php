@@ -3545,6 +3545,56 @@ $wpdb->query( $wpdb->prepare( "DELETE FROM {$av_audit_table} WHERE object_type =
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$av_txn_table} WHERE id = %d", $av_txn_id ) );
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$av_table} WHERE id = %d", $av_person_id ) );
 
+// ── ۳۸: مبلغ منفی در CSV نباید به متن تبدیل شود ─────────────────────
+/*
+ * باگ ۷۰: محافظت تزریق فرمول، هر رشته‌ای که با `-` شروع می‌شد را با
+ * آپاستروف می‌پوشاند — از جمله مبالغ منفی. نتیجه در فایل CSV:
+ *
+ *     ثریا حسینی,…,1019000,'-192000,"مانده منفی"
+ *
+ * Excel و LibreOffice آپاستروف را نشانهٔ «متن» می‌گیرند، پس آن سلول
+ * دیگر عدد نیست: `SUM()` صفر می‌دهد و نمودار ستونی ساخته نمی‌شود.
+ *
+ * این عارضه در جریان رفع باگ ۶۳ روی نمونهٔ واقعی دیده شد.
+ */
+spk_equals( '-192000', Sparkknife_Ledger_Export_Service::sanitize_cell( '-192000' ), 'مبلغ منفی آپاستروف نمی‌گیرد' );
+spk_equals( '-1', Sparkknife_Ledger_Export_Service::sanitize_cell( '-1' ), 'منفی کوچک آپاستروف نمی‌گیرد' );
+spk_equals( '0', Sparkknife_Ledger_Export_Service::sanitize_cell( '0' ), 'صفر دست‌نخورده می‌ماند' );
+spk_equals( '125000', Sparkknife_Ledger_Export_Service::sanitize_cell( '125000' ), 'مبلغ مثبت دست‌نخورده می‌ماند' );
+spk_equals( '1,250,000', Sparkknife_Ledger_Export_Service::sanitize_cell( '1,250,000' ), 'عدد با جداکننده دست‌نخورده می‌ماند' );
+spk_equals( '-1,250,000.50', Sparkknife_Ledger_Export_Service::sanitize_cell( '-1,250,000.50' ), 'منفی اعشاری دست‌نخورده می‌ماند' );
+spk_equals( '-7438000', Sparkknife_Ledger_Export_Service::sanitize_cell( '-7438000' ), 'مانده کل منفی دست‌نخورده می‌ماند' );
+
+/*
+ * امنیت نباید فدا شده باشد: هر چیزی که عدد خالص نیست و با `-` شروع
+ * می‌شود باید همچنان مسدود شود.
+ */
+$csv_neg_unsafe = array( '-1+1', '-cmd', '- 1', '-2+3', '--1', '-1e5' );
+$csv_neg_ok     = true;
+
+foreach ( $csv_neg_unsafe as $csv_neg_payload ) {
+	if ( 0 !== strpos( Sparkknife_Ledger_Export_Service::sanitize_cell( $csv_neg_payload ), "'" ) ) {
+		$csv_neg_ok = false;
+		break;
+	}
+}
+
+spk_assert( $csv_neg_ok, 'هر شش منفیِ غیرعددی همچنان آپاستروف می‌گیرند' );
+
+// پیش‌وند پوشاننده + فرمول باید همچنان مسدود شود.
+spk_assert(
+	0 === strpos( Sparkknife_Ledger_Export_Service::sanitize_cell( "\u{200B}=cmd|calc" ), "'" ),
+	'ZWSP + فرمول همچنان مسدود می‌شود'
+);
+spk_assert(
+	0 === strpos( Sparkknife_Ledger_Export_Service::sanitize_cell( "\u{00A0}-1+1" ), "'" ),
+	'NBSP + منفی خطرناک همچنان مسدود می‌شود'
+);
+
+// متون سالم دست‌نخورده.
+spk_equals( 'زهرا صادقی', Sparkknife_Ledger_Export_Service::sanitize_cell( 'زهرا صادقی' ), 'نام فارسی دست‌نخورده می‌ماند' );
+spk_equals( '09129241959', Sparkknife_Ledger_Export_Service::sanitize_cell( '09129241959' ), 'شماره تماس دست‌نخورده می‌ماند' );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
