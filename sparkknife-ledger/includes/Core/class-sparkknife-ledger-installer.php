@@ -101,6 +101,7 @@ class Sparkknife_Ledger_Installer {
 		Sparkknife_Ledger_Capabilities::add_capabilities();
 		self::store_versions();
 		do_action( 'sparkknife_ledger_activated' );
+
 	}
 
 	/**
