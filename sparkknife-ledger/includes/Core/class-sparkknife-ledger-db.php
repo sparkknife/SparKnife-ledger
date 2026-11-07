@@ -4,6 +4,8 @@
  *
  * تنها این کلاس‌ها و Repositoryها با $wpdb کار می‌کنند.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

@@ -9,6 +9,8 @@
  * @var string $current صفحه جاری.
  * @var string $base_url نشانی پایه.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

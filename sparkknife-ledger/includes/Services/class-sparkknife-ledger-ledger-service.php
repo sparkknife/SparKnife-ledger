@@ -6,6 +6,8 @@
  *   مانده = مجموع ورودی‌های معتبر − مجموع خروجی‌های معتبر
  * تراکنش‌های باطل‌شده (status = void) هرگز در محاسبات لحاظ نمی‌شوند.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

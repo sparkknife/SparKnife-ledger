@@ -8,10 +8,26 @@
  * Requires PHP:      7.4
  * Author:            SparKnife
  * Author URI:        https://github.com/sparkknife
- * License:           GPL-2.0-or-later
- * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * License:           GPL-2.0-or-later OR commercial — see LICENSE
+ * License URI:       https://github.com/sparkknife/SparKnife-ledger/blob/main/sparkknife-ledger/LICENSE
  * Text Domain:       sparkknife-ledger
  * Domain Path:       /languages
+ *
+ * SparKnife Ledger — دفتر حساب اشخاص برای وردپرس.
+ *
+ * SparKnife Ledger محصولی از SparKnife است: طراحی، مالکیت و
+ * مسئولیت نگهداری آن با SparKnife است. هر تصمیم طراحی در
+ * docs/ARCHITECTURE.md توضیح دارد و هر باگ رفع‌شده در docs/AUDIT.md
+ * با ریشه و آزمون رگرسیون ثبت شده است.
+ *
+ * کد عمداً ساده و خواناست: بدون Composer، بدون فریم‌ورک
+ * جاوااسکریپت، بدون وابستگی بیرونی. تنها چیزی که لازم است خود
+ * وردپرس و PHP است. هیچ کتابخانهٔ شخص ثالثی در بسته نیست.
+ *
+ * @author     SparKnife <155084046+sparkknife@users.noreply.github.com>
+ * @copyright  2026 SparKnife. All rights reserved.
+ * @license    GPL-2.0-or-later OR commercial — see LICENSE
+ * @link       https://github.com/sparkknife/SparKnife-ledger
  *
  * @package SparKnife_Ledger
  */

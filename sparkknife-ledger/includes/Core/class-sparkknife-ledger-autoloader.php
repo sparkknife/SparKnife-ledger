@@ -8,6 +8,8 @@
  *   Sparkknife_Ledger_Persons_Controller  → includes/Admin/Controllers/class-sparkknife-ledger-persons-controller.php
  *   Sparkknife_Ledger_Money               → includes/Core/class-sparkknife-ledger-money.php
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

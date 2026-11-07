@@ -13,6 +13,8 @@
  * - همیشه گزینه‌های سبک (نسخه، وضعیت نصب) پاک می‌شوند؛ حذف آن‌ها داده
  *   مالی نیست و فقط باعث نصب تمیز در آینده می‌شود.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

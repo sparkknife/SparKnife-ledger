@@ -2,6 +2,8 @@
 /**
  * راه‌انداز بخش مدیریت: منوها، دارایی‌ها و مسیریابی کنترلرها.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

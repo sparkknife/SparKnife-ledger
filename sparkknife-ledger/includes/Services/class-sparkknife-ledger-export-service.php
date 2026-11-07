@@ -2,6 +2,8 @@
 /**
  * سرویس خروجی گزارش‌ها (CSV سازگار با Excel، چاپ و PDF).
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

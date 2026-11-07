@@ -1,0 +1,18 @@
+SparKnife Ledger
+Copyright © 2026 SparKnife. All rights reserved.
+
+This product is licensed under a dual license:
+
+  1) GNU General Public License v2.0 or later (GPL-2.0-or-later)
+     https://www.gnu.org/licenses/gpl-2.0.html
+
+  2) SparKnife Commercial License
+     Contact SparKnife for terms.
+
+You may choose the license that suits your use.
+
+Author: SparKnife <155084046+sparkknife@users.noreply.github.com>
+Repository: https://github.com/sparkknife/SparKnife-ledger
+
+Third-party components: none. This plugin has no runtime dependency
+on Composer packages, JavaScript frameworks, or external services.

@@ -5,6 +5,8 @@
  * @var string $type   transaction|person|account.
  * @var string $status وضعیت.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

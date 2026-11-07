@@ -9,6 +9,8 @@
  * @var string $arg      نام پارامتر صفحه.
  * @var int    $per_page تعداد در صفحه.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

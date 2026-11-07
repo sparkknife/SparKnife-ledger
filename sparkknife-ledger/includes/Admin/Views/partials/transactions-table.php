@@ -8,6 +8,8 @@
  * @var string $empty_url    دکمه حالت خالی.
  * @var bool   $show_person  نمایش ستون شخص.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

@@ -1941,3 +1941,9 @@ php tests/run-tests.php /path/to/wp-load.php
 نمی‌شد، چون `shell_exec` در آن محیط اجرا نمی‌شود و کل نمونه را قفل
 می‌کند. حالا با `sparkknife_ledger_can_spawn()` در **۶ ثانیه** تمام
 می‌شود. روی PHP عادی همان بررسی‌ها اجرا می‌شوند.
+
+---
+
+© ۱۴۰۵ / ۲۰۲۶ **SparKnife**. همهٔ حقوق محفوظ است.
+
+[SparKnife Ledger](https://github.com/sparkknife/SparKnife-ledger) · نوشتهٔ SparKnife

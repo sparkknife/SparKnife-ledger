@@ -460,3 +460,9 @@ wp eval 'print_r( Sparkknife_Ledger_Installer::get_health_report() );'
 ```
 
 خروجی شامل وضعیت هر جدول، تعداد ردیف‌ها و نسخه اسکیماست.
+
+---
+
+© ۱۴۰۵ / ۲۰۲۶ **SparKnife**. همهٔ حقوق محفوظ است.
+
+[SparKnife Ledger](https://github.com/sparkknife/SparKnife-ledger) · نوشتهٔ SparKnife

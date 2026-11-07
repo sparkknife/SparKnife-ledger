@@ -236,3 +236,9 @@ wp plugin deactivate sparkknife-ledger && wp db import backup.sql
 ```
 
 بدون SSH: UpdraftPlus برای پشتیبان + بارگذاری ZIP از پنل وردپرس.
+
+---
+
+© ۱۴۰۵ / ۲۰۲۶ **SparKnife**. همهٔ حقوق محفوظ است.
+
+[SparKnife Ledger](https://github.com/sparkknife/SparKnife-ledger) · نوشتهٔ SparKnife

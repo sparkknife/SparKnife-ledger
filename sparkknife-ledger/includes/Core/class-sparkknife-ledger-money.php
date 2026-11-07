@@ -6,6 +6,8 @@
  * (مبلغ × ۱۰^۴) و هرگز از float برای محاسبات مالی استفاده نمی‌شود.
  * منطق محاسبات از منطق نمایش جدا است.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

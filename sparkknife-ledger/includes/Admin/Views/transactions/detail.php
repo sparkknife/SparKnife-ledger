@@ -7,6 +7,8 @@
  * @var array  $history     تاریخچه.
  * @var string $current     صفحه جاری.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 

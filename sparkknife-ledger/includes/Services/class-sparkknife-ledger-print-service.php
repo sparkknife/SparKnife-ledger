@@ -6,6 +6,8 @@
  * RTL بدون نیاز به فونت یا کتابخانه PDF سمت سرور دقیق و قابل اعتماد است.
  * برای تولید PDF سرورساید، هوک sparkknife_ledger_render_pdf در دسترس است.
  *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ *
  * @package SparKnife_Ledger
  */
 
