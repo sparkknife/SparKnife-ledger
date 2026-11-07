@@ -135,8 +135,26 @@
 			} );
 		}
 
-		// اعتبارسنجی فرم تراکنش.
+		/*
+		 * اعتبارسنجی فرم تراکنش.
+		 *
+		 * `reportValidity()` اول صدا زده می‌شود: اگر مرورگر مشکل بومی
+		 * (فیلد الزامی خالی، ورودی بد) ببیند، پیام خودش را نشان
+		 * می‌دهد و ما فقط جلوی ارسال را می‌گیریم. بدون این، پیام
+		 * فارسی ما و پیام مرورگر هم‌زمان می‌آمدند و کاربر دو خطای
+		 * متفاوت برای یک فیلد می‌دید.
+		 *
+		 * اگر مرورگر اعتبارسنجی بومی را پشتیبانی نکند
+		 * (`noValidate` true نیست ولی `reportValidity` وجود ندارد)،
+		 * `typeof` بررسی می‌کند تا خطای جاوااسکریپت ندهد.
+		 */
 		if ( form.id === 'spk-transaction-form' ) {
+			if ( 'function' === typeof form.reportValidity && ! form.reportValidity() ) {
+				event.preventDefault();
+				event.stopPropagation();
+				return false;
+			}
+
 			return validateTransactionForm( form, event );
 		}
 	}, true );
