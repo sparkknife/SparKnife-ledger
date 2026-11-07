@@ -5,7 +5,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-5.8%2B-21759b)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-777bb4)](https://www.php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-blue)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Tests](https://img.shields.io/badge/tests-942%20assertions-brightgreen)](#تستها)
+[![Tests](https://img.shields.io/badge/tests-955%20assertions-brightgreen)](#تستها)
 
 ---
 
@@ -109,6 +109,12 @@ unzip sparkknife-ledger.zip
 بازه‌های آماده (امروز، این هفته، این ماه، امسال) از هوک `sparkknife_ledger_preset_ranges` قابل گسترش است.
 
 خروجی: **CSV** (سازگار با Excel، با BOM و ارقام فارسی) و **نمایش چاپ/PDF**.
+
+**خروجی کامل داده** (تنظیمات ← خروجی کامل داده): همهٔ اشخاص،
+تراکنش‌ها و تاریخچه در یک فایل CSV برای آرشیو یا انتقال به سیستم
+دیگر. ستون‌های خام جدول می‌آیند، نه ستون‌های مشتق‌شده — مبلغ به‌صورت
+عدد صحیح مقیاس‌شده تا بازگرداندنش بی‌خطا باشد. تراکنش‌های باطل هم
+می‌آیند تا تاریخچه کامل بماند. جای پشتیبان دیتابیس را نمی‌گیرد.
 
 ### تاریخچه تغییرات
 
@@ -349,8 +355,8 @@ add_filter( 'sparkknife_ledger_export_formats', function ( $formats ) {
 php tests/run-tests.php /path/to/wp-load.php
 ```
 
-پوشش: **۹۴۲ assertion در ۱۰ سناریو** — ۳۳۳ در سناریوهای ۰۱–۰۹ و
-۶۰۹ در سناریوی رگرسیون.
+پوشش: **۹۵۵ assertion در ۱۰ سناریو** — ۳۳۳ در سناریوهای ۰۱–۰۹ و
+۶۲۲ در سناریوی رگرسیون.
 
 | # | سناریو |
 | --- | --- |
