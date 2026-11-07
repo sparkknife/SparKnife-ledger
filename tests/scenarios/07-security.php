@@ -33,7 +33,10 @@ if ( ! is_wp_error( $subscriber_id ) ) {
 		Sparkknife_Ledger_Person_Service::instance()->delete( (int) $unauthorized );
 	}
 
-	wp_set_current_user( (int) $GLOBALS['spk_test_admin_id'] ?: (int) get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) )[0] );
+	// بازگشت به مدیر. شناسه از دیتابیس خوانده می‌شود؛ متغیر جهانی‌ای که
+	// هرگز تعریف نمی‌شد قبلاً همین‌جا Warning تولید می‌کرد.
+	$restore_admin = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
+	wp_set_current_user( isset( $restore_admin[0] ) ? (int) $restore_admin[0] : 1 );
 }
 
 // ── مدیر: دسترسی کامل ─────────────────────────────────────────────

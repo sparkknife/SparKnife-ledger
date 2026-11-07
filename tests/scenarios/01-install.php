@@ -23,11 +23,20 @@ spk_assert( Sparkknife_Ledger_DB::tables_exist(), 'جداول افزونه شن�
 
 spk_equals( SPARKKNIFE_LEDGER_DB_VERSION, get_option( 'sparkknife_ledger_db_version' ), 'نسخه اسکیما ثبت شده است' );
 
-// ستون‌های کلیدی جدول تراکنش‌ها.
-$columns = $wpdb->get_col( "PRAGMA table_info({$transactions_table})" );
+/*
+ * ستون‌های کلیدی جدول تراکنش‌ها.
+ *
+ * ترتیب عمداً این است: اول SHOW COLUMNS (که افزونهٔ SQLite آن را به
+ * PRAGMA ترجمه می‌کند و بی‌خطا جواب می‌دهد)، بعد PRAGMA به‌عنوان
+ * fallback برای محیط‌هایی که SHOW COLUMNS را نمی‌شناسند. اگر برعکس
+ * باشد، روی SQLite یک خطای DB در لاگ می‌نشیند و «noise» تولید می‌کند.
+ */
+$columns = wp_list_pluck( (array) $wpdb->get_results( "SHOW COLUMNS FROM {$transactions_table}" ), 'Field' );
 
 if ( empty( $columns ) ) {
-	$columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$transactions_table}" ), 'Field' );
+	$wpdb->suppress_errors( true );
+	$columns = $wpdb->get_col( "PRAGMA table_info({$transactions_table})" );
+	$wpdb->suppress_errors( false );
 }
 
 $expected_columns = array( 'id', 'reference', 'person_id', 'type', 'amount', 'currency', 'txn_date', 'description', 'status', 'created_by', 'created_at', 'updated_by', 'updated_at', 'void_reason', 'voided_by', 'voided_at' );
