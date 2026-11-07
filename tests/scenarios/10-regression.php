@@ -3595,6 +3595,92 @@ spk_assert(
 spk_equals( 'زهرا صادقی', Sparkknife_Ledger_Export_Service::sanitize_cell( 'زهرا صادقی' ), 'نام فارسی دست‌نخورده می‌ماند' );
 spk_equals( '09129241959', Sparkknife_Ledger_Export_Service::sanitize_cell( '09129241959' ), 'شماره تماس دست‌نخورده می‌ماند' );
 
+// ── ۳۹: خلاصهٔ تاریخچه با نوع تغییر باید بخواند ─────────────────────
+/*
+ * باگ ۷۲: `$action` در حالت «فقط تغییر وضعیت» به `status_change`
+ * تبدیل می‌شد، ولی متن خلاصه همیشه «ویرایش اطلاعات شخص» می‌ماند.
+ *
+ *      [غیرفعال‌سازی]  ویرایش اطلاعات شخص «آرش محمدی»
+ *
+ * کاربر از این ردیف نتیجه می‌گیرد نام یا تلفن هم عوض شده و بی‌جهت
+ * دنبال جزئیاتی می‌گردد که وجود ندارد.
+ */
+$sm_marker = 'MARKER_SM_' . wp_generate_password( 6, false, false );
+
+$sm_id = Sparkknife_Ledger_Person_Service::instance()->create(
+	array(
+		'name'        => $sm_marker,
+		'phone'       => '',
+		'status'      => 'active',
+		'description' => '',
+	)
+);
+
+spk_assert( ! is_wp_error( $sm_id ), 'شخص آزمون خلاصهٔ ممیزی ساخته شد' );
+
+// تغییر وضعیت → خلاصه باید «تغییر وضعیت» باشد، نه «ویرایش».
+Sparkknife_Ledger_Person_Service::instance()->set_status( $sm_id, 'inactive' );
+
+$sm_history = Sparkknife_Ledger_Audit_Service::instance()->get_history( 'person', $sm_id, 10 );
+$sm_status_summary = '';
+$sm_has_status     = false;
+
+foreach ( (array) $sm_history as $sm_entry ) {
+	if ( 'status_change' === $sm_entry->action ) {
+		$sm_has_status     = true;
+		$sm_status_summary = (string) $sm_entry->summary;
+		break;
+	}
+}
+
+spk_assert( $sm_has_status, 'تغییر وضعیت با action مستقل ثبت شده است' );
+spk_assert(
+	false !== mb_strpos( $sm_status_summary, 'تغییر وضعیت' ),
+	'خلاصهٔ تغییر وضعیت می‌گوید «تغییر وضعیت»، نه «ویرایش اطلاعات»'
+);
+spk_assert(
+	false === mb_strpos( $sm_status_summary, 'ویرایش' ),
+	'خلاصهٔ تغییر وضعیت واژهٔ «ویرایش» را ندارد'
+);
+spk_assert(
+	false !== mb_strpos( $sm_status_summary, 'غیرفعال' ),
+	'خلاصهٔ تغییر وضعیت، وضعیت جدید را نام می‌برد'
+);
+
+// ویرایش واقعی → خلاصه باید همچنان «ویرایش» بماند.
+Sparkknife_Ledger_Person_Service::instance()->update(
+	$sm_id,
+	array(
+		'name'        => $sm_marker . ' ویرایش‌شده',
+		'phone'       => '',
+		'status'      => 'inactive',
+		'description' => '',
+	)
+);
+
+$sm_history2 = Sparkknife_Ledger_Audit_Service::instance()->get_history( 'person', $sm_id, 10 );
+$sm_update_summary = '';
+
+foreach ( (array) $sm_history2 as $sm_entry ) {
+	if ( 'update' === $sm_entry->action ) {
+		$sm_update_summary = (string) $sm_entry->summary;
+		break;
+	}
+}
+
+spk_assert(
+	false !== mb_strpos( $sm_update_summary, 'ویرایش اطلاعات' ),
+	'ویرایش واقعی همچنان خلاصهٔ «ویرایش اطلاعات» دارد'
+);
+
+// تمیزکاری.
+global $wpdb;
+$sm_table = Sparkknife_Ledger_DB::persons_table();
+$sm_audit = Sparkknife_Ledger_DB::audit_table();
+
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$sm_audit} WHERE object_type = 'person' AND object_id = %d", $sm_id ) );
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$sm_table} WHERE id = %d", $sm_id ) );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
