@@ -210,7 +210,45 @@ class Sparkknife_Ledger_Export_Service {
 		if ( ! headers_sent() ) {
 			nocache_headers();
 			header( 'Content-Type: text/csv; charset=UTF-8' );
-			header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+
+			/*
+			 * نام فایل طبق RFC 6266 / RFC 5987.
+			 *
+			 * پیش‌تر فقط `filename="..."` فرستاده می‌شد و نام فارسی
+			 * (مثلاً «گزارش-فردی-آرش-محمدی») خام در سرآیند می‌نشست. سرآیند
+			 * HTTP بر پایهٔ بایت است و اجازهٔ نویسهٔ غیر ASCII ندارد:
+			 *
+			 *   - PHP-WASM و بعضی سرورها آن را به hex خام تبدیل می‌کنند و
+			 *     کاربر فایلی مثل `--d8-a2-d8-b1-...csv` می‌گیرد.
+			 *   - Apache با `mod_headers` در برخی پیکربندی‌ها خطای
+			 *     «Invalid header» می‌دهد و دانلود کاملاً از کار می‌افتد.
+			 *
+			 * راه استاندارد: یک `filename` سادهٔ ASCII برای سازگاری عقب‌رو
+			 * و یک `filename*` با کدگذاری percent (UTF-8) که مرورگرهای
+			 * مدرن ترجیح می‌دهند. راهنمای MDN و RFC 6266 هر دو همین را
+			 * توصیه می‌کنند.
+			 */
+			$ascii_filename = preg_replace( '/[^A-Za-z0-9_\-\.]/', '-', $filename );
+			$ascii_filename = trim( (string) $ascii_filename, '-' );
+
+			/*
+			 * اگر همهٔ نام فارسی بود، نسخهٔ ASCII چیزی جز تاریخ نمی‌ماند
+			 * (مثل `2026-11-07-092904.csv`) و کاربر نمی‌فهمد کدام گزارش
+			 * است. یک پیشوند لاتین اضافه می‌شود تا نام معنادار بماند.
+			 */
+			if ( '' === $ascii_filename || preg_match( '/^[\d\-]+\.csv$/', $ascii_filename ) ) {
+				$ascii_filename = 'sparkknife-ledger-report-' . $ascii_filename;
+
+				if ( 'sparkknife-ledger-report-.csv' === $ascii_filename ) {
+					$ascii_filename = 'sparkknife-ledger-report.csv';
+				}
+			}
+
+			header(
+				'Content-Disposition: attachment; filename="' . $ascii_filename . '"; '
+				. "filename*=UTF-8''" . rawurlencode( $filename )
+			);
+
 			header( 'X-Content-Type-Options: nosniff' );
 		}
 
