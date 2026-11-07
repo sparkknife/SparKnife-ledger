@@ -3890,6 +3890,53 @@ foreach ( $mix_ids as $mix_id ) {
 	Sparkknife_Ledger_Person_Service::instance()->delete( $mix_id );
 }
 
+// ── ۴۳: جستجوی بی‌محتوا در تراکنش‌ها کوئری را نمی‌شکند ──────────────
+//
+// مخزن اشخاص از قبل نگهبان داشت: اگر یکسان‌سازی عبارت را کاملاً حذف
+// کند، هیچ شرطی ساخته نمی‌شود. مخزن تراکنش‌ها همان نگهبان را نداشت و
+// مستقیم شرط می‌ساخت. نتیجه یک خطای واقعی بود — نه صفحهٔ خالی، یک
+// پیام «خطای دیتابیس» جلوی چشم کاربر:
+//
+//   WHERE 1=1 AND ()   →   syntax error near ")"
+//
+// این تست همان مسیر واقعی را صدا می‌زند و مطمئن می‌شود نتیجه «بدون
+// خطا» است، نه «با پیام خطا».
+global $wpdb;
+
+$txn_repo       = Sparkknife_Ledger_Transaction_Repository::instance();
+$txn_err_before = $wpdb->last_error;
+
+foreach ( array( '', ' ', "\t", "\u{200C}", "\u{200B}", "\u{FEFF}", " \u{200C} " ) as $blank_txn_q ) {
+	$wpdb->last_error = '';
+
+	$txn_blank_result = $txn_repo->query( array( 'search' => $blank_txn_q, 'per_page' => 20 ) );
+
+	spk_equals(
+		'',
+		(string) $wpdb->last_error,
+		'جستجوی بی‌محتوا در تراکنش‌ها خطای دیتابیس نمی‌دهد: ' . bin2hex( $blank_txn_q )
+	);
+
+	spk_assert(
+		isset( $txn_blank_result['total'] ) && is_int( $txn_blank_result['total'] ),
+		'جستجوی بی‌محتوا در تراکنش‌ها نتیجهٔ معتبر برمی‌گرداند: ' . bin2hex( $blank_txn_q )
+	);
+
+	spk_equals(
+		(int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . Sparkknife_Ledger_DB::transactions_table() ),
+		(int) $txn_blank_result['total'],
+		'جستجوی بی‌محتوا همهٔ تراکنش‌ها را می‌بیند (فیلتر اعمال نمی‌شود): ' . bin2hex( $blank_txn_q )
+	);
+}
+
+$wpdb->last_error = $txn_err_before;
+
+// جستجوی واقعی در تراکنش‌ها همچنان کار می‌کند.
+$txn_real_result = $txn_repo->query( array( 'search' => 'zzz-no-such-reference-zzz', 'per_page' => 20 ) );
+
+spk_equals( '', (string) $wpdb->last_error, 'جستجوی عادی تراکنش خطا نمی‌دهد' );
+spk_equals( 0, (int) $txn_real_result['total'], 'جستجوی بی‌نتیجه صفر ردیف می‌دهد' );
+
 // ── ۱۰: سیاست نگه‌داری داده پس از همه تغییرات پابرجاست ──────────────
 Sparkknife_Ledger_Settings::save( $defaults, false );
 Sparkknife_Ledger_Settings::flush_cache();
