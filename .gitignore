@@ -36,3 +36,4 @@ test_key.pem
 test_pub.pem
 wrong.pem
 wrong_pub.pem
+node_modules/

@@ -16,6 +16,24 @@
 /**
  * راه‌اندازی محیط.
  */
+/*
+ * `STDERR` فقط در CLI تعریف شده است.
+ *
+ * اگر کسی این آزمون را از مرورگر، WP-CLI داخل PHP-FPM، یا محیط
+ * WebAssembly اجرا کند، ثابت وجود ندارد و به‌جای پیام خطای مفید،
+ * `Undefined constant "STDERR"` می‌گیرد. مسیر خطا آن‌قدر دور از
+ * علت است که کاربر فکر می‌کند خودِ آزمون خراب است.
+ *
+ * روی خود محیط توسعه همین اتفاق افتاد و یک ساعت وقت گرفت.
+ */
+if ( ! defined( 'STDERR' ) ) {
+	define( 'STDERR', fopen( 'php://stderr', 'wb' ) );
+}
+
+if ( ! defined( 'STDOUT' ) ) {
+	define( 'STDOUT', fopen( 'php://output', 'wb' ) );
+}
+
 $wp_load = getenv( 'SPARKKNIFE_LEDGER_TEST_WP' );
 
 if ( ! $wp_load && isset( $argv[1] ) ) {

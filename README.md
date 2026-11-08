@@ -5,7 +5,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-5.8%2B-21759b)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-777bb4)](https://www.php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-blue)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Tests](https://img.shields.io/badge/tests-988%20assertions-brightgreen)](#تستها)
+[![Tests](https://img.shields.io/badge/tests-987%20assertions-brightgreen)](#تستها)
 
 ---
 
@@ -402,7 +402,10 @@ lint                   77 فایل | 0 خطا
 اگر PHP روی ماشین ندارید، PHP-WASM کافی است:
 
 ```bash
-npm install @php-wasm/node @php-wasm/universal
+# ⚠️ این دو گروه را در یک نصب با هم ندهید — npm یکی را حذف می‌کند.
+npm install @php-wasm/node @php-wasm/universal   # برای آزمون زمان اجرا
+# یا
+npm install php-parser                            # برای lint و static-audit
 
 # ساخت سایت وردپرس آزمایشی (SQLite) — یک دستور
 node tools/setup-test-site.mjs /tmp/wpsite
@@ -419,7 +422,7 @@ node tools/php-wasm.mjs /tmp/myscript.php
 > برمی‌گرداند، نه شیء PHP. باید با `new PHP(id)` از
 > `@php-wasm/universal` بسته‌بندی شود.
 
-پوشش: **۹۸۸ assertion در ۱۰ سناریو** — ۳۳۳ در سناریوهای ۰۱–۰۹ و
+پوشش: **۹۸۷ assertion در ۱۰ سناریو** — ۳۳۳ در سناریوهای ۰۱–۰۹ و
 ۶۵۵ در سناریوی رگرسیون.
 
 | # | سناریو |
