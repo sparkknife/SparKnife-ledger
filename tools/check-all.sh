@@ -46,6 +46,7 @@ run "lint" tools/lint.mjs
 run "انسجام کلاس‌ها" tools/static-audit.mjs
 run "قواعد امنیتی" tools/static-audit-rules.mjs
 run "سازگاری PHP" tools/php-compat.mjs
+run "ایندکس MySQL" tools/mysql-index-check.mjs
 run "امضای نویسنده" tools/check-authorship.mjs
 
 echo "══════════════════════════════════════════════════"

@@ -275,6 +275,7 @@ sparkknife-ledger/
 | [`docs/RELEASE-SIGNING.md`](docs/RELEASE-SIGNING.md) | امضای دیجیتال بستهٔ انتشار با RSA |
 | [`docs/YOUR-STEPS.md`](docs/YOUR-STEPS.md) | کارهایی که پیش از فروش باید خودتان انجام دهید |
 | [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار — ۸۹ باگ مستند |
+| [`docs/WHAT-I-DID.md`](docs/WHAT-I-DID.md) | چه کاری در پاس آخر انجام شد و چطور تأییدش کنید |
 
 ### قواعد کد
 
