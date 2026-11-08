@@ -4761,3 +4761,44 @@ if ( null !== $audit_with_summary && '' !== $audit_with_summary ) {
 		'باگ ۸۸: متن summary جدول تاریخچه در خروجی دیده می‌شود'
 	);
 }
+
+/*
+ * -----------------------------------------------------------------------------
+ * باگ ۹۰ — ارتقا بدون ورود مدیر هرگز اجرا نمی‌شد.
+ *
+ * `maybe_upgrade()` با `is_admin()` گارد شده بود. اگر سایت با
+ * WP-Cron یا WP-CLI به‌روز می‌شد و مدیر هرگز به پنل نمی‌آمد،
+ * اسکیما روی نسخهٔ قبلی می‌ماند.
+ *
+ * آزمون این را می‌سنجد که گارد جدید کرون را می‌پذیرد. در محیط
+ * آزمون is_admin() روشن است، پس نمی‌توان حالت کرون را واقعاً ساخت؛
+ * به‌جایش مطمئن می‌شویم منطق گارد به cron وابسته است، نه فقط admin.
+ * -----------------------------------------------------------------------------
+ */
+$installer_src = file_get_contents(
+	dirname( __DIR__, 2 ) . '/sparkknife-ledger/includes/Core/class-sparkknife-ledger-installer.php'
+);
+
+spk_assert(
+	false !== strpos( $installer_src, 'wp_doing_cron()' ),
+	'باگ ۹۰: گارد ارتقا WP-Cron را می‌پذیرد'
+);
+
+spk_assert(
+	false !== strpos( $installer_src, "'WP_CLI'" ) || false !== strpos( $installer_src, '"WP_CLI"' ),
+	'باگ ۹۰: گارد ارتقا WP-CLI را می‌پذیرد'
+);
+
+// ارتقا در محیط مدیر باید درست کار کند (مسیر عادی).
+$v_before = get_option( Sparkknife_Ledger_Installer::VERSION_OPTION, '' );
+update_option( Sparkknife_Ledger_Installer::VERSION_OPTION, '0.9.0' );
+Sparkknife_Ledger_Installer::maybe_upgrade();
+
+spk_equals(
+	SPARKKNIFE_LEDGER_VERSION,
+	get_option( Sparkknife_Ledger_Installer::VERSION_OPTION, '' ),
+	'باگ ۹۰: ارتقا در محیط مدیر کار می‌کند'
+);
+
+update_option( Sparkknife_Ledger_Installer::VERSION_OPTION, $v_before );
+Sparkknife_Ledger_Installer::maybe_upgrade();

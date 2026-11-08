@@ -5,7 +5,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-5.8%2B-21759b)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-777bb4)](https://www.php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-blue)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Tests](https://img.shields.io/badge/tests-987%20assertions-brightgreen)](#تستها)
+[![Tests](https://img.shields.io/badge/tests-990%20assertions-brightgreen)](#تستها)
 
 ---
 
@@ -274,7 +274,7 @@ sparkknife-ledger/
 | [`docs/AUTHORSHIP.md`](docs/AUTHORSHIP.md) | نویسنده، مالکیت، لایسنس دوگانه |
 | [`docs/RELEASE-SIGNING.md`](docs/RELEASE-SIGNING.md) | امضای دیجیتال بستهٔ انتشار با RSA |
 | [`docs/YOUR-STEPS.md`](docs/YOUR-STEPS.md) | کارهایی که پیش از فروش باید خودتان انجام دهید |
-| [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار — ۸۸ باگ مستند |
+| [`docs/AUDIT.md`](docs/AUDIT.md) | گزارش ممیزی پیش از انتشار — ۸۹ باگ مستند |
 
 ### قواعد کد
 
@@ -422,7 +422,7 @@ node tools/php-wasm.mjs /tmp/myscript.php
 > برمی‌گرداند، نه شیء PHP. باید با `new PHP(id)` از
 > `@php-wasm/universal` بسته‌بندی شود.
 
-پوشش: **۹۸۷ assertion در ۱۰ سناریو** — ۳۳۳ در سناریوهای ۰۱–۰۹ و
+پوشش: **۹۹۰ assertion در ۱۰ سناریو** — ۳۳۳ در سناریوهای ۰۱–۰۹ و
 ۶۵۵ در سناریوی رگرسیون.
 
 | # | سناریو |

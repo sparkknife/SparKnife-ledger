@@ -60,14 +60,27 @@ class Sparkknife_Ledger_License {
 	 * تنظیمی امضا را بررسی کند. کلید خصوصی متناظر هرگز در مخزن، بسته
 	 * یا هیچ جای عمومی نیست.
 	 */
+	/*
+	 * کلید عمومی لایسنس.
+	 *
+	 * این کلید جفتِ tools/licensing/private_key.pem است. کلید خصوصی
+	 * **هرگز** در مخزن، در بسته، یا روی سرور قرار نمی‌گیرد — فقط روی
+	 * دستگاه خود SparKnife. با آن، لایسنس و امضای بسته ساخته می‌شود.
+	 *
+	 * ⚠️ اگر روزی جفت کلید را عوض کردید، **این مقدار هم باید با آن**
+	 * عوض شود. جفت نبودن این دو، تمام لایسنس‌ها را باطل می‌کند و
+	 * پیام خطایش هم گمراه‌کننده است: «لایسنس نامعتبر».
+	 */
 	const PUBLIC_KEY = '-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8xPDL7jSxsQrPFNCERGe
-MWcZ2jfMFb11Vhu83G7GAxHARgRy93I8jDElN/dnEz+Tf6elUsK7v3QFSQTZRvkU
-H/S2qCSYTMRx6pDY0ln+lMe9dJVNiAR16yRhsqZX6k47upy6AfOSq0eSdI3uFaz8
-2oR4p/raWq3/HF5zV0EnxRnQCvNSYqd34dbPwzw50oPibgPFQLDfgkfS6rMWXZJL
-GHoRPrZNgzgZcjWD37d3+QOZrvBW6U0Y+Ni3Oj5lsZe91x8igeNuN/bsXJR5Ms6T
-4sTzNYDRl3Xp1UYNZJK/cuPLneUN/eHaSmWr9jLXP0LpbIeFon10iCfaK0rC58PL
-2wIDAQAB
+MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAvf3JMl07YUdG9Gjtsfiy
+sgqkMvTDaWGcwIcbMquHqH2S7aBYvvt3W7pRSoXGjSBO+rumJ1nIMdKFmWIMmxa9
+4T/TA+gyfwudbv3yQFL2DPPt9QM0ffwnjKRtNqo8M0ATU8BwgZ8L7v9iqf24tKZn
+GD7uCQ0SMERHSYhlyAtwTfnpZLaTmQ9fXA19rkoK3U0YVrQV7MYaHQba6Vj0f+5h
+IgIIaO4vMDfmyCK3EedjEs+Nl9zXgJZiAlQndBaCnxCahzNVri5jhXnGq3N7WWgv
+5qfJYOho2rcNgbfqMLQ784riO9bTxqSsLzJHH3Eq99uL7K3nWUzd1ze1QOuVWGuN
+NPXZMZg7JhfK5S90xkxtIQRvABKu9L+fqf14BKbAl596cyunj+xCda98f3pVTGvo
+YxpKVmH8RvqPZb7NOQuITwdhk+GFfPeDuFTZa2W/blCHf40VD8pkJouXBp5+V/Tg
+Dc9/n4z9YmMIaOFNbzTEtuEiYnLINAu5d7WgDnxdvG2HAgMBAAE=
 -----END PUBLIC KEY-----';
 
 	/**
