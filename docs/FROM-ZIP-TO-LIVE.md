@@ -18,166 +18,166 @@
 
 ---
 
-## گام ۰ — پیش‌نیازها
+## گام ۰ — باز کردن پوشه در VS Code
 
-روی لپ‌تاپ یا سروری که کار می‌کنید، این‌ها را داشته باشید:
+این را یک بار انجام دهید:
 
-```bash
-# بررسی
-php -v      # باید 7.4 یا بالاتر باشد
-openssl version
+۱. VS Code را باز کنید
+۲. منوی بالا → **File** → **Open Folder...**
+۳. پوشه‌ای که `tools` و `sparkknife-ledger` داخلش است را انتخاب کنید
+۴. منوی بالا → **Terminal** → **New Terminal**
+
+پایین پنجره یک کادر باز می‌شود. **همهٔ دستورهای این سند را همان‌جا
+بزنید.**
+
+| سیستم | میانبر باز کردن ترمینال |
+| --- | --- |
+| ویندوز / لینوکس | `` Ctrl + ` `` |
+| مک | `` Cmd + ` `` |
+
+### اگر روی ویندوز هستید — یک بار این را بررسی کنید
+
+در همان ترمینال بزنید:
+
+```
+echo $SHELL
 ```
 
-اگر `php -v` خطا داد:
+اگر `bash` نشان داد → خوب است.
 
-| سیستم | نصب |
-| --- | --- |
-| Ubuntu / Debian | `sudo apt install php-cli openssl` |
-| macOS | `brew install php` |
-| Windows | [php.net/downloads](https://windows.php.net/download) — نسخهٔ Thread Safe، و پوشهٔ `php` را به `PATH` اضافه کنید |
+اگر خطا داد یا `powershell` بود: کنار کادر ترمینال فلش `v` را
+بزنید → **Select Default Profile** → **Git Bash**.
 
-روی ویندوز، `openssl` همراه PHP می‌آید. اگر `openssl` را نشناخت،
-از **Git Bash** استفاده کنید که هر دو را دارد.
+اگر Git Bash نبود، [Git for Windows](https://git-scm.com/download/win)
+را نصب کنید و VS Code را ببندید و دوباره باز کنید.
 
 ---
 
-## گام ۱ — ساخت جفت کلید (۱۰ دقیقه)
+## گام ۱ — بررسی PHP (۱ دقیقه)
 
-### ۱.۱ باز کردن پوشهٔ درست
-
-زیپ را استخراج کنید. داخلش این ساختار است:
+در ترمینال بزنید:
 
 ```
-SparKnife-ledger/
-├── sparkknife-ledger/        ← این فولدر را روی هاست آپلود می‌کنید
-├── docs/
-├── tools/                    ← دستورهای زیر از همین‌جا اجرا می‌شود
-├── tests/
-└── package.json
+php -v
 ```
 
-⚠️ **مهم:** دستورهای گام ۱ را باید از **ریشهٔ زیپ** اجرا کنید (پوشه‌ای
-که `tools` داخلش است)، نه از داخل `sparkknife-ledger`.
+### اگر نسخه نشان داد
 
-### ۱.۲ اجرای دستورها
+چیزی مثل `PHP 8.2.12 (cli)` می‌بینید. **برو گام ۲.**
 
-```bash
-cd tools/licensing
+### اگر `php: command not found` داد
 
-# کلید خصوصی — ۳۰۷۲ بیت
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out private_key.pem
+**ویندوز:**
 
-# کلید عمومی متناظر
-openssl rsa -in private_key.pem -pubout -out public_key.pem
+۱. [windows.php.net/download](https://windows.php.net/download) را باز کنید
+۲. زیر **PHP 8.2** روی **Thread Safe** → **x64** بزنید و zip را بگیرید
+۳. آن را در `C:\php` باز کنید
+۴. کلید `Win` را بزنید، تایپ کنید `environment`، و
+   **Edit the system environment variables** را باز کنید
+۵. دکمهٔ **Environment Variables...**
+۶. در جدول پایینی (**System variables**) روی `Path` دوبار کلیک کنید
+۷. **New** → بنویسید `C:\php` → OK در همهٔ پنجره‌ها
+۸. **VS Code را کامل ببندید و دوباره باز کنید** ← این را رد نکنید
+۹. دوباره `php -v`
 
-# تأیید
-openssl pkey -in private_key.pem -noout -check
-```
-
-خروجی دستور آخر باید باشد:
-
-```
-Key is valid
-```
-
-اگر `Key is valid` نگرفت، **متوقف شوید** و خطا را بفرستید.
-
-### ۱.۳ گرفتن اثر انگشت
-
-```bash
-openssl rsa -in private_key.pem -pubout 2>/dev/null | openssl dgst -sha256 -r | awk '{print $1}'
-```
-
-یک رشتهٔ ۶۴ نویسه‌ای می‌گیرید مثل `a1b2c3…`. **این را یادداشت کنید.**
-
-### ۱.۴ جایگزینی کلید در کد — **این مهم‌ترین بخش است**
-
-فایل را باز کنید:
+**مک:**
 
 ```
-sparkknife-ledger/includes/Core/class-sparkknife-ledger-license.php
+brew install php
 ```
 
-خط **۷۴** را پیدا کنید. چنین چیزی می‌بینید:
+**اوبونتو / دبیان:**
 
-```php
-	const PUBLIC_KEY = '-----BEGIN PUBLIC KEY-----
-MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAvf3JMl07YUdG9Gjtsfiy
-sgqkMvTDaWGcwIcbMquHqH2S7aBYvvt3W7pRSoXGjSBO+rumJ1nIMdKFmWIMmxa9
+```
+sudo apt install php-cli
+```
+
+---
+
+## گام ۲ — ساخت کلید با یک دستور (۳ دقیقه)
+
+از ریشهٔ زیپ، در ترمینال VS Code:
+
+```
+php tools/licensing/make-keys.php
+```
+
+**همین. یک دستور.**
+
+این اسکریپت خودش:
+
+- جفت کلید ۳۰۷۲ بیتی می‌سازد
+- `PUBLIC_KEY` داخل کد را جایگزین می‌کند
+- با یک امضای آزمایشی **تأیید می‌کند** که کلیدها جفت‌اند
+- کلید خصوصی را چاپ می‌کند تا پشتیبان بگیرید
+
+### خروجی موفق
+
+```
+ساخت جفت کلید SparKnife Ledger
+──────────────────────────────────────────────────
+
+✓ افزونهٔ OpenSSL در PHP فعال است
+→ ساخت کلید ۳۰۷۲ بیتی (چند ثانیه طول می‌کشد) … ✓
+✓ کلید خصوصی  → tools/licensing/private_key.pem
+✓ کلید عمومی  → tools/licensing/public_key.pem
+
+اثر انگشت (SHA-256):
+  cde6cc2b09e7b0fe80925eabd59b2814ebdfa5ed405b6bb63a27ddf1339a23d8
+
+──────────────────────────────────────────────────
+→ جایگزینی PUBLIC_KEY در کد …
+✓ PUBLIC_KEY جایگزین شد
+✓ تأیید: امضای آزمایشی با کلید داخل کد بررسی شد و معتبر بود
+
+──────────────────────────────────────────────────
+
+⚠️  همین حالا پشتیبان بگیرید
+
+   محتوای کلید خصوصی:
+
+-----BEGIN PRIVATE KEY-----
+MIIG/gIBADANBgkqhkiG9w0BAQEFAASCBugwggbkAgEAAoIBgQC0WKkgxmu9wpDo
 ...
-Dc9/n4z9YmMIaOFNbzTEtuEiYnLINAu5d7WgDnxdvG2HAgMBAAE=
------END PUBLIC KEY-----';
+-----END PRIVATE KEY-----
 ```
 
-**کل این رشتهٔ بین دو کوتیشن را** با محتوای کامل `tools/licensing/public_key.pem`
-عوض کنید. یعنی نتیجه باید شود:
+### ۲.۱ پشتیبان — همین حالا
 
-```php
-	const PUBLIC_KEY = '-----BEGIN PUBLIC KEY-----
-کلید-تازه-شما-اینجا
------END PUBLIC KEY-----';
-```
+متن `-----BEGIN PRIVATE KEY-----` تا `-----END PRIVATE KEY-----` را
+**کامل** کپی کنید و در دو جا بگذارید:
 
-نکته‌های ریز که اشتباه می‌شوند:
+- [ ] گاوصندوق رمز (1Password / Bitwarden)
+- [ ] یک USB یا پرینت در جای امن
 
-| ❌ اشتباه | ✅ درست |
+اگر این گم شود، همهٔ لایسنس‌های فروخته‌شده باطل می‌شوند.
+
+### اگر خطا داد
+
+| خطا | کار |
 | --- | --- |
-| گذاشتن کلید در خطوط جدا با `"` | یک رشتهٔ تک‌کوتیشن، با `\n` واقعی داخلش |
-| حذف `-----BEGIN PUBLIC KEY-----` | فقط و فقط **متن کلید** را عوض کنید |
-| گذاشتن `;` داخل کوتیشن | `;` بعد از کوتیشن بسته |
-| عوض کردن فقط مخزن، بدون کد | **هر دو با هم** |
+| `افزونهٔ OpenSSL در PHP فعال نیست` | در `php.ini` خط `extension=openssl` را از حالت توضیح خارج کنید. مسیر فایل: `php --ini` |
+| `کلید خصوصی از قبل وجود دارد` | کلید قبلی هست. اگر مطمئنید، `بله` بنویسید و Enter |
+| `فایل افزونه پیدا نشد` | از ریشهٔ زیپ اجرا نکردید. `ls` بزنید — باید `tools` و `sparkknife-ledger` را ببینید |
+| `خروجی کلید خصوصی خالی است` | نصب PHP ناقص است. PHP را دوباره نصب کنید |
 
-ساده‌ترین راه مطمئن — یک دستور که خودش جایگزینی را انجام می‌دهد:
+> **نکته:** این اسکریپت را خودم روی PHP 8.2 اجرا و تأیید کردم —
+> کلید ساخت، `PUBLIC_KEY` جایگزین شد، و لایسنس ساخته‌شده با آن
+> `openssl_verify = 1` (معتبر) داد.
 
-```bash
-# از ریشهٔ زیپ اجرا کنید
-php -r '
-$f = "sparkknife-ledger/includes/Core/class-sparkknife-ledger-license.php";
-$pem = trim(file_get_contents("tools/licensing/public_key.pem"));
-$src = file_get_contents($f);
-$new = preg_replace("/const PUBLIC_KEY = \x27.*?\x27;/s", "const PUBLIC_KEY = \x27" . $pem . "\x27;", $src, 1);
-if ($new === $src) { echo "خطا: الگو پیدا نشد\n"; exit(1); }
-file_put_contents($f, $new);
-echo "کلید جایگزین شد\n";
-'
-```
+### چرا نه با `openssl` سیستم؟
 
-بعد تأیید کنید:
+اگر `openssl` دارید، همان سه دستور کلاسیک هم کار می‌کند. ولی برای
+جایگزینی `PUBLIC_KEY` باید دستی فایل را ویرایش کنید — و همان‌جاست
+که اشتباه پیش می‌آید. `make-keys.php` هر دو کار را با هم و با
+تأیید انجام می‌دهد.
 
-```bash
-# باید بگوید جایگزین شد ✓
-php -r '
-$f = "sparkknife-ledger/includes/Core/class-sparkknife-ledger-license.php";
-$pem = trim(file_get_contents("tools/licensing/public_key.pem"));
-$src = file_get_contents($f);
-echo (strpos($src, $pem) !== false) ? "جایگزین شد ✓\n" : "جایگزین نشد ✗\n";
-'
-```
-
-### ۱.۵ پشتیبان کلید خصوصی — **قبل از رفتن به گام ۲**
-
-```bash
-cat tools/licensing/private_key.pem
-```
-
-کل خروجی را **دقیقاً** کپی و در دو جا ذخیره کنید:
-
-- [ ] گاوصندوق رمز (1Password / Bitwarden / …)
-- [ ] یک USB یا پرینت داخل گاوصندوق فیزیکی
-
-⚠️ اگر این کلید گم شود:
-- همهٔ لایسنس‌هایی که صادر کرده‌اید **باطل** می‌شوند
-- باید جفت تازه بسازید و به همهٔ خریداران کلید نو بدهید
-- `private_key.pem` در `.gitignore` است، پس هرگز به گیت نمی‌رود
-
----
-
-## گام ۲ — آزمون لایسنس روی سیستم خودتان (۵ دقیقه)
+## گام ۳ — آزمون لایسنس قبل از آپلود (۵ دقیقه)
 
 **این کار را قبل از آپلود انجام دهید.** اگر لایسنس کار نکند، بهتر است
 اینجا بفهمید نه بعد از فروش.
 
-### ۲.۱ صدور یک کلید آزمایشی
+### ۳.۱ صدور یک کلید آزمایشی
 
 ```bash
 php tools/licensing/issue.php --domain=example.com --edition=pro --expiry=2027-12-31
@@ -185,7 +185,7 @@ php tools/licensing/issue.php --domain=example.com --edition=pro --expiry=2027-1
 
 خروجی یک رشتهٔ بلند شروع‌شده با `SPK1.` است. کپی کنید.
 
-### ۲.۲ تأیید امضا
+### ۳.۲ تأیید امضا
 
 ```bash
 php tools/licensing/issue.php --verify=SPK1.کلید-کپی-شده
@@ -193,7 +193,7 @@ php tools/licensing/issue.php --verify=SPK1.کلید-کپی-شده
 
 باید بگوید معتبر است و دامنه/نسخه/انقضا را نشان دهد.
 
-### ۲.۳ اگر خطا داد
+### ۳.۳ اگر خطا داد
 
 | خطا | معنا | راه‌حل |
 | --- | --- | --- |
@@ -203,7 +203,7 @@ php tools/licensing/issue.php --verify=SPK1.کلید-کپی-شده
 
 ---
 
-## گام ۳ — بستهٔ تازه بسازید (۲ دقیقه)
+## گام ۴ — بستهٔ تازه بسازید (۲ دقیقه)
 
 چون `PUBLIC_KEY` را عوض کردید، زیپ قبلی دیگر درست نیست. زیپ تازه بسازید:
 
@@ -245,7 +245,7 @@ unzip -l sparkknife-ledger.zip | grep -c "private_key"
 
 ---
 
-## گام ۴ — نصب روی وردپرس (۱۰ دقیقه)
+## گام ۵ — نصب روی وردپرس (۱۰ دقیقه)
 
 ### ۴.۱ چه چیزی لازم دارید
 
@@ -284,7 +284,7 @@ unzip -l sparkknife-ledger.zip | grep -c "private_key"
 
 ---
 
-## گام ۵ — بررسی سلامت (۵ دقیقه)
+## گام ۶ — بررسی سلامت (۵ دقیقه)
 
 ### ۵.۱ روشن کردن نمایش خطا (اگر مشکلی هست)
 
@@ -316,7 +316,7 @@ define( 'WP_DEBUG_DISPLAY', false );
 
 **دفتر حساب → لایسنس**
 
-کلیدی که در گام ۲.۱ ساختید را وارد کنید — ولی باید برای **دامنهٔ همین
+کلیدی که در گام ۳.۱ ساختید را وارد کنید — ولی باید برای **دامنهٔ همین
 سایت** باشد، نه `example.com`.
 
 ```bash
@@ -348,7 +348,7 @@ php tests/run-tests.php /var/www/html/wp-load.php
 
 ---
 
-## گام ۶ — آزمون عملکرد از رابط کاربری (۲۰ دقیقه)
+## گام ۷ — آزمون عملکرد از رابط کاربری (۲۰ دقیقه)
 
 این جدول را با سایت آزمایشی خودتان پر کنید:
 
@@ -370,7 +370,7 @@ php tests/run-tests.php /var/www/html/wp-load.php
 
 ---
 
-## گام ۷ — آزمون دسترسی (۱۰ دقیقه)
+## گام ۸ — آزمون دسترسی (۱۰ دقیقه)
 
 باگ امنیتی ۸۶ از این‌جا پیدا شد. این آزمون را رد نکنید.
 
@@ -397,7 +397,7 @@ php tests/run-tests.php /var/www/html/wp-load.php
 
 ---
 
-## گام ۸ — اسکرین‌شات برای فروش (۱۵ دقیقه)
+## گام ۹ — اسکرین‌شات برای فروش (۱۵ دقیقه)
 
 با دادهٔ ساختگی، نه واقعی.
 
@@ -409,7 +409,7 @@ php tests/run-tests.php /var/www/html/wp-load.php
 
 ---
 
-## گام ۹ — امضا و انتشار نهایی
+## گام ۱۰ — امضا و انتشار نهایی
 
 بعد از هر تغییری در کد، بسته را دوباره بسازید و امضا کنید:
 
