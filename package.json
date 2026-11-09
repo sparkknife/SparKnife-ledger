@@ -1,0 +1,29 @@
+{
+  "name": "sparkknife-ledger-tools",
+  "version": "1.1.0",
+  "private": true,
+  "description": "ابزارهای توسعه و آزمون افزونهٔ SparKnife Ledger",
+  "author": "SparKnife <155084046+sparkknife@users.noreply.github.com>",
+  "license": "GPL-2.0-or-later OR LicenseRef-SparKnife-Commercial",
+  "type": "module",
+  "scripts": {
+    "lint": "node tools/lint.mjs",
+    "audit": "node tools/static-audit.mjs",
+    "rules": "node tools/static-audit-rules.mjs",
+    "compat": "node tools/php-compat.mjs",
+    "authorship": "node tools/check-authorship.mjs",
+    "check": "./tools/check-all.sh",
+    "test-site": "node tools/setup-test-site.mjs",
+    "php": "node tools/php-wasm.mjs"
+  },
+  "devDependencies": {
+    "php-parser": "^3.1.5"
+  },
+  "optionalDependencies": {
+    "@php-wasm/node": "^3.1.54",
+    "@php-wasm/universal": "^3.1.54"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

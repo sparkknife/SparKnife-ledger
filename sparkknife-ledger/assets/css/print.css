@@ -1,0 +1,155 @@
+/**
+ * SparKnife Ledger – استایل چاپ گزارش (RTL)
+ *
+ * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
+ */
+
+:root {
+	--print-ink: #111827;
+	--print-muted: #6b7280;
+	--print-line: #d1d5db;
+	--print-brand: #0f766e;
+}
+
+* { box-sizing: border-box; }
+
+body.spk-print {
+	margin: 0;
+	padding: 24px;
+	background: #f3f4f6;
+	color: var(--print-ink);
+	font-family: "Vazirmatn", "IRANSans", "Segoe UI", Tahoma, sans-serif;
+	font-size: 13px;
+	line-height: 1.7;
+	direction: rtl;
+}
+
+.spk-print__toolbar {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	flex-wrap: wrap;
+	max-width: 900px;
+	margin: 0 auto 16px;
+	padding: 12px 16px;
+	background: #fff;
+	border-radius: 12px;
+	border: 1px solid #e5e7eb;
+}
+
+.spk-print__button {
+	padding: 8px 18px;
+	border: 0;
+	border-radius: 9px;
+	background: var(--print-brand);
+	color: #fff;
+	font-size: 14px;
+	font-family: inherit;
+	cursor: pointer;
+}
+
+.spk-print__button:hover { background: #115e59; }
+.spk-print__hint { color: var(--print-muted); font-size: 12px; }
+
+.spk-print__page {
+	max-width: 900px;
+	margin: 0 auto;
+	padding: 28px;
+	background: #fff;
+	border-radius: 12px;
+	border: 1px solid #e5e7eb;
+}
+
+.spk-print__header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	padding-bottom: 14px;
+	border-bottom: 2px solid var(--print-brand);
+	margin-bottom: 18px;
+}
+
+.spk-print__header h1 { margin: 0; font-size: 19px; }
+.spk-print__subtitle { margin: 3px 0 0; color: var(--print-muted); font-size: 14px; }
+.spk-print__meta { display: flex; flex-direction: column; gap: 2px; color: var(--print-muted); font-size: 12px; text-align: left; }
+
+.spk-print__summary {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 10px;
+	margin-bottom: 18px;
+}
+
+.spk-print__summary > div {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 10px 12px;
+	border: 1px solid var(--print-line);
+	border-radius: 9px;
+	background: #f9fafb;
+}
+
+.spk-print__summary span { color: var(--print-muted); font-size: 11px; }
+.spk-print__summary strong { font-size: 14px; }
+
+.spk-print__table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 11.5px;
+	margin-bottom: 20px;
+}
+
+.spk-print__table th,
+.spk-print__table td {
+	border: 1px solid var(--print-line);
+	padding: 7px 8px;
+	text-align: right;
+	vertical-align: top;
+}
+
+.spk-print__table thead th { background: #f3f4f6; font-weight: 700; }
+.spk-print__table tfoot th { background: #f0fdfa; font-weight: 700; }
+.spk-print__table tr.is-void td { color: #9ca3af; text-decoration: line-through; }
+
+.spk-print__footer {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	padding-top: 10px;
+	border-top: 1px solid var(--print-line);
+	color: var(--print-muted);
+	font-size: 11px;
+}
+
+@media print {
+	@page { size: A4; margin: 12mm; }
+
+	body.spk-print { padding: 0; background: #fff; font-size: 11pt; }
+
+	.no-print,
+	.spk-print__toolbar { display: none !important; }
+
+	.spk-print__page {
+		max-width: none;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		box-shadow: none;
+	}
+
+	.spk-print__table { page-break-inside: auto; }
+	.spk-print__table tr { page-break-inside: avoid; page-break-after: auto; }
+	.spk-print__table thead { display: table-header-group; }
+	.spk-print__table tfoot { display: table-footer-group; }
+
+	a { color: inherit; text-decoration: none; }
+}
+
+@media (max-width: 700px) {
+	.spk-print__summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.spk-print__page { padding: 16px; }
+	body.spk-print { padding: 12px; }
+}
