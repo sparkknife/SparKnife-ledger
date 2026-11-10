@@ -531,10 +531,26 @@
 
 			var copy = el('button', 'btn ghost sm', 'کپی');
 			copy.onclick = function () {
-				ta.select();
-				document.execCommand('copy');
-				copy.textContent = 'کپی شد';
-				setTimeout(function () { copy.textContent = 'کپی'; }, 1500);
+				// Clipboard API نیاز به HTTPS یا localhost دارد — هر دو
+				// اینجا برقرارند. execCommand قدیمی در فایرفاکس روی
+				// textarea با direction:ltr گاهی متن برعکس کپی می‌کند،
+				// پس اول مسیر مدرن را امتحان می‌کنیم.
+				var done = function () {
+					copy.textContent = 'کپی شد';
+					setTimeout(function () { copy.textContent = 'کپی'; }, 1500);
+				};
+
+				if (navigator.clipboard && navigator.clipboard.writeText) {
+					navigator.clipboard.writeText(data.key).then(done).catch(function () {
+						ta.select();
+						document.execCommand('copy');
+						done();
+					});
+				} else {
+					ta.select();
+					document.execCommand('copy');
+					done();
+				}
 			};
 			kb.appendChild(copy);
 			out.appendChild(kb);
