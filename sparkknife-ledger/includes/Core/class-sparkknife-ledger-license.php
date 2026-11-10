@@ -296,7 +296,28 @@ Dc9/n4z9YmMIaOFNbzTEtuEiYnLINAu5d7WgDnxdvG2HAgMBAAE=
 			);
 		}
 
-		$public = openssl_pkey_get_public( self::PUBLIC_KEY );
+		/*
+		 * پاک‌سازی پیش از تحویل به OpenSSL.
+		 *
+		 * PEM باید newline واقعی داشته باشد. اگر کسی کلید را با ابزاری
+		 * در فایل بنویسد که `\n` را متن خام بگذارد (مثلاً جای‌گذاری با
+		 * sed در رشتهٔ تک‌کوتیشن PHP)، مقدار `PUBLIC_KEY` همان کاراکترهای
+		 * backslash و n می‌شود، نه شکست خط. OpenSSL آن را نمی‌فهمد و فقط
+		 * «ناموفق» می‌دهد — بدون هیچ سرنخی که مشکل از قالب کلید است.
+		 *
+		 * این حالت یک بار واقعاً رخ داد: لایسنس روی محیط توسعه معتبر
+		 * بود ولی روی سایت واقعی «کلید عمومی افزونه بارگذاری نشد»
+		 * می‌داد.
+		 *
+		 * به‌جای تکیه بر اینکه نویسندهٔ کلید درست انجام می‌دهد، همان‌جا
+		 * درستش می‌کنیم: `\n` متنی به شکست خط تبدیل می‌شود. PEM
+		 * استاندارد است و تغییر دیگری لازم نیست.
+		 */
+		$public_pem = str_replace( '\\n', "\n", (string) self::PUBLIC_KEY );
+		$public_pem = str_replace( "\r\n", "\n", $public_pem );
+		$public_pem = trim( $public_pem );
+
+		$public = openssl_pkey_get_public( $public_pem );
 
 		if ( false === $public ) {
 			return $invalid(
