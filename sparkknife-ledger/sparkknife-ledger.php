@@ -40,7 +40,7 @@ defined( 'ABSPATH' ) || exit;
 |--------------------------------------------------------------------------
 */
 
-define( 'SPARKKNIFE_LEDGER_VERSION', '1.1.0' );
+define( 'SPARKKNIFE_LEDGER_VERSION', '1.2.0' );
 define( 'SPARKKNIFE_LEDGER_FILE', __FILE__ );
 define( 'SPARKKNIFE_LEDGER_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SPARKKNIFE_LEDGER_URL', plugin_dir_url( __FILE__ ) );
@@ -87,6 +87,16 @@ add_action( 'activate_' . SPARKKNIFE_LEDGER_BASENAME, array( 'Sparkknife_Ledger_
 
 // اجرای کم‌هزینه بررسی به‌روزرسانی اسکیما و مهاجرت تنظیمات در هر بار بارگذاری.
 add_action( 'plugins_loaded', array( 'Sparkknife_Ledger_Installer', 'maybe_upgrade' ), 5 );
+
+/*
+ * به‌روزرسانی خودکار از GitHub.
+ *
+ * فقط در محیط مدیر ثبت می‌شود. در فرانت‌اند هیچ فیلتری لازم نیست و
+ * ثبت‌نکردنش یک فیلتر کمتر برای هر بارگذاری صفحه است.
+ */
+if ( is_admin() ) {
+	Sparkknife_Ledger_Updater::init();
+}
 
 /*
 |--------------------------------------------------------------------------

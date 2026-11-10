@@ -646,7 +646,164 @@ cmd_pack() {
 	echo ""
 }
 
-# ─── ۴) status ────────────────────────────────────────────────────────
+# ─── ۴) release ───────────────────────────────────────────────────────
+#
+# یک دستور که نسخه را بالا می‌برد، زیپ می‌سازد، و manifest را به‌روز
+# می‌کند. بدون این، به‌روزرسانی خودکار در وردپرس هیچ‌وقت فعال نمی‌شود،
+# چون release.json باید هم‌زمان با زیپ عوض شود.
+
+bump_version() {
+	local current="$1" part="$2"
+	local major minor patch
+
+	major="$(printf '%s' "$current" | cut -d. -f1)"
+	minor="$(printf '%s' "$current" | cut -d. -f2)"
+	patch="$(printf '%s' "$current" | cut -d. -f3)"
+	[ -n "$patch" ] || patch=0
+
+	case "$part" in
+		major) major=$(( major + 1 )); minor=0; patch=0 ;;
+		minor) minor=$(( minor + 1 )); patch=0 ;;
+		*)     patch=$(( patch + 1 )) ;;
+	esac
+
+	printf '%s.%s.%s' "$major" "$minor" "$patch"
+}
+
+write_release_json() {
+	local version="$1" changelog="$2"
+	local file="$ROOT/release.json"
+	local tested
+	tested="$(grep -E "^\s*\* Tested up to:" "$PLUGIN_DIR/readme.txt" 2>/dev/null | grep -oE "[0-9]+\.[0-9]+(\.[0-9]+)?" | head -1)"
+	[ -n "$tested" ] || tested='6.8.3'
+
+	# changelog را به HTML ساده تبدیل می‌کنیم: هر خط یک li.
+	local items=''
+	if [ -n "$changelog" ]; then
+		local line
+		while IFS= read -r line; do
+			[ -n "$line" ] || continue
+			items="$items<li>$line</li>"
+		done <<< "$changelog"
+	fi
+
+	python3 - "$file" "$version" "$tested" "$items" <<'PYEOF'
+import io, json, sys, datetime
+
+path, version, tested, items = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+
+data = {
+    "version": version,
+    # نشانی دانلود باید به GitHub Releases اشاره کند، نه مسیر داخل مخزن.
+    #
+    # زیپ در گیتignore است و در مخزن نیست، پس نشانی نسبی به build/ در
+    # raw.githubusercontent.com وجود ندارد و وردپرس خطای 404 می‌دهد.
+    # Releases برخلاف مخزن، فایل دودویی را نگه می‌دارد و نشانی‌اش
+    # ثابت است.
+    "download_url": "https://github.com/sparkknife/SparKnife-ledger/releases/download/v%s/sparkknife-ledger-%s.zip" % (version, version),
+    "requires": "6.0",
+    "tested": tested,
+    "requires_php": "7.4",
+    "last_updated": datetime.date.today().isoformat(),
+    "homepage": "https://github.com/sparkknife/SparKnife-ledger",
+    "changelog": "<h4>%s</h4><ul>%s</ul>" % (version, items) if items else "<h4>%s</h4>" % version,
+}
+
+io.open(path, 'w', encoding='utf-8').write(
+    json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+)
+PYEOF
+}
+
+cmd_release() {
+	local part='patch' changelog='' no_bump=0
+	for a in "$@"; do
+		case "$a" in
+			--major|--minor|--patch) part="${a#--}" ;;
+			--no-bump) no_bump=1 ;;
+			--changelog=*) changelog="${a#--changelog=}" ;;
+			--*) ;;
+			*) changelog="$a" ;;
+		esac
+	done
+
+	echo ""
+	echo "${BOLD}انتشار نسخهٔ تازه${OFF}"
+	echo "$LINE"
+	echo ""
+
+	[ -f "$PLUGIN_DIR/sparkknife-ledger.php" ] || die "افزونه پیدا نشد: $PLUGIN_DIR"
+
+	local current new
+	current="$(grep -E "define\( 'SPARKKNIFE_LEDGER_VERSION'" "$PLUGIN_DIR/sparkknife-ledger.php" | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" | head -1)"
+	[ -n "$current" ] || die "نسخهٔ فعلی خوانده نشد."
+
+	if [ "$no_bump" -eq 1 ]; then
+		new="$current"
+	else
+		new="$(bump_version "$current" "$part")"
+	fi
+
+	ok "نسخهٔ فعلی: $current"
+
+	if [ "$no_bump" -eq 0 ]; then
+		sed -i.bak "s/define( 'SPARKKNIFE_LEDGER_VERSION', '[^']*' );/define( 'SPARKKNIFE_LEDGER_VERSION', '$new' );/" "$PLUGIN_DIR/sparkknife-ledger.php" \
+			&& rm -f "$PLUGIN_DIR/sparkknife-ledger.php.bak"
+		ok "نسخهٔ تازه: $new"
+	fi
+
+	# Stable tag در readme هم باید هم‌گام باشد؛ وردپرس از همان می‌خواند.
+	if [ -f "$PLUGIN_DIR/readme.txt" ]; then
+		sed -i.bak "s/^Stable tag:.*/Stable tag: $new/" "$PLUGIN_DIR/readme.txt" && rm -f "$PLUGIN_DIR/readme.txt.bak"
+		ok "readme.txt هم‌گام شد"
+	fi
+
+	# اگر متن تغییرات نداده‌اند، از گیت می‌خوانیم.
+	if [ -z "$changelog" ] && git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+		local last_tag
+		last_tag="$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null || true)"
+		if [ -n "$last_tag" ]; then
+			changelog="$(git -C "$ROOT" log --no-merges --pretty=format:'%s' "$last_tag..HEAD" 2>/dev/null | head -20)"
+		else
+			changelog="$(git -C "$ROOT" log --no-merges --pretty=format:'%s' -20 2>/dev/null)"
+		fi
+	fi
+
+	cmd_pack || return 1
+
+	write_release_json "$new" "$changelog" || die "نوشتن release.json ناموفق بود."
+
+	ok "release.json به‌روز شد"
+	note "$ROOT/release.json"
+
+	echo ""
+	echo "$THIN"
+	echo "${BOLD}گام بعدی — این‌ها را خودتان انجام دهید${OFF}"
+	echo ""
+	echo "  ۱) release.json را در مخزن بگذارید:"
+	echo "     git add release.json sparkknife-ledger/"
+	echo "     git commit -m \"انتشار $new\""
+	echo "     git push"
+	echo ""
+	echo "  ۲) در GitHub → Releases → Draft a new release:"
+	echo "     tag:  v$new"
+	echo "     زیپ را ضمیمه کنید (نامش باید دقیقاً همین باشد):"
+	echo "       sparkknife-ledger-$new.zip"
+	echo "     ← پوشهٔ build/ همین فایل را دارد"
+	echo ""
+	echo "  ${BOLD}ترتیب مهم است:${OFF} اول Release، بعد push کردن release.json."
+	echo "  اگر برعکس باشد، وردپرس تا انتشار Release خطای 404 می‌گیرد"
+	echo "  (فقط تا لحظهٔ ساخت Release؛ بعدش درست می‌شود)."
+	echo ""
+	echo "  بعد از این، وردپرس مشتری‌ها خودش نسخهٔ تازه را می‌بیند:"
+	echo "     پیشخوان → به‌روزرسانی‌ها → یک کلیک"
+	echo ""
+
+	[ -f "$PRIV" ] && printf '  %sیادآوری:%s کلید خصوصی در زیپ نیست.\n' "$BOLD" "$OFF"
+	echo ""
+}
+
+# ─── ۵) status ────────────────────────────────────────────────────────
 
 cmd_status() {
 	echo ""
@@ -725,8 +882,9 @@ CMD="${1:-}"
 case "$CMD" in
 	setup)  cmd_setup "$@" ;;
 	key)    cmd_key "$@" ;;
-	pack)   cmd_pack "$@" ;;
-	status) cmd_status "$@" ;;
+	pack)    cmd_pack "$@" ;;
+	release) cmd_release "$@" ;;
+	status)  cmd_status "$@" ;;
 	''|help|-h|--help) usage ;;
 	*)
 		printf '\n%s✗ دستور ناشناخته: %s%s\n' "$BAD" "$CMD" "$OFF" >&2

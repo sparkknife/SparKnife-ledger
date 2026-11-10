@@ -56,6 +56,39 @@ class Sparkknife_Ledger_Admin_Loader {
 	}
 
 	/**
+	 * آیکون منوی وردپرس.
+	 *
+	 * وردپرس آیکون منو را به دو شکل می‌پذیرد: نام یک dashicon، یا نشانی
+	 * یک تصویر. dashicon عمومی («chart-area») شبیه ده‌ها افزونهٔ دیگر
+	 * است و در منوی شلوغ پیدا نمی‌شود.
+	 *
+	 * اینجا SVG خود افزونه را با data-URI می‌دهیم. دو دلیل برای SVG و
+	 * نه PNG:
+	 *
+	 *   ۱) وردپرس آیکون SVG را رنگی رندر می‌کند؛ dashicon و PNG تک‌رنگ
+	 *      می‌شوند و رنگشان با تم کاربر عوض می‌شود.
+	 *   ۲) یک فایل، همهٔ اندازه‌ها. PNG برای نمایش تیز روی صفحهٔ
+	 *      رتینا به دو نسخه نیاز دارد.
+	 *
+	 * ⚠️ نکتهٔ ظریف: رنگ داخل SVG باید صریح باشد. وردپرس آیکون‌ها را
+	 * با `fill: currentColor` سرور منو رنگ می‌کند؛ ولی SVG داخل
+	 * data-URI از CSS صفحه ارث نمی‌برد، پس اگر رنگ ندهیم سیاه می‌ماند
+	 * و روی منوی تیره نامرئی می‌شود.
+	 *
+	 * @return string
+	 */
+	private static function menu_icon() {
+		$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+			. '<path d="M5.5 11.5 H19.5" stroke="#a7aaad" stroke-width="3.2" stroke-linecap="round" fill="none"/>'
+			. '<path d="M20.5 6.5 L27 11.5 L20.5 16.5 Z" fill="#c3c4c7"/>'
+			. '<path d="M26.5 20.5 H12.5" stroke="#a7aaad" stroke-width="3.2" stroke-linecap="round" fill="none"/>'
+			. '<path d="M11.5 15.5 L5 20.5 L11.5 25.5 Z" fill="#c3c4c7"/>'
+			. '</svg>';
+
+		return 'data:image/svg+xml;base64,' . base64_encode( $svg ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- data-URI لازم است.
+	}
+
+	/**
 	 * ثبت منوهای پنل.
 	 *
 	 * @return void
@@ -68,7 +101,7 @@ class Sparkknife_Ledger_Admin_Loader {
 			Sparkknife_Ledger_Capabilities::normalize( 'reports' ),
 			self::MAIN_PAGE,
 			array( 'Sparkknife_Ledger_Dashboard_Controller', 'render' ),
-			'dashicons-chart-area',
+			self::menu_icon(),
 			26
 		);
 

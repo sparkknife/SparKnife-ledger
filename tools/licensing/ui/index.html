@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SparKnife Ledger — مدیریت لایسنس</title>
+<style>
+	:root {
+		--brand: #0f766e;
+		--brand-dark: #115e59;
+		--brand-light: #ccfbf1;
+		--amber: #e9a23b;
+		--ink: #0f172a;
+		--muted: #64748b;
+		--line: #e2e8f0;
+		--bg: #f8fafc;
+		--card: #ffffff;
+		--ok: #15803d;
+		--bad: #b91c1c;
+		--warn: #b45309;
+		--radius: 14px;
+	}
+
+	* { box-sizing: border-box; }
+
+	body {
+		margin: 0;
+		font-family: "Vazirmatn", "Segoe UI", Tahoma, system-ui, sans-serif;
+		background: var(--bg);
+		color: var(--ink);
+		line-height: 1.7;
+		font-size: 15px;
+	}
+
+	.wrap { max-width: 940px; margin: 0 auto; padding: 28px 20px 80px; }
+
+	/* ── سربرگ ── */
+	header.top {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		margin-bottom: 26px;
+	}
+
+	.mark {
+		width: 52px; height: 52px;
+		border-radius: 15px;
+		background: linear-gradient(135deg, var(--brand), #14b8a6);
+		display: grid; place-items: center;
+		box-shadow: 0 8px 20px -8px rgba(15,118,110,.7);
+		flex: 0 0 auto;
+	}
+	.mark svg { width: 30px; height: 30px; display: block; }
+
+	h1 { margin: 0; font-size: 21px; letter-spacing: -.2px; }
+	.sub { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+	/* ── نوار وضعیت ── */
+	.status {
+		display: flex; flex-wrap: wrap; gap: 8px;
+		margin-bottom: 22px;
+	}
+	.chip {
+		display: inline-flex; align-items: center; gap: 6px;
+		padding: 5px 12px; border-radius: 100px;
+		font-size: 12.5px; font-weight: 600;
+		background: #fff; border: 1px solid var(--line);
+	}
+	.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+	.chip.ok .dot { background: var(--ok); }
+	.chip.bad .dot { background: var(--bad); }
+	.chip.warn .dot { background: var(--warn); }
+
+	/* ── تب‌ها ── */
+	.tabs {
+		display: flex; gap: 4px;
+		border-bottom: 1px solid var(--line);
+		margin-bottom: 22px;
+		overflow-x: auto;
+	}
+	.tab {
+		appearance: none; border: 0; background: none;
+		padding: 11px 16px; cursor: pointer;
+		font: inherit; font-weight: 600; font-size: 14px;
+		color: var(--muted);
+		border-bottom: 2px solid transparent;
+		white-space: nowrap;
+		border-radius: 8px 8px 0 0;
+	}
+	.tab:hover { color: var(--ink); background: #fff; }
+	.tab[aria-selected="true"] {
+		color: var(--brand);
+		border-bottom-color: var(--brand);
+		background: #fff;
+	}
+
+	/* ── کارت ── */
+	.card {
+		background: var(--card);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		padding: 22px;
+		margin-bottom: 18px;
+	}
+	.card h2 { margin: 0 0 4px; font-size: 16px; }
+	.card .hint { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+
+	label.f {
+		display: block; margin-bottom: 14px;
+	}
+	label.f > span {
+		display: block; margin-bottom: 5px;
+		font-size: 13px; font-weight: 600;
+	}
+	label.f .note { font-weight: 400; color: var(--muted); font-size: 12px; }
+
+	input, select, textarea {
+		width: 100%; padding: 10px 12px;
+		border: 1px solid var(--line); border-radius: 10px;
+		font: inherit; font-size: 14px;
+		background: #fff; color: var(--ink);
+	}
+	input:focus, select:focus, textarea:focus {
+		outline: 2px solid var(--brand-light);
+		border-color: var(--brand);
+	}
+	textarea { resize: vertical; min-height: 90px; }
+	.ltr { direction: ltr; text-align: left; font-family: ui-monospace, monospace; font-size: 12.5px; }
+
+	.row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+	@media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+
+	/* ── دکمه ── */
+	.btn {
+		appearance: none; border: 1px solid transparent;
+		padding: 10px 18px; border-radius: 10px;
+		font: inherit; font-weight: 600; font-size: 14px;
+		cursor: pointer;
+		display: inline-flex; align-items: center; gap: 7px;
+		background: var(--brand); color: #fff;
+		transition: .15s;
+	}
+	.btn:hover { background: var(--brand-dark); }
+	.btn:disabled { opacity: .5; cursor: not-allowed; }
+	.btn.ghost {
+		background: #fff; color: var(--ink); border-color: var(--line);
+	}
+	.btn.ghost:hover { background: var(--bg); }
+	.btn.amber { background: var(--amber); color: #3d2600; }
+	.btn.amber:hover { background: #d99326; }
+	.btn.sm { padding: 6px 12px; font-size: 12.5px; }
+
+	/* ── خروجی ── */
+	.out {
+		margin-top: 16px; padding: 16px;
+		border-radius: 12px; background: var(--bg);
+		border: 1px solid var(--line);
+		display: none;
+	}
+	.out.show { display: block; }
+	.out h3 { margin: 0 0 10px; font-size: 13px; color: var(--muted); font-weight: 600; }
+
+	.keybox {
+		display: flex; gap: 8px; align-items: flex-start;
+	}
+	.keybox textarea {
+		min-height: 96px; font-size: 11.5px; line-height: 1.55;
+		background: #fff;
+	}
+
+	.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 14px 0; }
+	.fact {
+		background: #fff; border: 1px solid var(--line);
+		border-radius: 10px; padding: 9px 12px;
+	}
+	.fact b { display: block; font-size: 11px; color: var(--muted); font-weight: 600; margin-bottom: 1px; }
+	.fact span { font-size: 13.5px; font-weight: 600; }
+
+	.verdict {
+		display: flex; align-items: center; gap: 9px;
+		padding: 11px 14px; border-radius: 10px;
+		font-weight: 600; font-size: 13.5px;
+	}
+	.verdict.ok { background: #dcfce7; color: #14532d; }
+	.verdict.bad { background: #fee2e2; color: #7f1d1d; }
+	.verdict.warn { background: #fef3c7; color: #78350f; }
+
+	.steps { margin: 14px 0 0; padding: 0; list-style: none; counter-reset: s; }
+	.steps li {
+		position: relative; padding-right: 34px; margin-bottom: 11px;
+		font-size: 13.5px;
+	}
+	.steps li::before {
+		counter-increment: s; content: counter(s);
+		position: absolute; right: 0; top: 1px;
+		width: 23px; height: 23px; border-radius: 50%;
+		background: var(--brand-light); color: var(--brand-dark);
+		font-size: 12px; font-weight: 700;
+		display: grid; place-items: center;
+	}
+
+	.empty { color: var(--muted); font-size: 13.5px; text-align: center; padding: 30px 10px; }
+
+	code.inl {
+		background: var(--bg); padding: 1px 6px; border-radius: 5px;
+		font-size: 12.5px; direction: ltr; display: inline-block;
+		font-family: ui-monospace, monospace;
+	}
+
+	.warnbox {
+		background: #fffbeb; border: 1px solid #fde68a;
+		border-radius: 10px; padding: 12px 14px;
+		font-size: 13px; color: #78350f;
+		margin-bottom: 16px;
+	}
+	.warnbox b { display: block; margin-bottom: 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+	<header class="top">
+		<div class="mark" aria-hidden="true">
+			<svg viewBox="0 0 32 32">
+				<path d="M5.5 11.5 H19.5" stroke="#fff" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+				<path d="M20.5 6.5 L27 11.5 L20.5 16.5 Z" fill="#E9A23B"/>
+				<path d="M26.5 20.5 H12.5" stroke="#fff" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+				<path d="M11.5 15.5 L5 20.5 L11.5 25.5 Z" fill="#E9A23B"/>
+			</svg>
+		</div>
+		<div>
+			<h1>SparKnife Ledger</h1>
+			<p class="sub">مدیریت لایسنس — بدون نیاز به خط فرمان</p>
+		</div>
+	</header>
+
+	<div class="status" id="status">
+		<span class="chip"><span class="dot"></span> در حال اتصال…</span>
+	</div>
+
+	<div class="tabs" role="tablist">
+		<button class="tab" role="tab" aria-selected="true" data-panel="issue">صدور لایسنس</button>
+		<button class="tab" role="tab" aria-selected="false" data-panel="verify">بررسی کلید</button>
+		<button class="tab" role="tab" aria-selected="false" data-panel="setup">راه‌اندازی</button>
+		<button class="tab" role="tab" aria-selected="false" data-panel="release">انتشار نسخه</button>
+		<button class="tab" role="tab" aria-selected="false" data-panel="help">راهنما</button>
+	</div>
+
+	<!-- ── صدور ── -->
+	<section class="panel" id="panel-issue">
+		<div class="card">
+			<h2>لایسنس تازه برای یک مشتری</h2>
+			<p class="hint">دامنه را وارد کنید و دکمه را بزنید. کلید آماده می‌شود.</p>
+
+			<label class="f">
+				<span>دامنهٔ سایت مشتری</span>
+				<input type="text" id="domain" placeholder="example.com" dir="ltr">
+				<span class="note">
+					فقط دامنه، بدون <code class="inl">https://</code> و بدون <code class="inl">www</code>.
+					برای همهٔ زیردامنه‌ها: <code class="inl">*.example.com</code> — برای هر دامنه‌ای: <code class="inl">*</code>
+				</span>
+			</label>
+
+			<div class="row">
+				<label class="f">
+					<span>نسخه</span>
+					<select id="edition">
+						<option value="pro">pro — یک سایت</option>
+						<option value="agency">agency — کل شبکه</option>
+					</select>
+				</label>
+				<label class="f">
+					<span>انقضا <span class="note">(خالی = یک سال بعد)</span></span>
+					<input type="date" id="expiry" dir="ltr">
+				</label>
+			</div>
+
+			<label class="f" style="margin-bottom:18px">
+				<span style="font-weight:400">
+					<input type="checkbox" id="forever" style="width:auto;margin-left:6px">
+					بدون انقضا (فروش دائمی)
+				</span>
+			</label>
+
+			<button class="btn" id="btn-issue">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+				صدور کلید
+			</button>
+
+			<div class="out" id="issue-out"></div>
+		</div>
+	</section>
+
+	<!-- ── بررسی ── -->
+	<section class="panel" id="panel-verify" hidden>
+		<div class="card">
+			<h2>بررسی یک کلید</h2>
+			<p class="hint">کلیدی که مشتری فرستاده یا کلیدی که خودتان صادر کرده‌اید را اینجا بچسبانید.</p>
+
+			<label class="f">
+				<span>کلید لایسنس</span>
+				<textarea id="verify-key" class="ltr" placeholder="SPK1.xxxxx.yyyyy"></textarea>
+			</label>
+
+			<button class="btn" id="btn-verify">بررسی</button>
+			<div class="out" id="verify-out"></div>
+		</div>
+	</section>
+
+	<!-- ── راه‌اندازی ── -->
+	<section class="panel" id="panel-setup" hidden>
+		<div class="card">
+			<h2>راه‌اندازی کلید امضا</h2>
+			<p class="hint">یک بار در عمر پروژه. کلید خصوصی می‌سازد و کلید عمومی را داخل کد می‌گذارد.</p>
+			<div id="setup-state"></div>
+			<div id="setup-out" class="out"></div>
+		</div>
+	</section>
+
+	<!-- ── انتشار ── -->
+	<section class="panel" id="panel-release" hidden>
+		<div class="card">
+			<h2>انتشار نسخهٔ تازه</h2>
+			<p class="hint">نسخه را بالا می‌برد، زیپ می‌سازد، و فایل به‌روزرسانی را می‌نویسد.</p>
+
+			<div class="row">
+				<label class="f">
+					<span>نوع افزایش نسخه</span>
+					<select id="bump">
+						<option value="patch">patch — رفع باگ (۱٫۲٫۰ → ۱٫۲٫۱)</option>
+						<option value="minor">minor — قابلیت تازه (۱٫۲٫۰ → ۱٫۳٫۰)</option>
+						<option value="major">major — تغییر بزرگ (۱٫۲٫۰ → ۲٫۰٫۰)</option>
+					</select>
+				</label>
+				<label class="f">
+					<span>متن تغییرات <span class="note">(هر خط یک مورد)</span></span>
+					<textarea id="changelog" placeholder="رفع نمایش مبلغ در تاریخچه&#10;لوگوی تازه"></textarea>
+				</label>
+			</div>
+
+			<button class="btn amber" id="btn-release">ساخت نسخه</button>
+			<div class="out" id="release-out"></div>
+		</div>
+	</section>
+
+	<!-- ── راهنما ── -->
+	<section class="panel" id="panel-help" hidden>
+		<div class="card">
+			<h2>کلید خصوصی کجا باشد</h2>
+			<p class="hint">با آن هر لایسنس جعلی قابل ساخت است.</p>
+			<ul class="steps">
+				<li><b>در گیت نگذارید.</b> فایل <code class="inl">private_key.pem</code> در <code class="inl">tools/licensing/</code> است و در <code class="inl">.gitignore</code> نادیده گرفته می‌شود. مطمئن شوید.</li>
+				<li><b>در چت نفرستید.</b> نه به من، نه به کسی دیگر.</li>
+				<li><b>پشتیبان بگیرید.</b> مدیر رمز، یا یک فایل رمزگذاری‌شده در جای امن.</li>
+				<li><b>اگر گم شود:</b> لایسنس‌های صادرشده کار می‌کنند ولی تمدید ممکن نیست — باید <code class="inl">setup --force</code> بزنید و همهٔ کلیدها را از نو صادر کنید.</li>
+			</ul>
+		</div>
+
+		<div class="card">
+			<h2>به‌روزرسانی خودکار چطور کار می‌کند</h2>
+			<ul class="steps">
+				<li>افزونه هر ۶ ساعت <code class="inl">release.json</code> را از مخزن می‌خواند.</li>
+				<li>اگر نسخهٔ آن از نسخهٔ نصب‌شده بالاتر باشد، وردپرس در «پیشخوان → به‌روزرسانی‌ها» نشانش می‌دهد.</li>
+				<li>مشتری روی «به‌روزرسانی» می‌زند و وردپرس زیپ را از GitHub Releases می‌گیرد.</li>
+				<li>هیچ داده‌ای از سایت مشتری به هیچ‌جا نمی‌رود. فقط یک درخواست خواندن.</li>
+			</ul>
+		</div>
+	</section>
+
+</div>
+
+<script>
+(function () {
+	'use strict';
+
+	// ── کمکی‌ها ──────────────────────────────────────────────────
+	var $ = function (id) { return document.getElementById(id); };
+
+	var el = function (tag, cls, text) {
+		var n = document.createElement(tag);
+		if (cls) { n.className = cls; }
+		if (text !== undefined) { n.textContent = text; }
+		return n;
+	};
+
+	var show = function (node) { node.classList.add('show'); };
+	var hide = function (node) { node.classList.remove('show'); node.textContent = ''; };
+
+	var api = function (path, options) {
+		return fetch('api/' + path, options || {})
+			.then(function (r) { return r.json(); })
+			.catch(function () {
+				return { ok: false, message: 'سرور در دسترس نیست. آیا برنامه را از پوشهٔ پروژه باز کرده‌اید؟' };
+			});
+	};
+
+	// ── وضعیت ────────────────────────────────────────────────────
+	api('status').then(function (data) {
+		var box = $('status');
+		box.textContent = '';
+
+		var chip = function (label, state) {
+			var c = el('span', 'chip ' + (state || ''));
+			c.appendChild(el('span', 'dot'));
+			c.appendChild(document.createTextNode(label));
+			box.appendChild(c);
+		};
+
+		if (data.private_key) {
+			chip('کلید خصوصی آماده', 'ok');
+		} else {
+			chip('کلید خصوصی ندارد — تب «راه‌اندازی»', 'bad');
+		}
+
+		if (data.key_in_code) {
+			chip('کلید در کد هم‌تراز', 'ok');
+		} else if (data.private_key) {
+			chip('کلید کد ناهم‌تراز — راه‌اندازی را بزنید', 'warn');
+		}
+
+		if (data.version) { chip('نسخهٔ ' + data.version, ''); }
+
+		// وضعیت تب راه‌اندازی
+		var s = $('setup-state');
+		s.textContent = '';
+
+		if (!data.private_key) {
+			s.appendChild(el('p', 'hint', 'هنوز کلیدی ساخته نشده. دکمهٔ زیر را بزنید.'));
+			var b = el('button', 'btn', 'ساخت کلید و آماده‌سازی');
+			b.onclick = function () { runSetup(false); };
+			s.appendChild(b);
+		} else {
+			var v = el('div', 'verdict ok');
+			v.appendChild(document.createTextNode('✓ کلید آماده است'));
+			s.appendChild(v);
+
+			var d = el('p', 'hint');
+			d.style.marginTop = '12px';
+			d.appendChild(document.createTextNode('اثر انگشت: '));
+			d.appendChild(el('code', 'inl', data.fingerprint || '—'));
+			s.appendChild(d);
+
+			var b2 = el('button', 'btn ghost sm', 'ساخت کلید تازه (خطرناک)');
+			b2.onclick = function () { runSetup(true); };
+			s.appendChild(b2);
+		}
+	});
+
+	var runSetup = function (force) {
+		if (force && !confirm('با کلید تازه، همهٔ لایسنس‌هایی که تا حالا صادر کرده‌اید باطل می‌شوند و مشتری‌ها باید کلید نو بگیرند. مطمئنید؟')) {
+			return;
+		}
+
+		var out = $('setup-out');
+		out.textContent = '';
+		show(out);
+		out.appendChild(el('p', 'hint', 'در حال ساخت کلید…'));
+
+		var fd = new FormData();
+		fd.append('force', force ? '1' : '0');
+
+		api('setup', { method: 'POST', body: fd }).then(function (data) {
+			hide(out);
+			show(out);
+
+			var v = el('div', 'verdict ' + (data.ok ? 'ok' : 'bad'));
+			v.appendChild(document.createTextNode((data.ok ? '✓ ' : '✗ ') + data.message));
+			out.appendChild(v);
+
+			if (data.ok) { setTimeout(function () { location.reload(); }, 1600); }
+		});
+	};
+
+	// ── صدور ─────────────────────────────────────────────────────
+	$('btn-issue').onclick = function () {
+		var domain = $('domain').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+		var out = $('issue-out');
+
+		if (!domain) {
+			hide(out); show(out);
+			var w = el('div', 'verdict bad');
+			w.appendChild(document.createTextNode('✗ دامنه لازم است'));
+			out.appendChild(w);
+			$('domain').focus();
+			return;
+		}
+
+		this.disabled = true;
+		hide(out);
+
+		var fd = new FormData();
+		fd.append('domain', domain);
+		fd.append('edition', $('edition').value);
+		fd.append('expiry', $('forever').checked ? '' : $('expiry').value);
+		fd.append('forever', $('forever').checked ? '1' : '0');
+
+		var btn = this;
+
+		api('issue', { method: 'POST', body: fd }).then(function (data) {
+			btn.disabled = false;
+			show(out);
+
+			if (!data.ok) {
+				var e = el('div', 'verdict bad');
+				e.appendChild(document.createTextNode('✗ ' + data.message));
+				out.appendChild(e);
+				return;
+			}
+
+			var facts = el('div', 'facts');
+			[['دامنه', data.domain], ['نسخه', data.edition], ['انقضا', data.expiry || 'بدون انقضا'], ['سریال', data.serial]].forEach(function (pair) {
+				var f = el('div', 'fact');
+				f.appendChild(el('b', null, pair[0]));
+				f.appendChild(el('span', null, pair[1]));
+				facts.appendChild(f);
+			});
+			out.appendChild(facts);
+
+			var v = el('div', 'verdict ' + (data.valid ? 'ok' : 'warn'));
+			v.appendChild(document.createTextNode(data.valid ? '✓ بررسی خودکار: معتبر است' : '! بررسی خودکار انجام نشد'));
+			out.appendChild(v);
+
+			out.appendChild(el('h3', null, 'کلید — این را به مشتری بدهید'));
+
+			var kb = el('div', 'keybox');
+			var ta = el('textarea', 'ltr');
+			ta.value = data.key;
+			ta.readOnly = true;
+			ta.spellcheck = false;
+			kb.appendChild(ta);
+
+			var copy = el('button', 'btn ghost sm', 'کپی');
+			copy.onclick = function () {
+				ta.select();
+				document.execCommand('copy');
+				copy.textContent = 'کپی شد';
+				setTimeout(function () { copy.textContent = 'کپی'; }, 1500);
+			};
+			kb.appendChild(copy);
+			out.appendChild(kb);
+
+			out.appendChild(el('h3', null, 'مشتری کجا وارد کند'));
+			var ol = el('ol', 'steps');
+			['پیشخوان وردپرس → SparKnife Ledger → سلامت و امنیت',
+			 'بخش «لایسنس» → کادر متن → کلید را بچسبانید',
+			 'دکمهٔ «فعال‌سازی لایسنس»'].forEach(function (t) {
+				ol.appendChild(el('li', null, t));
+			});
+			out.appendChild(ol);
+		});
+	};
+
+	// ── بررسی ────────────────────────────────────────────────────
+	$('btn-verify').onclick = function () {
+		var key = $('verify-key').value.trim();
+		var out = $('verify-out');
+
+		if (!key) {
+			hide(out); show(out);
+			var w = el('div', 'verdict bad');
+			w.appendChild(document.createTextNode('✗ کلید را بچسبانید'));
+			out.appendChild(w);
+			return;
+		}
+
+		this.disabled = true;
+		hide(out);
+
+		var btn = this;
+		var fd = new FormData();
+		fd.append('key', key);
+
+		api('verify', { method: 'POST', body: fd }).then(function (data) {
+			btn.disabled = false;
+			show(out);
+
+			var v = el('div', 'verdict ' + (data.valid ? 'ok' : 'bad'));
+			v.appendChild(document.createTextNode((data.valid ? '✓ ' : '✗ ') + data.message));
+			out.appendChild(v);
+
+			if (data.payload) {
+				var facts = el('div', 'facts');
+				[['دامنه', data.payload.domain], ['نسخه', data.payload.edition],
+				 ['انقضا', data.payload.expiry || 'بدون انقضا'], ['سریال', data.payload.serial]].forEach(function (p) {
+					var f = el('div', 'fact');
+					f.appendChild(el('b', null, p[0]));
+					f.appendChild(el('span', null, p[1]));
+					facts.appendChild(f);
+				});
+				out.appendChild(facts);
+			}
+		});
+	};
+
+	// ── انتشار ───────────────────────────────────────────────────
+	$('btn-release').onclick = function () {
+		var out = $('release-out');
+		hide(out);
+		this.disabled = true;
+
+		var btn = this;
+		var fd = new FormData();
+		fd.append('bump', $('bump').value);
+		fd.append('changelog', $('changelog').value);
+
+		api('release', { method: 'POST', body: fd }).then(function (data) {
+			btn.disabled = false;
+			show(out);
+
+			var v = el('div', 'verdict ' + (data.ok ? 'ok' : 'bad'));
+			v.appendChild(document.createTextNode((data.ok ? '✓ ' : '✗ ') + data.message));
+			out.appendChild(v);
+
+			if (data.ok) {
+				var facts = el('div', 'facts');
+				[['نسخه', data.version], ['فایل‌ها', String(data.files)], ['حجم', data.size]].forEach(function (p) {
+					var f = el('div', 'fact');
+					f.appendChild(el('b', null, p[0]));
+					f.appendChild(el('span', null, p[1]));
+					facts.appendChild(f);
+				});
+				out.appendChild(facts);
+
+				if (data.zip) {
+					out.appendChild(el('h3', null, 'فایل زیپ'));
+					out.appendChild(el('code', 'inl', data.zip));
+				}
+
+				if (data.next && data.next.length) {
+					out.appendChild(el('h3', null, 'گام بعدی — دستی'));
+					var ol = el('ol', 'steps');
+					data.next.forEach(function (t) { ol.appendChild(el('li', null, t)); });
+					out.appendChild(ol);
+				}
+			}
+		});
+	};
+
+	// ── تب‌ها ────────────────────────────────────────────────────
+	var tabs = document.querySelectorAll('.tab');
+
+	Array.prototype.forEach.call(tabs, function (tab) {
+		tab.onclick = function () {
+			Array.prototype.forEach.call(tabs, function (t) {
+				t.setAttribute('aria-selected', String(t === tab));
+			});
+
+			Array.prototype.forEach.call(document.querySelectorAll('.panel'), function (p) {
+				p.hidden = true;
+			});
+
+			$('panel-' + tab.dataset.panel).hidden = false;
+		};
+	});
+
+	// «بدون انقضا» تاریخ را غیرفعال می‌کند.
+	$('forever').onchange = function () {
+		$('expiry').disabled = this.checked;
+		if (this.checked) { $('expiry').value = ''; }
+	};
+})();
+</script>
+</body>
+</html>

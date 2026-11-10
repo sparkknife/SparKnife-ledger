@@ -37,7 +37,15 @@ if ( isset( $header_actions ) && is_array( $header_actions ) ) {
 	<header class="spk-header">
 		<div class="spk-header__main">
 			<div class="spk-header__brand" aria-hidden="true">
-				<span class="spk-logo">S</span>
+				<?php /* لوگو: دو ردیف دفتر با فلش مقابل هم — ورودی و خروجی. */ ?>
+				<span class="spk-logo">
+					<svg viewBox="0 0 32 32" width="26" height="26" focusable="false">
+						<path d="M5.5 11.5 H19.5" stroke="#fff" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+						<path d="M20.5 6.5 L27 11.5 L20.5 16.5 Z" fill="#E9A23B"/>
+						<path d="M26.5 20.5 H12.5" stroke="#fff" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+						<path d="M11.5 15.5 L5 20.5 L11.5 25.5 Z" fill="#E9A23B"/>
+					</svg>
+				</span>
 			</div>
 			<div class="spk-header__text">
 				<h1 class="spk-title"><?php echo esc_html( $title ); ?></h1>

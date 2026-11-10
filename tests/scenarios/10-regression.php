@@ -4935,3 +4935,188 @@ spk_assert(
 	'باگ ۹۵: person_id دیگر فیلد مخفی نیست (وگرنه انتخاب کاربر را بازنویسی می‌کرد)'
 );
 
+// ── ۲۶: به‌روزرسانی خودکار از GitHub ──────────────────────────────
+//
+// بدون این، هر نسخهٔ تازه یعنی کاربر باید پوشه را پاک کند و زیپ را از
+// نو نصب کند. برای کسی که فقط با وردپرس کار می‌کند، همین یک گام کافی
+// است که هیچ‌وقت به‌روزرسانی نکند.
+
+spk_assert( class_exists( 'Sparkknife_Ledger_Updater' ), 'به‌روزرسان: کلاس بارگذاری می‌شود' );
+
+/**
+ * ساخت پاسخ HTTP جعلی برای release.json.
+ *
+ * @param array $body بدنه.
+ * @return callable
+ */
+$spk_fake_release = static function ( $body ) {
+	return static function ( $pre, $args, $url ) use ( $body ) {
+		if ( false === strpos( $url, 'release.json' ) ) {
+			return $pre;
+		}
+
+		return array(
+			'response' => array( 'code' => 200, 'message' => 'OK' ),
+			'body'     => wp_json_encode( $body ),
+			'headers'  => array(),
+			'cookies'  => array(),
+		);
+	};
+};
+
+// ۲۶.۱ — نسخهٔ بالاتر باید تشخیص داده شود.
+$hook = $spk_fake_release(
+	array(
+		'version'      => '9.9.9',
+		'download_url' => 'https://example.com/sparkknife-ledger-9.9.9.zip',
+		'tested'       => '6.8.3',
+		'requires'     => '6.0',
+	)
+);
+
+add_filter( 'pre_http_request', $hook, 10, 3 );
+delete_transient( Sparkknife_Ledger_Updater::CACHE_KEY );
+
+$transient = new stdClass();
+$transient->response  = array();
+$transient->no_update = array();
+
+$result = Sparkknife_Ledger_Updater::check_for_update( $transient );
+
+spk_assert(
+	isset( $result->response[ SPARKKNIFE_LEDGER_BASENAME ] ),
+	'به‌روزرسان: نسخهٔ بالاتر تشخیص داده می‌شود'
+);
+
+if ( isset( $result->response[ SPARKKNIFE_LEDGER_BASENAME ] ) ) {
+	spk_equals(
+		'9.9.9',
+		$result->response[ SPARKKNIFE_LEDGER_BASENAME ]->new_version,
+		'به‌روزرسان: شمارهٔ نسخهٔ تازه درست است'
+	);
+}
+
+// ۲۶.۲ — نسخهٔ یکسان نباید پیشنهاد شود.
+remove_filter( 'pre_http_request', $hook, 10 );
+$hook_same = $spk_fake_release(
+	array(
+		'version'      => SPARKKNIFE_LEDGER_VERSION,
+		'download_url' => 'https://example.com/x.zip',
+	)
+);
+
+add_filter( 'pre_http_request', $hook_same, 10, 3 );
+delete_transient( Sparkknife_Ledger_Updater::CACHE_KEY );
+
+$transient2 = new stdClass();
+$transient2->response  = array();
+$transient2->no_update = array();
+
+spk_assert(
+	empty( Sparkknife_Ledger_Updater::check_for_update( $transient2 )->response ),
+	'به‌روزرسان: نسخهٔ یکسان پیشنهاد نمی‌شود'
+);
+
+// ۲۶.۳ — نسخهٔ پایین‌تر هم نباید پیشنهاد شود.
+remove_filter( 'pre_http_request', $hook_same, 10 );
+$hook_old = $spk_fake_release(
+	array(
+		'version'      => '0.0.1',
+		'download_url' => 'https://example.com/old.zip',
+	)
+);
+
+add_filter( 'pre_http_request', $hook_old, 10, 3 );
+delete_transient( Sparkknife_Ledger_Updater::CACHE_KEY );
+
+$transient3 = new stdClass();
+$transient3->response  = array();
+$transient3->no_update = array();
+
+spk_assert(
+	empty( Sparkknife_Ledger_Updater::check_for_update( $transient3 )->response ),
+	'به‌روزرسان: نسخهٔ قدیمی‌تر پیشنهاد نمی‌شود'
+);
+
+// ۲۶.۴ — بدون شبکه نباید خطا بدهد. افزونه باید آفلاین کامل کار کند.
+remove_filter( 'pre_http_request', $hook_old, 10 );
+$hook_offline = static function ( $pre, $args, $url ) {
+	if ( false === strpos( $url, 'release.json' ) ) {
+		return $pre;
+	}
+
+	return new WP_Error( 'http_request_failed', 'شبکه نیست' );
+};
+
+add_filter( 'pre_http_request', $hook_offline, 10, 3 );
+delete_transient( Sparkknife_Ledger_Updater::CACHE_KEY );
+
+$transient4 = new stdClass();
+$transient4->response = array();
+
+spk_assert(
+	empty( Sparkknife_Ledger_Updater::check_for_update( $transient4 )->response ),
+	'به‌روزرسان: بدون شبکه بی‌خطا رد می‌شود'
+);
+
+remove_filter( 'pre_http_request', $hook_offline, 10 );
+delete_transient( Sparkknife_Ledger_Updater::CACHE_KEY );
+
+// ۲۶.۵ — نام پوشهٔ GitHub باید اصلاح شود.
+//
+// GitHub زیپ شاخه را با نام `SparKnife-ledger-main` می‌سازد، ولی افزونه
+// در پوشهٔ `sparkknife-ledger` نصب است. اگر نام عوض نشود، وردپرس نسخهٔ
+// تازه را کنار نسخهٔ قبلی نصب می‌کند و دو افزونهٔ هم‌نام فعال می‌شوند.
+require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-base.php';
+require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-direct.php';
+
+global $wp_filesystem;
+$spk_fs_backup = $wp_filesystem;
+$wp_filesystem = new WP_Filesystem_Direct( array() );
+
+$spk_upd_tmp = trailingslashit( get_temp_dir() ) . 'spk-upd-' . wp_generate_password( 6, false );
+wp_mkdir_p( $spk_upd_tmp . '/SparKnife-ledger-main' );
+file_put_contents( $spk_upd_tmp . '/SparKnife-ledger-main/sparkknife-ledger.php', '<?php' );
+
+$spk_fixed = Sparkknife_Ledger_Updater::fix_source_dir(
+	trailingslashit( $spk_upd_tmp ) . 'SparKnife-ledger-main',
+	trailingslashit( $spk_upd_tmp ),
+	null,
+	array( 'plugin' => SPARKKNIFE_LEDGER_BASENAME )
+);
+
+spk_equals( 'sparkknife-ledger', basename( $spk_fixed ), 'به‌روزرسان: نام پوشهٔ GitHub اصلاح می‌شود' );
+
+// ۲۶.۶ — افزونهٔ دیگر نباید دست بخورد.
+$spk_other = Sparkknife_Ledger_Updater::fix_source_dir(
+	trailingslashit( $spk_upd_tmp ) . 'SparKnife-ledger-main',
+	trailingslashit( $spk_upd_tmp ),
+	null,
+	array( 'plugin' => 'some-other-plugin/some-other-plugin.php' )
+);
+
+spk_equals( 'SparKnife-ledger-main', basename( $spk_other ), 'به‌روزرسان: پوشهٔ افزونهٔ دیگر تغییر نمی‌کند' );
+
+$wp_filesystem = $spk_fs_backup;
+
+// ۲۶.۷ — manifest منتشرشده باید سالم و خوانا باشد.
+$spk_manifest_path = dirname( SPARKKNIFE_LEDGER_FILE, 2 ) . '/release.json';
+
+if ( is_readable( $spk_manifest_path ) ) {
+	$spk_manifest = json_decode( file_get_contents( $spk_manifest_path ), true );
+
+	spk_assert( is_array( $spk_manifest ), 'به‌روزرسان: release.json معتبر است' );
+
+	if ( is_array( $spk_manifest ) ) {
+		spk_assert( ! empty( $spk_manifest['version'] ), 'به‌روزرسان: release.json نسخه دارد' );
+		spk_assert(
+			! empty( $spk_manifest['download_url'] ) && 0 === strpos( $spk_manifest['download_url'], 'https://github.com/' ),
+			'به‌روزرسان: نشانی دانلود به GitHub Releases اشاره می‌کند'
+		);
+		spk_assert(
+			version_compare( $spk_manifest['version'], SPARKKNIFE_LEDGER_VERSION, '>=' ),
+			'به‌روزرسان: نسخهٔ manifest از نسخهٔ کد عقب نیست'
+		);
+	}
+}
+

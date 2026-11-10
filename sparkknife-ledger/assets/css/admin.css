@@ -98,10 +98,15 @@
 	height: 46px;
 	border-radius: 13px;
 	background: linear-gradient(135deg, var(--spk-brand), #14b8a6);
-	color: #fff;
-	font-size: 22px;
-	font-weight: 700;
 	box-shadow: 0 6px 16px -6px rgba(15, 118, 110, 0.7);
+	flex: 0 0 auto;
+}
+
+/* لوگو داخل خودش SVG دارد، نه حرف؛ پس رنگ متن لازم نیست. */
+.spk-logo svg {
+	display: block;
+	width: 26px;
+	height: 26px;
 }
 
 .spk-title {
