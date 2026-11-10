@@ -5120,6 +5120,76 @@ if ( is_readable( $spk_manifest_path ) ) {
 	}
 }
 
+// ۲۶.۸ — اگر فایل Release ضمیمه نشده باشد، باید به زیپ شاخه برگردد.
+//
+// این حالت واقعاً رخ داد: Release با تگ ساخته شد ولی زیپ آپلود نشد.
+// نتیجه: وردپرس «دانلود ناموفق» می‌داد با پیامی که هیچ سرنخی از علت
+// نداشت. کاربر فکر می‌کرد آپدیت خودکار خراب است، در حالی که فقط یک
+// گام دستی جا افتاده بود.
+
+$spk_head_404 = static function ( $pre, $args, $url ) {
+	if ( false === strpos( $url, 'releases/download' ) ) {
+		return $pre;
+	}
+
+	return array(
+		'response' => array( 'code' => 404, 'message' => 'Not Found' ),
+		'body'     => '',
+		'headers'  => array(),
+		'cookies'  => array(),
+	);
+};
+
+add_filter( 'pre_http_request', $spk_head_404, 10, 3 );
+
+$spk_pkg_method = new ReflectionMethod( 'Sparkknife_Ledger_Updater', 'usable_package' );
+$spk_pkg_method->setAccessible( true );
+
+$spk_fallback = $spk_pkg_method->invoke(
+	null,
+	array(
+		'download_url' => 'https://github.com/x/y/releases/download/v1/x.zip',
+		'fallback_url' => 'https://codeload.github.com/x/y/zip/refs/heads/main',
+	)
+);
+
+spk_assert(
+	false !== strpos( $spk_fallback, 'codeload' ),
+	'به‌روزرسان: بدون فایل Release، به زیپ شاخه برمی‌گردد'
+);
+
+// ۲۶.۹ — اگر نشانی سالم باشد، نباید جایگزین شود (جایگزین بزرگ‌تر است).
+remove_filter( 'pre_http_request', $spk_head_404, 10 );
+$spk_head_200 = static function ( $pre, $args, $url ) {
+	if ( false === strpos( $url, 'releases/download' ) ) {
+		return $pre;
+	}
+
+	return array(
+		'response' => array( 'code' => 200, 'message' => 'OK' ),
+		'body'     => '',
+		'headers'  => array(),
+		'cookies'  => array(),
+	);
+};
+
+add_filter( 'pre_http_request', $spk_head_200, 10, 3 );
+
+$spk_primary = $spk_pkg_method->invoke(
+	null,
+	array(
+		'download_url' => 'https://github.com/x/y/releases/download/v1/x.zip',
+		'fallback_url' => 'https://codeload.github.com/x/y/zip/refs/heads/main',
+	)
+);
+
+spk_assert(
+	false !== strpos( $spk_primary, 'releases/download' ),
+	'به‌روزرسان: نشانی سالم Release جایگزین نمی‌شود'
+);
+
+remove_filter( 'pre_http_request', $spk_head_200, 10 );
+
 // ── ۲۷: محدودیت نسخهٔ رایگان ──────────────────────────────────────
 //
 // بدون محدودیت، لایسنس فقط یک برچسب است: کاربر بدون کلید همهٔ
@@ -5247,4 +5317,45 @@ if ( '' !== $spk_license_backup ) {
 }
 
 Sparkknife_Ledger_License::flush();
+
+// ۲۷.۸ — بعد از خطا، پیام موفقیت نباید نشان داده شود.
+//
+// در `handle_person_save` و `handle_transaction_save`، بلوک خطا
+// `return` نداشت. نتیجه دوگانه بود:
+//
+//   ۱) بعد از پیام خطا، پیام «با موفقیت ثبت شد» هم می‌آمد.
+//   ۲) `(int) $result` روی WP_Error عدد ۱ می‌داد، پس پیوند «ویرایش»
+//      کاربر را به صفحهٔ ویرایش شخص شمارهٔ ۱ می‌برد — کس دیگری.
+//
+// این باگ وقتی تازه دیده شد که سقف نسخهٔ رایگان اضافه شد: خطای «سقف
+// پر است» با پیام موفقیت همراه می‌شد.
+
+$spk_ctrl_src = file_get_contents(
+	SPARKKNIFE_LEDGER_DIR . 'includes/Admin/Controllers/class-sparkknife-ledger-admin-controller.php'
+);
+
+// در بلوک ثبت شخص، پس از flash_error باید return باشد.
+$spk_person_block = '';
+
+if ( preg_match( '/\$result = \$service->create\( \$input \);(.{0,1200})/s', $spk_ctrl_src, $spk_m ) ) {
+	$spk_person_block = $spk_m[1];
+}
+
+spk_assert( '' !== $spk_person_block, 'باگ ۹۶: بلوک ثبت شخص پیدا می‌شود' );
+
+spk_assert(
+	(bool) preg_match( '/redirect_back_with\([^;]+;\s*\/\*.*?\*\/\s*return;/s', $spk_person_block )
+	|| (bool) preg_match( '/redirect_back_with\([^;]+;[\s\S]{0,700}?return;/', $spk_person_block ),
+	'باگ ۹۶: پس از خطای ثبت شخص، return وجود دارد'
+);
+
+// شمارش return در بلوک تراکنش.
+$spk_tx_block = '';
+
+if ( preg_match( '/\$result = \$service->create\( \$input \);(.{0,1400}?)add_notice\(\s*\'success\'/s', $spk_ctrl_src, $spk_m2 ) ) {
+	$spk_tx_block = $spk_m2[1];
+}
+
+spk_assert( '' !== $spk_tx_block, 'باگ ۹۶: بلوک ثبت تراکنش پیدا می‌شود' );
+spk_assert( false !== strpos( $spk_tx_block, 'return;' ), 'باگ ۹۶: پس از خطای ثبت تراکنش، return وجود دارد' );
 

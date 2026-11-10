@@ -243,6 +243,18 @@ class Sparkknife_Ledger_Admin_Controller {
 		if ( is_wp_error( $result ) ) {
 			$this->flash_error( $result );
 			$this->redirect_back_with( $redirect, 0, $input );
+
+			/*
+			 * `return` بدون آن، جریان به `add_notice` می‌رسید و بعد از
+			 * خطا پیام «شخص جدید با موفقیت ثبت شد» هم نشان داده می‌شد.
+			 * بدتر: `(int) $result` روی WP_Error عدد ۱ می‌دهد، پس
+			 * پیوند «ویرایش» به شخص شمارهٔ ۱ می‌رفت — یعنی کاربر را
+			 * به صفحهٔ ویرایش کس دیگری می‌برد.
+			 *
+			 * این باگ وقتی تازه پیدا شد که سقف نسخهٔ رایگان اضافه شد:
+			 * خطای «سقف پر است» با پیام موفقیت همراه می‌شد.
+			 */
+			return;
 		}
 
 		Sparkknife_Ledger_Admin_Loader::add_notice(
@@ -427,6 +439,13 @@ class Sparkknife_Ledger_Admin_Controller {
 					admin_url( 'admin.php' )
 				)
 			);
+
+			/*
+			 * بدون `return`، بعد از خطا پیام موفقیت هم نشان داده می‌شد
+			 * و `(int) $result` روی WP_Error به شناسهٔ ۱ تبدیل می‌شد.
+			 * همان باگی که در ثبت شخص بود.
+			 */
+			return;
 		}
 
 		Sparkknife_Ledger_Admin_Loader::add_notice(

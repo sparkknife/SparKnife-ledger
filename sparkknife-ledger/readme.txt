@@ -4,7 +4,7 @@ Tags: accounting, ledger, finance, persons, jalali, persian, rtl, reports
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later, or commercial license
 License URI: https://github.com/sparkknife/SparKnife-ledger/blob/main/sparkknife-ledger/LICENSE
 Author: SparKnife

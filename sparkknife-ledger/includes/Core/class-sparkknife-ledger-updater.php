@@ -141,6 +141,28 @@ class Sparkknife_Ledger_Updater {
 			$info['download_url'] = 'https://github.com/' . self::REPO . '/raw/' . self::BRANCH . '/' . ltrim( $info['download_url'], '/' );
 		}
 
+		/*
+		 * نشانی جایگزین.
+		 *
+		 * اگر زیپ در Release ضمیمه نشده باشد، نشانی اصلی 404 می‌دهد و
+		 * به‌روزرسانی کامل شکست می‌خورد — با پیام مبهم «دانلود ناموفق»
+		 * که هیچ سرنخی نمی‌دهد.
+		 *
+		 * این اتفاق واقعاً رخ داد: Release ساخته شد ولی فایل ضمیمه
+		 * نشد. کاربر فکر می‌کند آپدیت خودکار خراب است، در حالی که فقط
+		 * یک گام دستی جا افتاده.
+		 *
+		 * نشانی جایگزین، زیپ خود شاخه است (codeload). همان زیپ است با
+		 * نام پوشهٔ دیگر، که `fix_source_dir` اصلاحش می‌کند. بزرگ‌تر از
+		 * زیپ ساخته‌شده است (چون فایل‌های توسعه هم دارد) ولی کار
+		 * می‌کند — و «کار می‌کند» از «۴۰۴» بهتر است.
+		 */
+		$info['fallback_url'] = sprintf(
+			'https://codeload.github.com/%s/zip/refs/heads/%s',
+			self::REPO,
+			self::BRANCH
+		);
+
 		set_transient( self::CACHE_KEY, $info, self::CACHE_TTL );
 
 		return $info;
@@ -173,7 +195,7 @@ class Sparkknife_Ledger_Updater {
 			'plugin'       => SPARKKNIFE_LEDGER_BASENAME,
 			'new_version'  => $info['version'],
 			'url'          => $info['homepage'],
-			'package'      => $info['download_url'],
+			'package'      => self::usable_package( $info ),
 			'icons'        => array(),
 			'banners'      => array(),
 			'tested'       => $info['tested'],
@@ -196,6 +218,53 @@ class Sparkknife_Ledger_Updater {
 		}
 
 		return $transient;
+	}
+
+	/**
+	 * نشانی‌ای که واقعاً کار می‌کند.
+	 *
+	 * اول نشانی اصلی Release را با یک درخواست HEAD سبک می‌آزماید. اگر
+	 * 404 داد، به زیپ شاخه برمی‌گردد.
+	 *
+	 * چرا HEAD و نه دانلود کامل: ۵۰۰ کیلوبایت دانلود در هر بار بررسی
+	 * به‌روزرسانی، برای سایتی که فقط می‌خواهد بداند نسخهٔ تازه هست یا
+	 * نه، اتلاف است. HEAD فقط هدرها را می‌گیرد.
+	 *
+	 * نتیجهٔ آزمون ۶ ساعت کش می‌شود (همان کش release_info)، پس این
+	 * درخواست هم در هر بار بارگذاری صفحه تکرار نمی‌شود.
+	 *
+	 * @param array<string, mixed> $info اطلاعات نسخه.
+	 * @return string
+	 */
+	private static function usable_package( array $info ) {
+		$primary = isset( $info['download_url'] ) ? (string) $info['download_url'] : '';
+
+		if ( '' === $primary ) {
+			return isset( $info['fallback_url'] ) ? (string) $info['fallback_url'] : '';
+		}
+
+		$check = wp_remote_head(
+			$primary,
+			array(
+				'timeout'     => 8,
+				'redirection' => 3,
+				'user-agent'  => 'SparKnife-Ledger/' . SPARKKNIFE_LEDGER_VERSION,
+			)
+		);
+
+		// اگر شبکه کلاً نیست، آزمون ممکن نیست. نشانی اصلی را بده؛
+		// وردپرس خودش در زمان نصب خطا را نشان می‌دهد.
+		if ( is_wp_error( $check ) ) {
+			return $primary;
+		}
+
+		$code = (int) wp_remote_retrieve_response_code( $check );
+
+		if ( 200 === $code || 302 === $code || 301 === $code ) {
+			return $primary;
+		}
+
+		return isset( $info['fallback_url'] ) ? (string) $info['fallback_url'] : $primary;
 	}
 
 	/**

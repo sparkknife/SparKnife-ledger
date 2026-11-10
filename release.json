@@ -1,10 +1,10 @@
 {
-  "version": "1.2.0",
-  "download_url": "https://github.com/sparkknife/SparKnife-ledger/releases/download/v1.2.0/sparkknife-ledger-1.2.0.zip",
+  "version": "1.3.0",
+  "download_url": "https://github.com/sparkknife/SparKnife-ledger/releases/download/v1.3.0/sparkknife-ledger-1.3.0.zip",
   "requires": "6.0",
   "tested": "6.8.3",
   "requires_php": "7.4",
   "last_updated": "2026-11-10",
   "homepage": "https://github.com/sparkknife/SparKnife-ledger",
-  "changelog": "<h4>1.2.0</h4><ul><li>نسخهٔ ۱٫۲٫۰ — رابط گرافیکی لایسنس، به‌روزرسانی خودکار، لوگو، محدودیت نسخهٔ رایگان</li></ul>"
+  "changelog": "<h4>1.3.0</h4><ul><li>محدودیت نسخهٔ رایگان (۵۰ شخص، ۵۰۰ تراکنش)، رفع باگ پیام موفقیت بعد از خطا</li></ul>"
 }
