@@ -35,6 +35,8 @@ class Sparkknife_Ledger_Autoloader {
 		'Sparkknife_Ledger_Sanitizer',
 		'Sparkknife_Ledger_Validator',
 		'Sparkknife_Ledger_Installer',
+		'Sparkknife_Ledger_Gate',
+		'Sparkknife_Ledger_Updater',
 	);
 
 	/**

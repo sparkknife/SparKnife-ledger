@@ -49,6 +49,7 @@ class Sparkknife_Ledger_Health_Controller {
 				'log'      => Sparkknife_Ledger_Security::get_log( 25 ),
 				'license'  => Sparkknife_Ledger_License::state( true ),
 				'license_key' => Sparkknife_Ledger_License::key(),
+				'usage'    => Sparkknife_Ledger_Gate::usage(),
 				'current'  => 'health',
 			)
 		);

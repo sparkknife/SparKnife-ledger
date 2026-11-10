@@ -5120,3 +5120,131 @@ if ( is_readable( $spk_manifest_path ) ) {
 	}
 }
 
+// ── ۲۷: محدودیت نسخهٔ رایگان ──────────────────────────────────────
+//
+// بدون محدودیت، لایسنس فقط یک برچسب است: کاربر بدون کلید همهٔ
+// قابلیت‌ها را دارد و دلیلی برای خرید ندارد. این آزمون‌ها تضمین
+// می‌کنند سقف واقعاً اعمال شود، نه فقط در صفحه نمایش داده شود.
+
+spk_assert( class_exists( 'Sparkknife_Ledger_Gate' ), 'محدودیت: کلاس Gate بارگذاری می‌شود' );
+
+// وضعیت لایسنس را برای آزمون کنترل می‌کنیم.
+$spk_license_backup = Sparkknife_Ledger_License::key();
+Sparkknife_Ledger_License::remove_key();
+Sparkknife_Ledger_License::flush();
+
+// اطمینان از اینکه هیچ لایسنس معتبری از آزمون‌های قبلی نمانده.
+spk_assert( ! Sparkknife_Ledger_License::is_active(), 'محدودیت: پیش‌نیاز — بدون لایسنس' );
+
+/**
+ * باز کردن موقت همهٔ قابلیت‌ها برای آزمودن مسیر «لایسنس‌دار».
+ *
+ * @return callable
+ */
+$spk_open_all = static function () {
+	return true;
+};
+
+// ۲۷.۱ — زیر سقف مجاز است.
+$spk_allowed = Sparkknife_Ledger_Gate::can_add_person( Sparkknife_Ledger_Gate::FREE_PERSONS - 1 );
+
+spk_assert( true === $spk_allowed, 'محدودیت: یک شخص زیر سقف مجاز است' );
+
+// ۲۷.۲ — روی سقف رد می‌شود.
+$spk_blocked = Sparkknife_Ledger_Gate::can_add_person( Sparkknife_Ledger_Gate::FREE_PERSONS );
+
+spk_assert( is_wp_error( $spk_blocked ), 'محدودیت: شخص روی سقف رد می‌شود' );
+spk_equals( 'sparkknife_ledger_limit_persons', $spk_blocked->get_error_code(), 'محدودیت: کد خطای سقف شخص درست است' );
+
+// پیام نباید ارقام لاتین داشته باشد؛ رابط فارسی است.
+spk_assert(
+	false === strpos( $spk_blocked->get_error_message(), (string) Sparkknife_Ledger_Gate::FREE_PERSONS ),
+	'محدودیت: عدد سقف در پیام با ارقام لاتین نوشته نمی‌شود'
+);
+
+// ۲۷.۳ — سقف تراکنش.
+$spk_tx_blocked = Sparkknife_Ledger_Gate::can_add_transaction( Sparkknife_Ledger_Gate::FREE_TRANSACTIONS );
+
+spk_assert( is_wp_error( $spk_tx_blocked ), 'محدودیت: تراکنش روی سقف رد می‌شود' );
+spk_equals( 'sparkknife_ledger_limit_transactions', $spk_tx_blocked->get_error_code(), 'محدودیت: کد خطای سقف تراکنش درست است' );
+
+spk_assert(
+	true === Sparkknife_Ledger_Gate::can_add_transaction( Sparkknife_Ledger_Gate::FREE_TRANSACTIONS - 1 ),
+	'محدودیت: یک تراکنش زیر سقف مجاز است'
+);
+
+// ۲۷.۴ — قابلیت‌های pro بدون لایسنس بسته‌اند.
+spk_assert( ! Sparkknife_Ledger_Gate::is_open( 'excel' ), 'محدودیت: خروجی اکسل بدون لایسنس بسته است' );
+spk_assert( ! Sparkknife_Ledger_Gate::is_open( 'multi' ), 'محدودیت: گزارش چند-شخصی بدون لایسنس بسته است' );
+
+// ۲۷.۵ — سرویس واقعی هم باید رد کند، نه فقط Gate.
+$spk_person_svc = Sparkknife_Ledger_Person_Service::instance();
+$spk_person_repo = Sparkknife_Ledger_Person_Repository::instance();
+
+$spk_room  = Sparkknife_Ledger_Gate::FREE_PERSONS - $spk_person_repo->count_by_status( 'all' );
+$spk_added = 0;
+
+// تا سقف پر می‌کنیم (اگر جا باشد).
+if ( $spk_room > 0 ) {
+	for ( $spk_i = 0; $spk_i < $spk_room; $spk_i++ ) {
+		$spk_new = $spk_person_svc->create(
+			array(
+				'name'  => 'آزمون سقف ' . wp_generate_password( 8, false ),
+				'phone' => '',
+			)
+		);
+
+		if ( ! is_wp_error( $spk_new ) ) {
+			$spk_added++;
+		}
+	}
+}
+
+$spk_now = $spk_person_repo->count_by_status( 'all' );
+
+spk_assert( $spk_now >= Sparkknife_Ledger_Gate::FREE_PERSONS, 'محدودیت: شمارش به سقف رسید' );
+
+$spk_overflow = $spk_person_svc->create(
+	array(
+		'name'  => 'آزمون سرریز ' . wp_generate_password( 8, false ),
+		'phone' => '',
+	)
+);
+
+spk_assert( is_wp_error( $spk_overflow ), 'محدودیت: سرویس واقعی شخص را روی سقف رد می‌کند' );
+spk_equals( 'sparkknife_ledger_limit_persons', $spk_overflow->get_error_code(), 'محدودیت: سرویس همان کد خطا را می‌دهد' );
+
+// ۲۷.۶ — با لایسنس، سقف باید برداشته شود.
+add_filter( 'sparkknife_ledger_feature_open', $spk_open_all );
+
+spk_assert( Sparkknife_Ledger_Gate::is_open( 'persons' ), 'محدودیت: با لایسنس، اشخاص باز است' );
+spk_assert( true === Sparkknife_Ledger_Gate::can_add_person( 99999 ), 'محدودیت: با لایسنس سقف شخص برداشته می‌شود' );
+spk_assert( true === Sparkknife_Ledger_Gate::can_add_transaction( 99999 ), 'محدودیت: با لایسنس سقف تراکنش برداشته می‌شود' );
+spk_assert( Sparkknife_Ledger_Gate::is_open( 'excel' ), 'محدودیت: با لایسنس خروجی اکسل باز است' );
+
+// سرویس واقعی هم باید بپذیرد.
+$spk_over_ok = $spk_person_svc->create(
+	array(
+		'name'  => 'آزمون با لایسنس ' . wp_generate_password( 8, false ),
+		'phone' => '',
+	)
+);
+
+spk_assert( ! is_wp_error( $spk_over_ok ), 'محدودیت: با لایسنس، سرویس شخص را روی سقف می‌پذیرد' );
+
+remove_filter( 'sparkknife_ledger_feature_open', $spk_open_all );
+
+// ۲۷.۷ — usage باید اعداد درست بدهد.
+$spk_usage = Sparkknife_Ledger_Gate::usage();
+
+spk_assert( isset( $spk_usage['persons']['used'] ), 'محدودیت: usage تعداد اشخاص را می‌دهد' );
+spk_equals( Sparkknife_Ledger_Gate::FREE_PERSONS, $spk_usage['persons']['limit'], 'محدودیت: usage سقف درست را می‌دهد' );
+spk_assert( $spk_usage['persons']['used'] >= Sparkknife_Ledger_Gate::FREE_PERSONS, 'محدودیت: usage تعداد واقعی را می‌دهد' );
+
+// بازگرداندن لایسنس اولیه.
+if ( '' !== $spk_license_backup ) {
+	Sparkknife_Ledger_License::save_key( $spk_license_backup );
+}
+
+Sparkknife_Ledger_License::flush();
+

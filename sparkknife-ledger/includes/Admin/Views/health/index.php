@@ -178,6 +178,62 @@ require __DIR__ . '/../partials/header.php';
 	<?php endif; ?>
 </section>
 
+<?php /* ── مصرف نسخهٔ رایگان ─────────────────────────────────── */ ?>
+<?php if ( isset( $usage ) && ! $usage['licensed'] ) : ?>
+<section class="spk-card">
+	<h2 class="spk-card__title"><?php esc_html_e( 'مصرف نسخهٔ رایگان', 'sparkknife-ledger' ); ?></h2>
+
+	<p class="spk-muted">
+		<?php esc_html_e( 'نسخهٔ رایگان سقف دارد. با لایسنس، سقف برداشته می‌شود.', 'sparkknife-ledger' ); ?>
+	</p>
+
+	<?php
+	$spk_meters = array(
+		array(
+			'label' => __( 'اشخاص', 'sparkknife-ledger' ),
+			'data'  => $usage['persons'],
+		),
+		array(
+			'label' => __( 'تراکنش‌ها', 'sparkknife-ledger' ),
+			'data'  => $usage['transactions'],
+		),
+	);
+	?>
+
+	<?php foreach ( $spk_meters as $spk_meter ) : ?>
+		<?php
+		$spk_m      = $spk_meter['data'];
+		$spk_full   = ! empty( $spk_m['full'] );
+		$spk_pct    = (int) $spk_m['pct'];
+		$spk_class  = $spk_full ? 'is-negative' : ( $spk_pct >= 90 ? 'is-warn' : 'is-ok' );
+		?>
+		<div class="spk-meter">
+			<div class="spk-meter__head">
+				<span class="spk-meter__label"><?php echo esc_html( $spk_meter['label'] ); ?></span>
+				<span class="spk-meter__value">
+					<?php
+					printf(
+						/* translators: 1: used, 2: limit */
+						esc_html__( '%1$s از %2$s', 'sparkknife-ledger' ),
+						esc_html( Sparkknife_Ledger_Money::digits( (string) $spk_m['used'] ) ),
+						esc_html( Sparkknife_Ledger_Money::digits( (string) $spk_m['limit'] ) )
+					);
+					?>
+				</span>
+			</div>
+			<div class="spk-meter__track">
+				<div class="spk-meter__fill <?php echo esc_attr( $spk_class ); ?>" style="width: <?php echo esc_attr( (string) $spk_pct ); ?>%"></div>
+			</div>
+			<?php if ( $spk_full ) : ?>
+				<p class="spk-meter__full">
+					<?php esc_html_e( 'سقف پر شده. برای ادامه، لایسنس فعال کنید.', 'sparkknife-ledger' ); ?>
+				</p>
+			<?php endif; ?>
+		</div>
+	<?php endforeach; ?>
+</section>
+<?php endif; ?>
+
 <?php /* ── گزارش امنیتی ───────────────────────────────────────── */ ?>
 <section class="spk-card">
 	<h2 class="spk-card__title"><?php esc_html_e( 'رویدادهای امنیتی', 'sparkknife-ledger' ); ?></h2>

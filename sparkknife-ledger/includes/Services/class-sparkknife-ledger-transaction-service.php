@@ -158,6 +158,15 @@ class Sparkknife_Ledger_Transaction_Service {
 			return $validated;
 		}
 
+		// سقف نسخهٔ رایگان؛ پیش از تولید شمارهٔ مرجع تا شمارهٔ بی‌مصرف نسازیم.
+		$allowed = Sparkknife_Ledger_Gate::can_add_transaction(
+			Sparkknife_Ledger_Transaction_Repository::instance()->count( 'all' )
+		);
+
+		if ( is_wp_error( $allowed ) ) {
+			return $allowed;
+		}
+
 		$validated['reference'] = $this->generate_reference( $validated['txn_date'] );
 
 		$id = Sparkknife_Ledger_DB::transaction(

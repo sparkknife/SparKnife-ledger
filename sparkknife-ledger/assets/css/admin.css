@@ -1469,3 +1469,64 @@ textarea.spk-input { min-height: 84px; resize: vertical; }
 @media (prefers-reduced-motion: reduce) {
 	.spk-wrap * { transition: none !important; animation: none !important; }
 }
+
+/* ── نوار مصرف نسخهٔ رایگان ──────────────────────────────────────── */
+
+.spk-meter {
+	margin-bottom: 18px;
+}
+
+.spk-meter:last-child {
+	margin-bottom: 0;
+}
+
+.spk-meter__head {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	margin-bottom: 6px;
+	gap: 12px;
+}
+
+.spk-meter__label {
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.spk-meter__value {
+	font-size: 12.5px;
+	color: var(--spk-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.spk-meter__track {
+	height: 8px;
+	border-radius: 100px;
+	background: var(--spk-line, #e2e8f0);
+	overflow: hidden;
+}
+
+.spk-meter__fill {
+	height: 100%;
+	border-radius: 100px;
+	transition: width .3s ease;
+}
+
+.spk-meter__fill.is-ok {
+	background: var(--spk-brand);
+}
+
+.spk-meter__fill.is-warn {
+	background: #b45309;
+}
+
+.spk-meter__fill.is-negative {
+	background: var(--spk-bad, #b91c1c);
+}
+
+.spk-meter__full {
+	margin: 6px 0 0;
+	font-size: 12.5px;
+	color: var(--spk-bad, #b91c1c);
+	font-weight: 600;
+}

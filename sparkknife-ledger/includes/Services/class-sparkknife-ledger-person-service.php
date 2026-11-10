@@ -59,6 +59,21 @@ class Sparkknife_Ledger_Person_Service {
 			return $validated;
 		}
 
+		/*
+		 * سقف نسخهٔ رایگان.
+		 *
+		 * بررسی پیش از جستجوی تکراری است تا کاربری که به سقف رسیده
+		 * پیام «تکراری است» نگیرد — پیام گمراه‌کننده‌ای که فکر می‌کند
+		 * مشکل از نام است.
+		 */
+		$allowed = Sparkknife_Ledger_Gate::can_add_person(
+			Sparkknife_Ledger_Person_Repository::instance()->count_by_status( 'all' )
+		);
+
+		if ( is_wp_error( $allowed ) ) {
+			return $allowed;
+		}
+
 		$existing = $this->find_duplicate( $validated['name'], $validated['phone'] );
 
 		if ( $existing ) {

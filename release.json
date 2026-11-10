@@ -1,10 +1,10 @@
 {
   "version": "1.2.0",
-  "download_url": "build/sparkknife-ledger-1.2.0.zip",
+  "download_url": "https://github.com/sparkknife/SparKnife-ledger/releases/download/v1.2.0/sparkknife-ledger-1.2.0.zip",
   "requires": "6.0",
   "tested": "6.8.3",
   "requires_php": "7.4",
   "last_updated": "2026-11-10",
   "homepage": "https://github.com/sparkknife/SparKnife-ledger",
-  "changelog": "<h4>۱٫۲٫۰</h4><ul><li>رفع پنج باگ گزارش‌شده: دکمه‌های سربرگ (افزودن شخص، CSV، چاپ)، صفحهٔ حذف‌شده‌ها، نمایش مبلغ در تاریخچه (۵۰۰٬۰۰۰ به‌جای ۵۰)، انتخاب شخص در گزارش فردی، و چیدمان مبالغ در متن راست‌به‌چپ</li><li>ابزار یک‌جا برای لایسنس: setup، key، pack، status</li><li>لوگوی اختصاصی در هدر و منوی وردپرس</li><li>به‌روزرسانی خودکار از همین صفحه</li></ul>"
+  "changelog": "<h4>1.2.0</h4><ul><li>نسخهٔ ۱٫۲٫۰ — رابط گرافیکی لایسنس، به‌روزرسانی خودکار، لوگو، محدودیت نسخهٔ رایگان</li></ul>"
 }
