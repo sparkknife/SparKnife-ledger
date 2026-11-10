@@ -98,10 +98,17 @@ ls
 از همان ترمینال:
 
 ```bash
-bash tools/licensing/make-keys.sh
+bash tools/licensing/sparkknife.sh setup
 ```
 
 **همین. نه PHP لازم است، نه نصب چیزی.**
+
+> **تازه:** یک ابزار جای همهٔ اسکریپت‌های قبلی را گرفته. سه دستور دارد و
+> کارهای دستی را خودش انجام می‌دهد: `setup`، `key`، `pack`، `status`.
+> راهنمای کامل: `docs/LICENSE-QUICKSTART.md`
+>
+> `make-keys.sh` و `issue.sh` هنوز کار می‌کنند، ولی لازم نیست از هر سه
+> استفاده کنید — `sparkknife.sh` هر سه را در یک جا دارد.
 
 ### ۳.۱ چه می‌کند
 
@@ -148,7 +155,7 @@ MIIG/AIBADANBgkqhkiG9w0BAQEFAASCBuYwggbiAgEAAoIBgQ...
 | --- | --- | --- |
 | `✗ openssl پیدا نشد` | Git Bash نیست | Git for Windows را نصب کنید |
 | `✗ فایل افزونه پیدا نشد` | از پوشهٔ اشتباه اجرا شد | گام ۲.۴ |
-| `⚠️ کلید خصوصی از قبل وجود دارد` | قبلاً ساخته‌اید | اگر مطمئنید: `bash tools/licensing/make-keys.sh --force` |
+| `⚠️ کلید خصوصی از قبل وجود دارد` | قبلاً ساخته‌اید | اگر مطمئنید: `bash tools/licensing/sparkknife.sh setup --force` |
 | `✗ کلید در فایل نتیجه کامل نیست` | مشکل در نوشتن فایل | فایل را برگردانید: `git checkout -- sparkknife-ledger/includes/Core/class-sparkknife-ledger-license.php` |
 
 ---
@@ -327,7 +334,7 @@ ls
 | `php: command not found` | PHP نیست | گام ۷.۲ — می‌توانید بگذرید |
 | `openssl: command not found` | Git Bash نیست | گام ۲.۳ |
 | `✗ فایل افزونه پیدا نشد` | زیپ ناقص | زیپ درست را دانلود کنید |
-| لایسنس نمی‌پذیرد | گام ۳ نیمه‌کاره | `bash tools/licensing/make-keys.sh --force` |
+| لایسنس نمی‌پذیرد | گام ۳ نیمه‌کاره | `bash tools/licensing/sparkknife.sh status` بزنید و راهنمایش را دنبال کنید |
 | صفحهٔ سفید | خطای PHP | گام ۶.۴ |
 | CSV فارسی به‌هم‌ریخته | تنظیمات اکسل | Data → From Text → جداکننده ویرگول |
 
@@ -337,7 +344,8 @@ ls
 
 | مورد | نتیجه |
 | --- | --- |
-| `make-keys.sh` روی زیپ دانلودشده از GitHub | ✓ کلید ساخت، `PUBLIC_KEY` عوض شد |
+| `sparkknife.sh setup` روی زیپ دانلودشده از GitHub | ✓ کلید ساخت، `PUBLIC_KEY` عوض شد |
+| `sparkknife.sh` از صفر تا نصب زیپ | ✓ setup → key → pack → لایسنس `pro` در وردپرس واقعی |
 | لایسنس با آن کلید در افزونه | ✓ `openssl_verify = 1` |
 | ۹۹۰ آزمون | صفر شکست |
 | PHP 7.4 تا 8.5 | همه بدون هشدار |
