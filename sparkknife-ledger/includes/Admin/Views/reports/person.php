@@ -178,17 +178,17 @@ require __DIR__ . '/../partials/nav.php';
 	</div>
 
 	<?php
-	$hidden_form_args = array();
-
-	if ( $person_id ) {
-		$hidden_form_args['person_id'] = $person_id;
-	}
-
+	/*
+	 * `person_id` پیش‌تر هم فیلد مخفی بود و هم قرار بود انتخابگر باشد.
+	 * اگر هر دو با هم به فرم می‌رفتند، فیلد مخفی مقدار انتخاب‌شده را
+	 * بازنویسی می‌کرد و انتخاب کاربر بی‌اثر می‌شد. حالا فقط انتخابگر
+	 * هست و `show_person` روشن است تا کاربر بتواند بین اشخاص جابه‌جا شود.
+	 */
 	Sparkknife_Ledger_Renderer::view(
 		'partials/filter-form',
 		array(
 			'action'      => admin_url( 'admin.php' ),
-			'hidden'      => array_merge( array( 'page' => 'sparkknife-ledger-reports' ), $hidden_form_args ),
+			'hidden'      => array( 'page' => 'sparkknife-ledger-reports' ),
 			'range'       => $args['range'],
 			'date_from'   => $args['date_from'],
 			'date_to'     => $args['date_to'],
@@ -197,7 +197,7 @@ require __DIR__ . '/../partials/nav.php';
 			'search'      => $args['search'],
 			'persons'     => $persons,
 			'person_id'   => $person_id,
-			'show_person' => false,
+			'show_person' => true,
 		)
 	);
 	?>

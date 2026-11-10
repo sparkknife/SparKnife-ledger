@@ -2,9 +2,10 @@
 /**
  * سربرگ مشترک صفحات افزونه.
  *
- * @var string $title       عنوان صفحه.
- * @var string $description توضیح کوتاه.
- * @var array  $actions     دکمه‌های سمت چپ (label, url, class).
+ * @var string $title          عنوان صفحه.
+ * @var string $description    توضیح کوتاه.
+ * @var array  $header_actions دکمه‌های سمت چپ (label, url, class).
+ * @var array  $actions        نام قدیمی همان متغیر؛ برای سازگاری عقب‌رو.
  *
  * @author  SparKnife <155084046+sparkknife@users.noreply.github.com>
  *
@@ -15,8 +16,22 @@ defined( 'ABSPATH' ) || exit;
 
 $title       = isset( $title ) ? $title : '';
 $description = isset( $description ) ? $description : '';
-$actions     = isset( $actions ) && is_array( $actions ) ? $actions : array();
 $current_tab = isset( $current_tab ) ? $current_tab : '';
+
+/*
+ * صفحه‌ها دکمه‌های سربرگ را در `$header_actions` می‌سازند، اما این قالب
+ * تا نسخهٔ ۱.۱.۰ فقط `$actions` را می‌خواند. نتیجه: هر ۹ صفحه‌ای که دکمهٔ
+ * سربرگ داشت (افزودن شخص، خروجی CSV، چاپ، افزودن تراکنش…) بی‌صدا دکمه‌اش
+ * را از دست می‌داد — بدون هیچ خطایی، چون `isset()` روی متغیر تعریف‌نشده
+ * فقط `false` می‌دهد.
+ *
+ * حالا هر دو نام پذیرفته می‌شوند و `$header_actions` اولویت دارد.
+ */
+if ( isset( $header_actions ) && is_array( $header_actions ) ) {
+	$actions = $header_actions;
+} else {
+	$actions = isset( $actions ) && is_array( $actions ) ? $actions : array();
+}
 ?>
 <div class="spk-wrap" dir="rtl">
 	<header class="spk-header">

@@ -178,6 +178,14 @@ class Sparkknife_Ledger_Transaction_Service {
 				'reference'   => array( 'from' => null, 'to' => $validated['reference'] ),
 				'person_id'   => array( 'from' => null, 'to' => $validated['person_id'] ),
 				'type'        => array( 'from' => null, 'to' => $validated['type'] ),
+				/*
+				 * مبلغ در تاریخچه به شکل انسانی ذخیره می‌شود، نه مقیاس‌شده.
+				 * `present_for_display()` هم همین انتظار را دارد و با
+				 * `format( $value, false )` نمایشش می‌دهد. اگر یک‌جا
+				 * مقیاس‌شده و جای دیگر انسانی ذخیره شود، یک مسیر ۱۰٬۰۰۰
+				 * برابر خطا می‌دهد و مسیر دیگر درست است — و تفاوتشان فقط
+				 * وقتی دیده می‌شود که کاربر همان ردیف را باز کند.
+				 */
 				'amount'      => array( 'from' => null, 'to' => Sparkknife_Ledger_Money::to_human( $validated['amount'] ) ),
 				'txn_date'    => array( 'from' => null, 'to' => $validated['txn_date'] ),
 				'description' => array( 'from' => null, 'to' => Sparkknife_Ledger_Sanitizer::limit( $validated['description'], 200 ) ),

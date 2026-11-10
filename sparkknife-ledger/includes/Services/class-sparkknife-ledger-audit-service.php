@@ -471,7 +471,16 @@ class Sparkknife_Ledger_Audit_Service {
 		}
 
 		if ( 'amount' === $field && is_numeric( $value ) ) {
-			return Sparkknife_Ledger_Money::format( (int) $value );
+			/*
+			 * تاریخچه مبلغ را به شکل «انسانی» ذخیره می‌کند (مثلاً «500000»
+			 * برای پانصد هزار تومان) نه به شکل مقیاس‌شده (5000000000).
+			 * اگر اینجا دوباره مقیاس‌شده فرض شود، هر مبلغ ۱۰٬۰۰۰ برابر
+			 * کوچک‌تر نشان داده می‌شود: ۵۰۰٬۰۰۰ تومان می‌شود «۵۰ تومان».
+			 *
+			 * `format()` با `$scaled = false` رشته را همان‌طور که هست
+			 * جداکننده می‌زند و واحد را می‌چسباند، بدون تقسیم بر مقیاس.
+			 */
+			return Sparkknife_Ledger_Money::format( (string) $value, false );
 		}
 
 		return $value;

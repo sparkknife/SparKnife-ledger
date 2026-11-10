@@ -4802,3 +4802,136 @@ spk_equals(
 
 update_option( Sparkknife_Ledger_Installer::VERSION_OPTION, $v_before );
 Sparkknife_Ledger_Installer::maybe_upgrade();
+
+// ── ۲۵ح: دکمه‌های سربرگ در همهٔ صفحه‌ها رندر می‌شوند ───────────────
+// قالب `partials/header.php` متغیر `$actions` را می‌خواند، ولی هر ۹
+// صفحهٔ افزونه دکمه‌ها را در `$header_actions` می‌ساختند. نتیجه: دکمهٔ
+// «افزودن شخص جدید»، «خروجی CSV»، «چاپ» و «افزودن تراکنش» همه بی‌صدا
+// ناپدید می‌شدند — بدون خطا، چون `isset()` روی متغیر تعریف‌نشده فقط
+// `false` می‌دهد.
+//
+// کاربر فقط می‌دید «جایی برای افزودن شخص نیست» و دلیلی برایش پیدا
+// نمی‌شد، چون صفحه سالم رندر می‌شد.
+
+$header_html = Sparkknife_Ledger_Renderer::capture(
+	'partials/header',
+	array(
+		'title'          => 'عنوان آزمون',
+		'header_actions' => array(
+			array(
+				'label' => 'دکمهٔ آزمون',
+				'url'   => 'https://example.com/x',
+				'class' => 'spk-btn--primary',
+			),
+		),
+	)
+);
+
+spk_assert( false !== strpos( $header_html, 'spk-header__actions' ), 'باگ ۹۱: بخش دکمه‌های سربرگ رندر می‌شود' );
+spk_assert( false !== strpos( $header_html, 'دکمهٔ آزمون' ), 'باگ ۹۱: دکمهٔ سربرگ در خروجی دیده می‌شود' );
+spk_assert( false !== strpos( $header_html, 'https://example.com/x' ), 'باگ ۹۱: نشانی دکمهٔ سربرگ حفظ می‌شود' );
+
+// نام قدیمی `$actions` هم باید کار کند (سازگاری عقب‌رو).
+$header_html_old = Sparkknife_Ledger_Renderer::capture(
+	'partials/header',
+	array(
+		'title'   => 'عنوان آزمون',
+		'actions' => array(
+			array(
+				'label' => 'دکمهٔ قدیمی',
+				'url'   => 'https://example.com/y',
+			),
+		),
+	)
+);
+
+spk_assert( false !== strpos( $header_html_old, 'دکمهٔ قدیمی' ), 'باگ ۹۱: نام قدیمی $actions هم پذیرفته می‌شود' );
+
+// ── ۲۵ط: `view` به قالب می‌رسد و حالت «حذف‌شده‌ها» کار می‌کند ────────
+// پارامتر `Renderer::view()` نامش `$view` بود و `extract( …, EXTR_SKIP )`
+// هر متغیر هم‌نام را رد می‌کند. پس کلید `view` هرگز به قالب نمی‌رسید و
+// صفحهٔ «حذف‌شده‌ها» همیشه حالت `all` را نشان می‌داد: عنوان «مدیریت
+// اشخاص» می‌شد و تب درست فعال نمی‌شد.
+//
+// همان اشتباهی که پیش‌تر برای `args` رخ داده بود و آن را با تغییر نام
+// پارامتر به `$view_data` حل کرده بودند؛ برای `view` تکرار شده بود.
+
+$view_state = array();
+
+$spk_view_probe = static function ( $view, array $data ) use ( &$view_state ) {
+	$view_state['view'] = isset( $view ) ? $view : '(تعریف‌نشده)';
+};
+
+$spk_renderer_class = new ReflectionClass( 'Sparkknife_Ledger_Renderer' );
+
+// قالب آزمون را در پوشهٔ موقت می‌سازیم و مسیرش را با فیلتر تزریق می‌کنیم.
+$spk_probe_dir = trailingslashit( get_temp_dir() ) . 'spk-view-probe-' . wp_generate_password( 6, false );
+wp_mkdir_p( $spk_probe_dir );
+file_put_contents( $spk_probe_dir . '/probe.php', '<?php $GLOBALS["spk_probe_view"] = isset( $view ) ? $view : "(تعریف‌نشده)";' );
+
+$spk_filter = static function ( $candidates, $view ) use ( $spk_probe_dir ) {
+	if ( 'probe-view-test' === $view ) {
+		return array( $spk_probe_dir . '/probe.php' );
+	}
+
+	return $candidates;
+};
+
+add_filter( 'sparkknife_ledger_view_paths', $spk_filter, 10, 2 );
+
+$GLOBALS['spk_probe_view'] = null;
+Sparkknife_Ledger_Renderer::view( 'probe-view-test', array( 'view' => 'deleted', 'other' => 'x' ) );
+
+remove_filter( 'sparkknife_ledger_view_paths', $spk_filter, 10 );
+
+spk_equals( 'deleted', isset( $GLOBALS['spk_probe_view'] ) ? $GLOBALS['spk_probe_view'] : null, 'باگ ۹۲: کلید view به قالب می‌رسد' );
+
+// ── ۲۵ی: مبلغ در تاریخچه ۱۰٬۰۰۰ برابر کوچک نشان داده نمی‌شود ────────
+// تاریخچه `amount` را به شکل انسانی ذخیره می‌کند (`to_human` → «500000»
+// برای پانصد هزار تومان)، ولی `present_for_display()` آن را مقیاس‌شده
+// فرض می‌کرد و دوباره بر ۱۰٬۰۰۰ تقسیم می‌کرد. نتیجه: ۵۰۰٬۰۰۰ تومان
+// می‌شد «۵۰ تومان» — و کاربر فکر می‌کرد مبلغ اشتباه ثبت شده.
+
+$audit_svc = Sparkknife_Ledger_Audit_Service::instance();
+
+$disp_500k = $audit_svc->present_for_display( 'amount', '500000' );
+
+spk_assert( false === strpos( $disp_500k, '۵۰ ' ), 'باگ ۹۳: پانصد هزار تومان به «۵۰ تومان» تبدیل نمی‌شود' );
+spk_assert( false !== strpos( $disp_500k, '۵۰۰' ), 'باگ ۹۳: پانصد هزار تومان با ارقام درست نشان داده می‌شود' );
+
+$disp_50 = $audit_svc->present_for_display( 'amount', '50' );
+
+spk_assert( false !== strpos( $disp_50, '۵۰' ), 'باگ ۹۳: پنجاه تومان درست نمایش داده می‌شود' );
+
+// ── ۲۵ک: مبالغ در متن راست‌به‌چپ جدا می‌شوند ───────────────────────
+// ارقام فارسی در یونیکد «عربی» طبقه‌بندی می‌شوند و کاما جهتش خنثی است.
+// نتیجه در متن RTL این بود که مرورگر «۵۰۰,۰۰۰» را «۰۰۰,۵۰۰» می‌چید.
+// عدد باید داخل LRI…PDI بیاید تا به‌عنوان یک واحد چپ‌به‌راست بماند.
+
+$bidi_out = Sparkknife_Ledger_Money::format( 5000000000 );
+
+spk_assert( false !== strpos( $bidi_out, "\u{2066}" ), 'باگ ۹۴: مبلغ با LRI آغاز می‌شود' );
+spk_assert( false !== strpos( $bidi_out, "\u{2069}" ), 'باگ ۹۴: مبلغ با PDI بسته می‌شود' );
+
+// ترتیب ارقام و جداکننده باید همان باشد که هست.
+spk_assert(
+	false !== strpos( $bidi_out, '۵۰۰' . Sparkknife_Ledger_Money::thousands_separator() . '۰۰۰' . "\u{2069}" ),
+	'باگ ۹۴: ترتیب ارقام و جداکننده حفظ می‌شود'
+);
+
+// ── ۲۵ل: انتخابگر شخص در گزارش فردی وجود دارد ─────────────────────
+// گزارش فردی همیشه اولین شخص را نشان می‌داد و هیچ راهی برای عوض کردنش
+// نبود. کاربر مجبور بود از فهرست اشخاص وارد شود. انتخابگر عمداً با
+// `show_person => false` خاموش شده بود و `person_id` هم فیلد مخفی بود.
+
+$report_src = file_get_contents(
+	SPARKKNIFE_LEDGER_DIR . 'includes/Admin/Views/reports/person.php'
+);
+
+spk_assert( false !== strpos( $report_src, "'show_person' => true" ), 'باگ ۹۵: گزارش فردی انتخابگر شخص را روشن می‌کند' );
+spk_assert( false === strpos( $report_src, "'show_person' => false" ), 'باگ ۹۵: انتخابگر شخص دیگر خاموش نیست' );
+spk_assert(
+	false === strpos( $report_src, "\$hidden_form_args['person_id']" ),
+	'باگ ۹۵: person_id دیگر فیلد مخفی نیست (وگرنه انتخاب کاربر را بازنویسی می‌کرد)'
+);
+
